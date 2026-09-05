@@ -1,52 +1,57 @@
 # anime-voice-sorter
 
-把一部动画拆成**按人分好组的纯净人声片段**，用于音色收集。
+给它一部动画，它把里面的说话声**按人分好组**，每组是一堆干净的语音片段。用来收集某个角色的音色。
 
 ```
-输入：  动画的若干集（视频或音轨）+ 字幕（可选）
-       可选：少量标注（每人几条样本）
+你给它：  动画的若干集（视频或音轨），字幕可给可不给
+         另外还可以给每个角色两三条样本，但不是必须的
 
-输出：  out/
-        ├─ speaker_01/  *.wav        原始采样率、无 BGM、单人、无重叠
-        ├─ speaker_02/  *.wav
-        ├─ _misc/                    时长不足以单独成组的零散说话人
-        ├─ _rejected/                被质量闸门拒收的片段（保留以便复查）
-        └─ manifest.parquet          每个片段的完整元数据与判决理由
+它给你：  out/
+          speaker_01/  一堆 wav      同一个人，没有背景音乐，没有两个人同时说话
+          speaker_02/  一堆 wav
+          _misc/                     只说了一两句的路人，不值得单独成组
+          _rejected/                 质量不达标被淘汰的片段，留着让你复查
+          manifest.parquet           一张表，记录每个片段的所有信息和淘汰原因
 ```
 
-这是一个**聚类**工具，不是分类工具：说话人数量与身份都未知，使用者事后才命名分组，甚至可以不命名。
+**它不知道有几个人，也不知道这些人是谁。** 它只负责把像的归到一起，你事后再听一听、给每组起个名字，或者干脆不起。
 
-## 状态
+## 现在到哪一步了
 
-**M1（工程骨架）完成，管线尚未实现。** 详细进度、下一个动作与阻塞项见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+**环境搭好了，流程一步都还没写。** 详细进度、下一步做什么、卡在哪，见 [`docs/STATUS.md`](docs/STATUS.md)。
 
-## 环境
+## 怎么装
 
-需要 [uv](https://docs.astral.sh/uv/)。
+需要先装 [uv](https://docs.astral.sh/uv/)。
 
 ```bash
 uv sync
 uv run avs doctor
 ```
 
-`doctor` 会报告 CUDA 可用性与各关键依赖的加载情况。开发机配置为 Windows + CUDA 12.8 轮子，CI（Linux）自动改用 CPU 轮子。
+`doctor` 会告诉你显卡能不能用、各个依赖装好了没有。
 
-diarization 用的 `pyannote/speaker-diarization-community-1` 是 gated 模型，首次使用前需在 HuggingFace 上接受条款并配置 token。
+开发机是 Windows 加独立显卡，装的是 CUDA 版本；自动检查跑在 Linux 上，会自动改装 CPU 版本，不用手动切换。
+
+切段认人用的模型需要先去 HuggingFace 网页上点同意、拿一个账号令牌，才能下载。
 
 ## 文档
 
-从 [`docs/README.md`](docs/README.md) 进，那里有索引和各文档的职责划分。
+从 [`docs/README.md`](docs/README.md) 进去，那里有导航和每份文档的分工。
 
-- [`docs/DESIGN.md`](docs/DESIGN.md)：管线结构、数据模型、失败模式、评估方法
-- [`docs/TOOLING.md`](docs/TOOLING.md)：选型的唯一事实来源，以及现成工具调研
-- [`docs/ROADMAP.md`](docs/ROADMAP.md)：进度的唯一事实来源
-- [`docs/DECISIONS.md`](docs/DECISIONS.md)：决策记录，「为什么不那样做」
-- [`docs/PRIOR_ART_AUDIT.md`](docs/PRIOR_ART_AUDIT.md)：前身项目的问题清单，已冻结
+- [`docs/GLOSSARY.md`](docs/GLOSSARY.md) —— 专业词的大白话解释，看不懂哪个词就查这里
+- [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) —— 流程怎么走，每步在解决什么问题
+- [`docs/TOOLS.md`](docs/TOOLS.md) —— 用了哪些现成工具，为什么选它
+- [`docs/STATUS.md`](docs/STATUS.md) —— 进度、下一步、卡住的地方
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) —— 做过哪些选择，为什么
+- [`docs/OLD_PROJECT.md`](docs/OLD_PROJECT.md) —— 上一版项目哪里错了
 
-## 一条贯穿全流程的红线
+## 有一个错绝对不能犯
 
-16 kHz 只用于分析，成品永远从原始采样率音轨按时间戳切。音色模型多在 40 到 48 kHz 训练，搞错会让成品**静默报废**：听感上不明显，流程里也不报错。
+分析声音用的是 16 kHz 的低采样率副本，但**最终导出的音频必须从原始采样率的音轨里切**。
+
+因为音色模型大多在 40 到 48 kHz 上训练。如果拿 16 kHz 的音频升采样回去当成品，高频信息已经永久丢了，补不回来。麻烦的是这种损坏**听着不明显、程序也不报错**，你可能训完一个音色模型才发现效果不对，还查不出原因。
 
 ## 许可
 
-TBD
+还没定。
