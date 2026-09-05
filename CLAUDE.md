@@ -4,7 +4,7 @@
 
 先读 README、docs/STATUS.md、docs/HISTORY.md。流程和指标见 docs/HOW_IT_WORKS.md；已完成实验见 docs/EXPERIMENTS.md。当前计划只维护在 STATUS，实验细节集中在 EXPERIMENTS，长期教训提炼到 HISTORY，不追加失效决策流水账。
 
-嵌入诊断已完成（runs/diagnosis）：近邻检索几乎全对，50 对漏合全部含短于 1.5 秒的片段，且多数跨集。连接规则对照也已完成：single/complete/mutual_knn 都不超过 average。当前下一步是只对短片段做整句字幕重切的针对性对照，标签必须重新精确匹配；不要把“换嵌入模型”“换聚类规则”或“继续试参考阈值”当作当前计划。重切对照尚未实施。
+嵌入诊断已完成：近邻检索几乎全对，50 对漏合全部含短于 1.5 秒的片段。single/complete/mutual_knn 都不超过 average；整句字幕重切短片段的闸门核对未通过，已停。针对短片段的 two_stage 是唯一有改善的候选（runs/groups/uma-two-stage.json），但分界与阈值都用了旧标签，尚未替换默认分组。当前下一步是给候选改动的短片段补新标签，只用新标签验证错合与漏合；不要把“换嵌入模型”“重切短片段”或“继续试参考阈值”当作当前计划。新标签验证尚未实施。
 
 ## 工作约束
 
