@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Annotated
@@ -44,6 +45,307 @@ def doctor() -> None:
             typer.echo(f"{mod:<15} ok")
         except Exception as exc:
             typer.echo(f"{mod:<15} FAILED: {exc}")
+
+
+def _vocals_of(run_dir: Path) -> Path:
+    stats_file = run_dir / "stats.json"
+    if not stats_file.exists():
+        typer.echo(f"找不到 {stats_file}，先跑一次 avs probe")
+        raise typer.Exit(1)
+    vocals = Path(json.loads(stats_file.read_text(encoding="utf-8"))["artifacts"]["vocals"])
+    if not vocals.exists():
+        typer.echo(f"找不到人声轨 {vocals}")
+        raise typer.Exit(1)
+    return vocals
+
+
+@app.command()
+def label(
+    run_dir: Annotated[Path, typer.Argument(help="probe 跑出来的目录，比如 runs/probe/ep01_v4")],
+    mode: Annotated[
+        str, typer.Option(help="names 对着画面报名字（推荐），pairs 两两比对，groups 听音分组")
+    ] = "names",
+    model: Annotated[str, typer.Option(help="pairs 模式按哪个模型的距离分档")] = "redimnet2-b6",
+    per_bin: Annotated[int, typer.Option(help="pairs 模式每档抽几对")] = 6,
+    per_speaker: Annotated[int, typer.Option(help="groups 模式每个机器分组抽几条")] = 5,
+    keep_ratio: Annotated[float, typer.Option(help="groups 模式只从音质最好的这个比例里抽")] = 0.5,
+    port: Annotated[int, typer.Option(help="本地服务用哪个端口")] = 8765,
+) -> None:
+    """人工标注，用来破掉循环论证。只听 127.0.0.1，音频不出本机。
+
+    三种模式，都看不到机器的答案。**推荐 names**，因为它的真答案来自视频而不是耳朵：
+
+    - **names（默认）**：给出时间点，你在动画里跳到那儿看是谁在说，把名字打进去。
+      片段按时间排好，视频从头拖一遍就行。这是唯一能给出「真的是谁」的模式，
+      标出来的东西还能当第 4 阶段的评估集用。
+    - **pairs**：一次放两条，问是不是同一个人。不需要视频，答完就忘。
+      配对按声纹距离分档抽，能直接量出分界线该定在哪。
+    - **groups**：听一条丢进一组。要在脑子里同时记住好几个人，一集有 9 个说话人时
+      基本记不住，实测一半的片段会被标成「听不清」。留着备用，不推荐。
+
+    进度随时存盘，下次再跑接着上次的。
+    """
+    from avs.stages.label import export_sample, load_sample, pick_sample, save_sample
+    from avs.stages.label_server import serve, write_page
+
+    if mode == "pairs":
+        return _label_pairs(run_dir, model, per_bin, port)
+    if mode == "names":
+        return _label_names(run_dir, per_speaker, keep_ratio, port)
+    if mode != "groups":
+        typer.echo(f"mode 只能是 names、pairs 或 groups，收到 {mode!r}")
+        raise typer.Exit(1)
+
+    quality_file = run_dir / "quality.json"
+    if not quality_file.exists():
+        typer.echo(f"找不到 {quality_file}，先跑一次 avs probe")
+        raise typer.Exit(1)
+    vocals = _vocals_of(run_dir)
+
+    clip_dir = run_dir / "label_clips"
+    sample_file = run_dir / "label_sample.json"
+    labels_file = run_dir / "labels.json"
+
+    if sample_file.exists():
+        sample = load_sample(sample_file)
+        typer.echo(f"接着上次的抽样，{len(sample.clips)} 条")
+    else:
+        scored = json.loads(quality_file.read_text(encoding="utf-8"))
+        scored.sort(key=lambda q: q["score"], reverse=True)
+        kept = scored[: max(1, round(len(scored) * keep_ratio))]
+        sample = pick_sample(kept, per_speaker=per_speaker)
+        save_sample(sample, sample_file)
+        typer.echo(f"从音质最好的 {len(kept)} 条里抽了 {len(sample.clips)} 条来标")
+        typer.echo(f"切片段到 {clip_dir} ……")
+        export_sample(sample, vocals, clip_dir)
+
+    labels = json.loads(labels_file.read_text(encoding="utf-8")) if labels_file.exists() else {}
+    write_page(clip_dir, sample, labels)
+
+    typer.echo(f"\n已标 {len(labels)} / {len(sample.clips)} 条")
+    typer.echo(f"打开 http://127.0.0.1:{port}/ 开始标，标完按 Ctrl+C 停掉服务")
+    try:
+        serve(clip_dir, labels_file, port)
+    except KeyboardInterrupt:
+        typer.echo(f"\n停了。结果在 {labels_file}")
+    return None
+
+
+def _label_names(run_dir: Path, per_speaker: int, keep_ratio: float, port: int) -> None:
+    """对着画面报名字。真答案来自视频，不靠耳朵，所以标出来的东西最可信。"""
+    from avs.stages.label import by_time, export_sample, load_sample, pick_sample, save_sample
+    from avs.stages.label_server import serve, write_names_page
+
+    quality_file = run_dir / "quality.json"
+    if not quality_file.exists():
+        typer.echo(f"找不到 {quality_file}，先跑一次 avs probe")
+        raise typer.Exit(1)
+    vocals = _vocals_of(run_dir)
+
+    clip_dir = run_dir / "label_clips"
+    sample_file = run_dir / "label_sample.json"
+    names_file = run_dir / "names.json"
+
+    if sample_file.exists():
+        sample = load_sample(sample_file)
+        typer.echo(f"用已有的抽样，{len(sample.clips)} 条")
+    else:
+        scored = json.loads(quality_file.read_text(encoding="utf-8"))
+        scored.sort(key=lambda q: q["score"], reverse=True)
+        kept = scored[: max(1, round(len(scored) * keep_ratio))]
+        sample = pick_sample(kept, per_speaker=per_speaker)
+        save_sample(sample, sample_file)
+        typer.echo(f"从音质最好的 {len(kept)} 条里抽了 {len(sample.clips)} 条")
+        typer.echo(f"切片段到 {clip_dir} ……")
+        export_sample(sample, vocals, clip_dir)
+
+    clips = by_time(sample)
+    names = json.loads(names_file.read_text(encoding="utf-8")) if names_file.exists() else {}
+    write_names_page(clip_dir, clips, names)
+
+    typer.echo(
+        f"\n已标 {len(names)} / {len(clips)} 条，时间点从 {clips[0]['stamp']} "
+        f"到 {clips[-1]['stamp']}"
+    )
+    typer.echo("时间戳是相对这一集音轨开头的，跟视频应该对得上，第一条先核对一下")
+    typer.echo(f"打开 http://127.0.0.1:{port}/ 开始标，标完按 Ctrl+C 停掉服务")
+    with contextlib.suppress(KeyboardInterrupt):
+        serve(clip_dir, names_file, port)
+    typer.echo(f"\n停了。结果在 {names_file}")
+    return None
+
+
+def _label_pairs(run_dir: Path, model: str, per_bin: int, port: int) -> None:
+    """两两比对模式。要先跑过 avs embed，因为配对是按声纹距离分档抽的。"""
+    import numpy as np
+
+    from avs.embeddings.extract import Embedded
+    from avs.stages.label import (
+        export_sample,
+        load_pairs,
+        load_sample,
+        pairs_report,
+        pick_pairs,
+        save_pairs,
+        save_sample,
+    )
+    from avs.stages.label_server import serve, write_pairs_page
+
+    vectors_file = run_dir / f"embeddings_{model}.npy"
+    meta_file = run_dir / f"embeddings_{model}.json"
+    if not (vectors_file.exists() and meta_file.exists()):
+        typer.echo(f"找不到 {model} 的指纹，先跑 avs embed {run_dir}")
+        raise typer.Exit(1)
+    vocals = _vocals_of(run_dir)
+
+    clip_dir = run_dir / "pair_clips"
+    sample_file = run_dir / "pair_sample.json"
+    pairs_file = run_dir / "pairs.json"
+    answers_file = run_dir / "pair_answers.json"
+
+    if pairs_file.exists() and sample_file.exists():
+        pairs = load_pairs(pairs_file)
+        sample = load_sample(sample_file)
+        typer.echo(f"接着上次的题目，{len(pairs)} 题")
+    else:
+        meta = [Embedded(**item) for item in json.loads(meta_file.read_text(encoding="utf-8"))]
+        sample, pairs = pick_pairs(meta, np.load(vectors_file), per_bin=per_bin)
+        save_sample(sample, sample_file)
+        save_pairs(pairs, pairs_file)
+        typer.echo(f"出了 {len(pairs)} 道题，涉及 {len(sample.clips)} 条片段")
+        typer.echo(f"切片段到 {clip_dir} ……")
+        export_sample(sample, vocals, clip_dir)
+
+    answers = json.loads(answers_file.read_text(encoding="utf-8")) if answers_file.exists() else {}
+    write_pairs_page(clip_dir, pairs, answers)
+
+    typer.echo(f"\n已答 {len(answers)} / {len(pairs)} 题")
+    typer.echo(f"打开 http://127.0.0.1:{port}/ 开始答，答完按 Ctrl+C 出结果")
+    with contextlib.suppress(KeyboardInterrupt):
+        serve(clip_dir, answers_file, port)
+
+    answers = json.loads(answers_file.read_text(encoding="utf-8")) if answers_file.exists() else {}
+    report = pairs_report(pairs, answers)
+    (run_dir / "pairs_report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    typer.echo(f"\n答了 {report['answered']} 题，拿不准 {report['unsure']} 题")
+    typer.echo("  声纹距离          听着是同一个人")
+    for row in report["curve"]:
+        bar = "█" * round(row["rate"] * 20)
+        typer.echo(
+            f"  {row['distance_from']:.3f}-{row['distance_to']:.3f}"
+            f"  {row['said_same']}/{row['answered']}  {bar}"
+        )
+    if report["threshold"] is not None:
+        typer.echo(f"\n分界线大约在 {report['threshold']}（人耳判同的比例穿过 50% 的地方）")
+    else:
+        typer.echo("\n还读不出分界线，可能是答的题太少，或者曲线没穿过 50%")
+    typer.echo(f"跟机器的看法一致的比例 {report['agrees_with_machine']}")
+
+
+@app.command()
+def embed(
+    run_dir: Annotated[Path, typer.Argument(help="probe 跑出来的目录，比如 runs/probe/ep01_v4")],
+    model: Annotated[
+        str, typer.Option(help="指纹模型：redimnet2-b6 / wespeaker-resnet293 / all")
+    ] = "all",
+    keep_ratio: Annotated[
+        float, typer.Option(help="只用音质最好的这个比例，跟 probe 保持一致")
+    ] = 0.5,
+    device: Annotated[str, typer.Option(help="cuda 或 cpu")] = "cuda",
+) -> None:
+    """算声音指纹，并量一次「声纹距离能不能把人分开」。
+
+    读 probe 留下的 quality.json 和 analysis_16k.wav，不重跑前面的步骤。
+    两个模型都跑一遍再比，理由见 TOOLS.md 第 2 节。
+    """
+    from avs.embeddings.extract import MODELS, embed_segments
+    from avs.evaluation.distance import distance_report, format_report
+    from avs.stages.label import apply_labels, load_sample, purity
+
+    quality_file = run_dir / "quality.json"
+    analysis = run_dir / "analysis_16k.wav"
+    for path in (quality_file, analysis):
+        if not path.exists():
+            typer.echo(f"找不到 {path}，先跑一次 avs probe")
+            raise typer.Exit(1)
+
+    scored = json.loads(quality_file.read_text(encoding="utf-8"))
+    scored.sort(key=lambda q: q["score"], reverse=True)
+    kept = scored[: max(1, round(len(scored) * keep_ratio))]
+    typer.echo(f"用音质最好的 {len(kept)} 条（共 {len(scored)} 条打过分）")
+
+    # 标注做过了就顺便拿人工标签再算一遍，那份才不是自己证明自己。
+    # names.json 优先：它的答案来自视频，比靠耳朵分组的 labels.json 可信。
+    sample_file = run_dir / "label_sample.json"
+    human = None
+    for source, note in (
+        (run_dir / "names.json", "看画面标的"),
+        (run_dir / "labels.json", "听音标的"),
+    ):
+        if source.exists() and sample_file.exists():
+            human = (source, load_sample(sample_file), json.loads(source.read_text("utf-8")))
+            typer.echo(f"找到人工标注 {len(human[2])} 条（{note}，来自 {source.name}），会一并算")
+            break
+
+    wanted = list(MODELS) if model == "all" else [model]
+    for name in wanted:
+        typer.echo(f"\n算指纹（{name}）……")
+        meta, vectors = embed_segments(analysis, kept, model=name, device=device)
+
+        import numpy as np
+
+        np.save(run_dir / f"embeddings_{name}.npy", vectors)
+        (run_dir / f"embeddings_{name}.json").write_text(
+            json.dumps([m.__dict__ for m in meta], ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
+
+        report = distance_report(meta, vectors)
+        # 文件名里不带比例，换个比例会覆盖上一次，所以把比例记进结果里
+        report["keep_ratio"] = keep_ratio
+        (run_dir / f"distance_{name}.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8"
+        )
+        typer.echo(format_report(name, report))
+
+        if human is None:
+            continue
+        _, sample, labels = human
+        human_meta, book = apply_labels(meta, labels, sample)
+        if len(human_meta) < 4:
+            typer.echo("  人工标注太少，先去 avs label 多标几条")
+            continue
+        human_report = distance_report(human_meta, vectors[book["indices"]])
+        human_report["keep_ratio"] = keep_ratio
+        human_report["labelled_by"] = "人工"
+        human_report["skipped"] = book["skipped"]
+        (run_dir / f"distance_{name}_human.json").write_text(
+            json.dumps(human_report, ensure_ascii=False, indent=1), encoding="utf-8"
+        )
+        typer.echo(format_report(f"{name}（人工标注）", human_report))
+
+    if human is None:
+        typer.echo(
+            "\n提醒：这里的「同一个人」是切段认人给的标签，不是人工标注。"
+            "结果差是硬结论，结果好还得人工听过才算数。"
+            "\n跑 avs label 标几十条，就能拿人工标签再算一遍。"
+        )
+        return
+
+    scores = purity(human[1], human[2])
+    (run_dir / "purity.json").write_text(
+        json.dumps(scores, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    typer.echo(f"\n机器分组的纯度（按人工标注算）：整体 {scores['overall_purity']}")
+    for machine, row in scores["groups"].items():
+        extra = "，".join(f"{k} {v} 条" for k, v in row["special"].items())
+        typer.echo(
+            f"  {machine}  标了 {row['labeled']} 条，纯度 {row['purity']}"
+            + (f"（{extra}）" if extra else "")
+        )
+    typer.echo("  只有一条的组纯度必然是 1.0，别当证据。")
 
 
 @app.command()
