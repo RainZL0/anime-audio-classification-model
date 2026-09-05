@@ -109,17 +109,17 @@ def test_manifest_records_where_each_file_came_from(tmp_path: Path) -> None:
     assert TARGET_LUFS - 30 < row["lufs_before"] < 0
 
 
-def test_summary_puts_misc_last(tmp_path: Path) -> None:
-    """`_misc` 是路人堆，排在最后，别让它抢主角的位置。"""
+def test_summary_puts_unassigned_last(tmp_path: Path) -> None:
+    """`_unassigned` 是未归属片段，排在最后，别让它抢主角的位置。"""
     vocals = tmp_path / "vocals.flac"
     _tone(vocals, 44_100)
     written = export(
         {
-            "_misc": [Clip("ep01", "A", 0.0, 5.0)],
+            "_unassigned": [Clip("ep01", "A", 0.0, 5.0)],
             "speaker_01": [Clip("ep01", "A", 0.0, 2.0)],
         },
         {"ep01": vocals},
         tmp_path / "out",
     )
     report = summarize(written)
-    assert [r["speaker"] for r in report["speakers"]] == ["speaker_01", "_misc"]
+    assert [r["speaker"] for r in report["speakers"]] == ["speaker_01", "_unassigned"]

@@ -1,0 +1,5 @@
+{
+  "run": "C:\\_Projects\\Py\\2026\\anime-voice-sorter\\runs\\probe\\ep02",
+  "vocals": "runs\\probe\\ep02\\separated\\uma_s2_02_(vocals)_mel_band_roformer_kim_ft2_bleedless_unwa.flac",
+  "note": "旧现场人工记录与抽样上下文，仅 name 标签用于身份评估；by-ear/groups 不作真值"
+}

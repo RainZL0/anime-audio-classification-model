@@ -1,22 +1,19 @@
 [project]
 name = "avs"
 version = "0.1.0"
-description = "Split an anime episode into clean, per-speaker vocal clips for voice/timbre collection"
+description = "Group subtitle-aligned anime voice clips by speaker"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "audio-separator[gpu]>=0.45.0",
-    "audiobox-aesthetics>=0.0.4",
     "audioread>=3.1.0",
     "numpy>=2.5.2",
     "pandas>=2.2",
     "pyannote-audio>=4.0",
     "pyarrow>=25.0.1",
-    "pydantic>=2.13.5",
-    "pydantic-settings>=2.15.0",
     "pyloudnorm>=0.2.0",
     "pysubs2>=1.9.0",
-    "rich>=15.0.0",
+    "scikit-learn>=1.6",
     "soundfile>=0.14.0",
     "torch>=2.11,<2.12",
     "torchaudio>=2.11,<2.12",
@@ -90,7 +87,6 @@ warn_unreachable = true
 [[tool.mypy.overrides]]
 module = [
     "audio_separator.*",
-    "audiobox_aesthetics.*",
     "pandas.*",
     "pyloudnorm.*",
     "sklearn.*",
