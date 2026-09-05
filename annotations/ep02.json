@@ -371,7 +371,7 @@
    "end": 1069.92,
    "stamp": "17:48.3",
    "machine": "SPEAKER_02",
-   "name": "解说",
+   "name": "解说A",
    "by_ear": null
   },
   {
@@ -380,7 +380,7 @@
    "end": 1072.3,
    "stamp": "17:50.3",
    "machine": "SPEAKER_02",
-   "name": "解说",
+   "name": "解说A",
    "by_ear": null
   },
   {
@@ -389,7 +389,7 @@
    "end": 1077.88,
    "stamp": "17:55.5",
    "machine": "SPEAKER_07",
-   "name": "解说2",
+   "name": "解说B",
    "by_ear": null
   },
   {
@@ -419,5 +419,11 @@
    "name": "teo",
    "by_ear": null
   }
- ]
+ ],
+ "renamed": {
+  "解说": "解说A",
+  "解说2": "解说B",
+  "on": "2026-09-06",
+  "why": "解说是两个人，原来的 解说 / 解说2 容易被读成同一个人的两种写法，改成并列的 A / B"
+ }
 }
