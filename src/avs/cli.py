@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -444,6 +444,54 @@ def multi(
     typer.echo(f"\n结果 -> {out}")
 
 
+def _split_by_subtitles(
+    state: Any, segments: list[Any], subs: Path, annotation: Any, duration: float
+) -> list[Any]:
+    """按字幕行把片段切开。切不动就原样返回，不让这一步挡住整个流程。
+
+    对齐是自己量出来的，不是写死的：字幕配的是视频，音轨是另外抽的，两边差多少取决于片源。
+    量不准的时候宁可不切 —— 拿错集数的字幕会安静地把每一段都切错位置，而切错的片段听着
+    仍然像话，很难发现，所以这里宁可放过也不放错。
+    """
+    from avs.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines, split_segments
+    from avs.stages.subtitle import summarize as summarize_split
+
+    if not subs.exists():
+        typer.echo(f"找不到字幕 {subs}，这一步跳过")
+        return segments
+
+    lines = load_lines(subs)
+    if not lines:
+        typer.echo(f"{subs} 里没读到对白行，这一步跳过")
+        return segments
+
+    speech = [(s.start, s.end) for s in annotation.get_timeline().support()]
+    offset, overlap = find_offset(lines, speech, duration)
+    typer.echo(f"字幕 {len(lines)} 行，跟音轨差 {offset:+.2f} 秒，对上之后重合度 {overlap}")
+    if overlap < MIN_OVERLAP_RATIO:
+        typer.echo(
+            f"重合度低于 {MIN_OVERLAP_RATIO}，这份字幕多半不是这一集的，不切了。"
+            "先核对集数和片源版本"
+        )
+        return segments
+
+    rows = [{"speaker": s.speaker, "start": s.start, "end": s.end} for s in segments]
+    pieces, dropped = split_segments(rows, lines, offset)
+    if not pieces:
+        typer.echo("按字幕切完什么都不剩，不切了")
+        return segments
+
+    stats = summarize_split(pieces, dropped, rows, offset, overlap)
+    state.stats["subtitle_split"] = stats
+    typer.echo(
+        f"按字幕切开：{stats['before']} 段 {stats['before_sec']} 秒"
+        f" -> {stats['after']} 段 {stats['after_sec']} 秒"
+        f"（留下 {stats['kept_ratio']:.0%}），"
+        f"落在字幕之外整条退回的 {stats['dropped']} 段"
+    )
+    return list(pieces)
+
+
 @app.command()
 def probe(
     audio: Annotated[Path, typer.Argument(help="原始音轨，比如 data/raw/uma_s2_01.flac")],
@@ -460,6 +508,10 @@ def probe(
     keep_ratio: Annotated[float, typer.Option(help="音质筛选保留比例，越小越严")] = 0.5,
     vocals_in: Annotated[
         Path | None, typer.Option(help="复用已经抠好的人声轨，跳过抠人声这一步")
+    ] = None,
+    subs: Annotated[
+        Path | None,
+        typer.Option(help="这一集的 ASS 字幕，给了就按字幕行把片段切开（强烈建议给）"),
     ] = None,
 ) -> None:
     """摸底测试：抠人声 + 切段认人，量效果和耗时。"""
@@ -523,6 +575,15 @@ def probe(
         with avs_probe.timed(state, "整理候选片段"):
             segments, build_info = build_segments(annotation, result.exclusive_speaker_diarization)
         state.stats["built"] = avs_probe.summarize_built(segments, build_info)
+        counts = build_info["counts"]
+        typer.echo(
+            f"候选片段 {counts['raw']} 段 -> 整理后留下 {counts['kept']} 段"
+            f"（共 {counts['kept_sec']} 秒），疑似唱歌 {counts['suspected_song']} 段"
+        )
+
+        if subs is not None:
+            segments = _split_by_subtitles(state, segments, subs, annotation, info.duration)
+
         segments_file = run_dir / "segments.json"
         segments_file.write_text(
             json.dumps(
@@ -533,11 +594,6 @@ def probe(
             encoding="utf-8",
         )
         state.artifacts["segments"] = str(segments_file)
-        counts = build_info["counts"]
-        typer.echo(
-            f"候选片段 {counts['raw']} 段 -> 整理后留下 {counts['kept']} 段"
-            f"（共 {counts['kept_sec']} 秒），疑似唱歌 {counts['suspected_song']} 段"
-        )
 
         from avs.stages.quality import keep_best, score_segments
         from avs.stages.quality import summarize as summarize_quality
