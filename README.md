@@ -24,7 +24,7 @@ uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01_v4.j
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
-重新调分组只需再跑 `group`。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
+重新调分组只需再跑 `group`；`--method` 可选 average（默认）、single、complete、mutual_knn，已实测都不超过 average。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
 
 固定片段比较两个模型（阈值 0.20—0.90，步长 0.01，保留错合与漏合完整曲线）：
 
@@ -33,7 +33,7 @@ uv run avs embed runs/episodes/ep01 runs/episodes/ep02 --model wespeaker-resnet2
 uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/comparison-next.json
 ```
 
-比较前会核验两种声纹覆盖同一批片段；使用人工标签挑出的阈值只能算探索结果。
+比较前会核验两种声纹覆盖同一批片段；使用人工标签挑出的阈值只能算探索结果。`--model` 可只比一个模型，`--method` 可重复给出连接规则，同时比较规则曲线。
 
 身份参考实验（保留原分组；每个目标角色至少有 4 条精确标签）：
 
