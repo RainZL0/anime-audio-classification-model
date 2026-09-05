@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 import typer
 
-from avs.stages.cluster import MISC_SECONDS, THRESHOLD
+from avs.stages.cluster import LOCAL_THRESHOLD, MISC_SECONDS, THRESHOLD
 from avs.stages.quality import KEEP_RATIO
 
 app = typer.Typer(
@@ -497,8 +497,11 @@ def _split_by_subtitles(
 def group(
     run_dirs: Annotated[list[Path], typer.Argument(help="要一起分组的 probe 目录，可以给多集")],
     threshold: Annotated[
-        float, typer.Option(help="合并的分界线，越小越不容易把两个人并到一起")
+        float, typer.Option(help="第二层（中心点跨集合并）的分界线，越小越不容易并错")
     ] = THRESHOLD,
+    local_threshold: Annotated[
+        float, typer.Option(help="第一层（集内把片段聚成组）的分界线")
+    ] = LOCAL_THRESHOLD,
     model: Annotated[str, typer.Option(help="用哪个模型的指纹")] = "redimnet2-b6",
     misc_seconds: Annotated[
         float, typer.Option(help="总时长不到这么久的组并进 _misc")
@@ -527,7 +530,7 @@ def group(
         runs.append((run_dir.name, meta, np.load(vectors_file)))
         typer.echo(f"{run_dir.name}：{len(meta)} 条片段")
 
-    groups = collect(runs)
+    groups = collect(runs, local_threshold)
     points = centroids(groups, runs)
     labels = link(points, threshold)
     assigned = assign(groups, labels, misc_seconds)
@@ -538,6 +541,7 @@ def group(
         json.dumps(
             {
                 "threshold": threshold,
+                "local_threshold": local_threshold,
                 "model": model,
                 "runs": {r.name: str(r) for r in run_dirs},
                 "summary": report,
