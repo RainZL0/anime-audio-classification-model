@@ -63,9 +63,12 @@ def group(
     out: Annotated[Path, typer.Option(help="新的分组 JSON 文件")],
     threshold: float = 0.5,
     model: str = "redimnet2-b6",
+    method: Annotated[
+        str, typer.Option(help="连接规则：average/single/complete/mutual_knn")
+    ] = "average",
 ) -> None:
-    """只读取缓存进行全局分组，小组保留；可以反复调整阈值。"""
-    result = pipeline.group(episodes, out, threshold, model)
+    """只读取缓存进行全局分组，小组保留；可以反复调整阈值和连接规则。"""
+    result = pipeline.group(episodes, out, threshold, model, method)
     typer.echo(result["summary"])
     typer.echo(f"分组 -> {out}")
 
@@ -90,13 +93,15 @@ def compare(
     episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
     annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
     out: Annotated[Path, typer.Option(help="新的比较报告 JSON")],
+    model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
+    method: Annotated[list[str] | None, typer.Option(help="连接规则，可重复；默认 average")] = None,
 ) -> None:
-    """比较两种缓存模型在 0.20—0.90 阈值下的错合与漏合；仅用于探索。"""
+    """比较缓存模型与连接规则在 0.20—0.90 阈值下的错合与漏合；仅用于探索。"""
     from avs.embeddings.extract import MODELS
     from avs.evaluation.compare import compare as compare_models
 
     result = compare_models(
-        episodes, annotation, list(MODELS), [i / 100 for i in range(20, 91)], out
+        episodes, annotation, model or list(MODELS), [i / 100 for i in range(20, 91)], out, method
     )
     typer.echo(f"比较 {len(result['results'])} 个设置 -> {out}")
 

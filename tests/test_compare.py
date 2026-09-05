@@ -29,7 +29,9 @@ def test_compare_matches_clip_ids_despite_different_cache_order(tmp_path: Path) 
     out = tmp_path / "comparison.json"
     report = compare([directory], [annotation], models, [0.5, 1.5], out)
     assert [r["false_merged_pairs"] for r in report["results"]] == [0, 1, 0, 1]
-    assert report["frontier"] == [{"model": m, "threshold": 0.5} for m in models]
+    assert report["frontier"] == [
+        {"model": m, "method": "average", "threshold": 0.5} for m in models
+    ]
     assert all(r["labeled_clips"] == 2 for r in report["results"])
     with pytest.raises(ValueError, match="已存在"):
         compare([directory], [annotation], models, [0.5], out)

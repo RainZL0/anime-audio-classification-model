@@ -17,12 +17,16 @@ def compare(
     models: list[str],
     thresholds: list[float],
     out: Path,
+    methods: list[str] | None = None,
 ) -> dict[str, Any]:
     """拒绝覆盖结果或比较不同覆盖的声纹；所有成绩均是探索，非独立验收。"""
+    methods = methods or ["average"]
     if out.exists():
         raise ValueError(f"报告已存在：{out}")
     if not models or len(set(models)) != len(models) or not thresholds:
         raise ValueError("需要不重复的模型名和至少一个阈值")
+    if len(set(methods)) != len(methods):
+        raise ValueError("连接规则不能重复")
     coverage = None
     inputs = []
     for model in models:
@@ -47,22 +51,24 @@ def compare(
     results = []
     with TemporaryDirectory(prefix="avs-compare-") as temp:
         for model in models:
-            for index, threshold in enumerate(thresholds):
-                path = Path(temp) / f"{model}-{index}.json"
-                groups = group(episodes, path, threshold, model)
-                scored = evaluate(path, annotations)
-                results.append(
-                    {
-                        "model": model,
-                        "threshold": threshold,
-                        **groups["summary"],
-                        **scored["metrics"],
-                        "unmatched_labels": scored["unmatched_labels"],
-                        "special_labels": scored["special_labels"],
-                        "labeled_unassigned": scored["labeled_unassigned"],
-                        "roles": scored["roles"],
-                    }
-                )
+            for method in methods:
+                for index, threshold in enumerate(thresholds):
+                    path = Path(temp) / f"{model}-{method}-{index}.json"
+                    groups = group(episodes, path, threshold, model, method)
+                    scored = evaluate(path, annotations)
+                    results.append(
+                        {
+                            "model": model,
+                            "method": method,
+                            "threshold": threshold,
+                            **groups["summary"],
+                            **scored["metrics"],
+                            "unmatched_labels": scored["unmatched_labels"],
+                            "special_labels": scored["special_labels"],
+                            "labeled_unassigned": scored["labeled_unassigned"],
+                            "roles": scored["roles"],
+                        }
+                    )
     # 同时更少错合、更多正确连接的点才算支配；不以组数少就宣称身份更准。
     frontier = [
         row
@@ -80,12 +86,15 @@ def compare(
     report = {
         "schema": "avs.comparison.v1",
         "note": "同批人工标签上的探索曲线；阈值已使用这些标签，不能作为独立验证。",
-        "strategy": "global_average",
+        "methods": methods,
         "embedded_clips": len(coverage or []),
         "inputs": inputs,
         "annotations": [{"path": str(p.resolve()), "sha256": digest(p)} for p in annotations],
         "results": results,
-        "frontier": [{"model": r["model"], "threshold": r["threshold"]} for r in frontier],
+        "frontier": [
+            {"model": r["model"], "method": r["method"], "threshold": r["threshold"]}
+            for r in frontier
+        ],
     }
     write_json(out, report)
     return report

@@ -91,6 +91,7 @@ module = [
     "pyloudnorm.*",
     "sklearn.*",
     "pyannote.*",
+    "scipy.*",
     "pysubs2.*",
     "soundfile.*",
     "torchaudio.*",

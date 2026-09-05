@@ -137,10 +137,14 @@ def group(
     out: Path,
     threshold: float = 0.5,
     model: str = FRONTIER,
+    method: str = "average",
 ) -> dict[str, Any]:
     import numpy as np
 
-    from avs.stages.cluster import cluster
+    from avs.stages.cluster import METHODS, cluster
+
+    if method not in METHODS:
+        raise ValueError(f"连接规则只能是 {', '.join(METHODS)}，收到 {method}")
 
     if out.exists():
         raise ValueError(f"输出已存在，使用新文件以保留上次分组：{out}")
@@ -167,7 +171,7 @@ def group(
         if len(vectors):
             matrices.append(vectors)
     vectors = np.concatenate(matrices) if matrices else np.empty((0, 0))
-    labels = cluster(vectors, threshold)
+    labels = cluster(vectors, threshold, method)
     # 按首次出现的片段顺序给组编号；小组保留，不合并到杂项桶。
     numbers: dict[int, str] = {}
     by_id = {}
@@ -180,7 +184,7 @@ def group(
         "schema": "avs.groups.v1",
         "model": model,
         "threshold": threshold,
-        "strategy": "global_average",
+        "strategy": f"global_{method}",
         "audio_assumption": "single_speaker",
         "episodes": episodes,
         "assignments": assignments,
