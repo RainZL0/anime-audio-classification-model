@@ -62,7 +62,6 @@ soundfile       ok
 
 | 卡在哪 | 影响什么 | 怎么解开 |
 | --- | --- | --- |
-| **人工标注存在 `runs/` 里，而 `runs/` 被 `.gitignore` 忽略** | 那 35 条是不可再生的人工，也是目前唯一的真答案，一句 `rm -rf runs/` 就没了 | 挪到会被跟踪的位置。注意 `data/` 也在忽略列表里，所以建议放仓库根的 `annotations/`，或者给 `.gitignore` 加一条例外。**需要先定放哪** |
 | 多人片段没法自动检测 | 音质筛选后仍有 26% 的片段有多个人说话，直接压产量 | 见「下一步」第 2 步，两个候选都待验 |
 
 HuggingFace 令牌已经解决（2026-09-05）。**注意一个坑**：`speaker-diarization-community-1`
@@ -260,7 +259,9 @@ HuggingFace 令牌已经解决（2026-09-05）。**注意一个坑**：`speaker-
 
 ### 产物在哪
 
-都在 `runs/probe/ep01_v4/`：`names.json`（看画面标的，最可信）、`labels_groups.json`（听音分组标的，一半是听不清，留档）、`label_sample.json`（抽样和机器标签）、`embeddings_*.npy` 和 `.json`、`distance_*.json`、`purity.json`。
+**人工标注归档在 [`annotations/ep01_v4.json`](../annotations/ep01_v4.json)，这一份会进 git。** 它是自包含的：每条片段的时间、机器标签、人工名字、以及更早那轮只靠耳朵标的结果都在同一行。格式说明见 [`annotations/README.md`](../annotations/README.md)。
+
+算出来的东西还在 `runs/probe/ep01_v4/` 里，那些是可以重跑的：`embeddings_*.npy` 和 `.json`、`distance_*.json`、`purity.json`，以及标注时的现场文件。`runs/` 被 git 忽略，删了不心疼。
 
 ## 各阶段计划
 
@@ -282,7 +283,7 @@ HuggingFace 令牌已经解决（2026-09-05）。**注意一个坑**：`speaker-
 
 | 顺序 | 做什么 | 要多久 | 为什么排这儿 |
 | --- | --- | --- | --- |
-| 1 | **把人工标注挪出 `runs/`** | 几分钟 | 不可再生，现在没被 git 跟踪。见上面「卡住的地方」 |
+| ~~1~~ | ~~把人工标注挪出 `runs/`~~ **已做完** | | 归档到 [`annotations/`](../annotations/)，`avs label` 现在每次停下来都会自动写一份 |
 | 2 | **多人片段检测：拿现有 34 条当尺子试候选** | 半天，不用人参与 | 这是真瓶颈，而且第一次可测 |
 | 3 | **跑第 2 集的 probe，再标 35 条** | 机器 15 分钟，人 20 分钟 | 两集都有真名字，才能第一次真正测跨集连接 |
 | 4 | **只用人工确认干净的片段验跨集连接** | 半天 | 绕开 26% 污染，先确认第 4 阶段的核心假设成立 |
