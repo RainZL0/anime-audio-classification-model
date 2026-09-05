@@ -82,13 +82,27 @@ def export(
     import numpy as np
     import soundfile as sf
 
+    if not any(assigned.values()):
+        raise ValueError("没有可导出的片段")
+    infos = {}
     for episode, path in vocals.items():
-        rate = sf.info(str(path)).samplerate
+        infos[episode] = sf.info(str(path))
+        rate = infos[episode].samplerate
         if rate < MIN_SAMPLE_RATE:
             raise ValueError(
                 f"{episode} 的人声轨是 {rate} Hz，低于 {MIN_SAMPLE_RATE} Hz。"
                 "成品必须从原始采样率的音轨上切，不能用 16 kHz 的分析副本"
             )
+
+    for clips in assigned.values():
+        for clip in clips:
+            info = infos[clip.episode]
+            if not (
+                np.isfinite(clip.start)
+                and np.isfinite(clip.end)
+                and 0 <= clip.start < clip.end <= info.duration + 1 / info.samplerate
+            ):
+                raise ValueError("片段超出人声轨时间范围")
 
     written: list[Written] = []
     for name, clips in assigned.items():
@@ -106,7 +120,7 @@ def export(
             )
             mono = data.mean(axis=1)
             scaled, before, gain = _normalize(mono, rate)
-            out = folder / f"{clip.episode}_{clip.start:08.2f}.wav"
+            out = folder / f"{clip.episode}_{clip.start:012.6f}_{clip.end:012.6f}.wav"
             sf.write(str(out), np.clip(scaled, -1.0, 1.0), rate, subtype="PCM_24")
             written.append(
                 Written(
@@ -160,7 +174,7 @@ def summarize(written: list[Written]) -> dict[str, Any]:
     rows = [
         {"speaker": name, "clips": len(v), "total_sec": round(sum(v), 1)} for name, v in per.items()
     ]
-    rows.sort(key=lambda r: (r["speaker"] == "_misc", -float(str(r["total_sec"]))))
+    rows.sort(key=lambda r: (r["speaker"] == "_unassigned", -float(str(r["total_sec"]))))
     return {
         "files": len(written),
         "total_sec": round(sum(w.duration for w in written), 1),

@@ -1,65 +1,55 @@
 # anime-voice-sorter
 
-给它一部动画，它把里面的说话声**按人分好组**，每组是一堆干净的语音片段。用来收集某个角色的音色。
+按字幕切出动画对白，再把同一角色的声音归到一起。**先完成说话人分类，偶发语气词和噪声后置。** 不按音质排名丢掉一半，也不把短小组混到一个人物桶里。
 
-```
-你给它：  动画的若干集（视频或音轨），字幕可给可不给
-         另外还可以给每个角色两三条样本，但不是必须的
+流程已跑通，身份分组仍需改善。当前进度、假设和下一步统一见 [项目现状](docs/STATUS.md)；本页只维护使用方法。
 
-它给你：  out/
-          speaker_01/  一堆 wav      同一个人，没有背景音乐，没有两个人同时说话
-          speaker_02/  一堆 wav
-          _misc/                     只说了一两句的路人，不值得单独成组
-          _rejected/                 质量不达标被淘汰的片段，留着让你复查
-          manifest.parquet           一张表，记录每个片段的所有信息和淘汰原因
-```
+## 使用
 
-**它不知道有几个人，也不知道这些人是谁。** 它只负责把像的归到一起，你事后再听一听、给每组起个名字，或者干脆不起。
+安装后用 `uv run avs --help` 查看命令。需要 FFmpeg；GPU 环境、字幕对齐与模型说明见 [工具](docs/TOOLS.md)。
 
-## 现在到哪一步了
-
-**整条流程跑通了**，两集能产出按人分好的成品目录（`out/uma_s2/`，44.1 kHz）。卡了最久的「一条片段里好几个人先后说话」用字幕切割解决了，分组好坏分 0.930。**剩下的主要缺口是「两个角色被并成一组」，这类错自动的修不了，要等人工修改界面。** 实测数字、下一步、卡在哪，见 [`docs/STATUS.md`](docs/STATUS.md)。
-
-```bash
-uv run avs probe data/raw/uma_s2_01.flac --name ep01 --subs "字幕.ass"  # 抠人声到音质筛选
-uv run avs embed runs/probe/ep01                                        # 算声音指纹
-uv run avs group runs/probe/ep01 runs/probe/ep02                        # 分组、跨集连接
-uv run avs export runs/groups.json --out out/uma_s2                     # 导出成品
-```
-
-## 怎么装
-
-需要先装 [uv](https://docs.astral.sh/uv/)。
-
-```bash
-uv sync
+```powershell
+uv sync --locked
 uv run avs doctor
+# 新的一集；省略 --offset 时自动估计字幕偏移
+uv run avs prepare data/raw/uma_s2_03.flac --subs "对应字幕.ass" --name ep03 --out runs/episodes/ep03
+uv run avs embed runs/episodes/ep03
 ```
 
-`doctor` 会告诉你显卡能不能用、各个依赖装好了没有。
+本机第 1、2 集已迁移好，可直接分组，不必重算模型：
 
-开发机是 Windows 加独立显卡，装的是 CUDA 版本；自动检查跑在 Linux 上，会自动改装 CPU 版本，不用手动切换。
+```powershell
+uv run avs group runs/episodes/ep01 runs/episodes/ep02 --out runs/groups/uma-next.json --threshold 0.5
+uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/groups/uma-next-evaluation.json
+uv run avs export runs/groups/uma-next.json --out out/uma-next
+```
 
-切段认人用的模型需要先去 HuggingFace 网页上点同意、拿一个账号令牌，才能下载。
+重新调分组只需再跑 `group`。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
 
-## 文档
+固定片段比较两个模型（阈值 0.20—0.90，步长 0.01，保留错合与漏合完整曲线）：
 
-从 [`docs/README.md`](docs/README.md) 进去，那里有导航和每份文档的分工。
+```powershell
+uv run avs embed runs/episodes/ep01 runs/episodes/ep02 --model wespeaker-resnet293
+uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/comparison-next.json
+```
 
-- [`docs/GLOSSARY.md`](docs/GLOSSARY.md) —— 专业词的大白话解释，看不懂哪个词就查这里
-- [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) —— 流程怎么走，每步在解决什么问题
-- [`docs/TOOLS.md`](docs/TOOLS.md) —— 用了哪些现成工具，为什么选它
-- [`docs/STATUS.md`](docs/STATUS.md) —— 进度、下一步、卡住的地方
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) —— 做过哪些选择，为什么
-- [`docs/HISTORY.md`](docs/HISTORY.md) —— **试过不行的路**，动手前先扫一眼
-- [`docs/OLD_PROJECT.md`](docs/OLD_PROJECT.md) —— 上一版项目哪里错了
+比较前会核验两种声纹覆盖同一批片段；使用人工标签挑出的阈值只能算探索结果。
 
-## 有一个错绝对不能犯
+身份参考实验（保留原分组；每个目标角色至少有 4 条精确标签）：
 
-分析声音用的是 16 kHz 的低采样率副本，但**最终导出的音频必须从原始采样率的音轨里切**。
+```powershell
+uv run avs references runs/groups/uma.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --role teo --role trainer --role 皇帝 --out runs/references-next
+# 增加 --nearest：按最近参考声音归属，扫描四个距离阈值
+```
 
-因为音色模型大多在 40 到 48 kHz 上训练。如果拿 16 kHz 的音频升采样回去当成品，高频信息已经永久丢了，补不回来。麻烦的是这种损坏**听着不明显、程序也不报错**，你可能训完一个音色模型才发现效果不对，还查不出原因。
+每角色分别取 1/2 条参考，各重复 20 次划分。报告中的基线和参考方法始终用同一批剩余片段评分；参考候选带有已用标签 ID，`evaluate` 会自动排除它们。输出仅为实验候选，当前实测不足以替换默认分组。
 
-## 许可
+```powershell
+uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
+```
 
-还没定。
+`label` 从全量片段随机抽样，按时间顺序展示，对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。
+
+导出回到原始采样率的人声轨；16 kHz 副本只用于分析。短于 1 秒、没有可靠声纹的片段保留在 `_unassigned`，不会被安静丢弃。
+
+[文档导航](docs/README.md) · [人工标注](annotations/README.md)

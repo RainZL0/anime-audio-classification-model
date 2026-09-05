@@ -1,0 +1,212 @@
+[
+ {
+  "clip_id": "clip_00",
+  "start": 373.96409375,
+  "end": 382.23284375000003,
+  "machine": "SPEAKER_04"
+ },
+ {
+  "clip_id": "clip_01",
+  "start": 355.09784375000004,
+  "end": 357.85284375,
+  "machine": "SPEAKER_02"
+ },
+ {
+  "clip_id": "clip_02",
+  "start": 397.26846875,
+  "end": 398.51721875000004,
+  "machine": "SPEAKER_10"
+ },
+ {
+  "clip_id": "clip_03",
+  "start": 5.38034375,
+  "end": 8.164718750000002,
+  "machine": "SPEAKER_09"
+ },
+ {
+  "clip_id": "clip_04",
+  "start": 785.91659375,
+  "end": 790.47284375,
+  "machine": "SPEAKER_04"
+ },
+ {
+  "clip_id": "clip_05",
+  "start": 235.47096875000003,
+  "end": 236.67346875,
+  "machine": "SPEAKER_03"
+ },
+ {
+  "clip_id": "clip_06",
+  "start": 9.329093750000002,
+  "end": 17.17596875,
+  "machine": "SPEAKER_09"
+ },
+ {
+  "clip_id": "clip_07",
+  "start": 1032.37159375,
+  "end": 1034.3840937500001,
+  "machine": "SPEAKER_06"
+ },
+ {
+  "clip_id": "clip_08",
+  "start": 498.00784375000006,
+  "end": 499.42971875,
+  "machine": "SPEAKER_02"
+ },
+ {
+  "clip_id": "clip_09",
+  "start": 555.9903437500001,
+  "end": 559.9647187500001,
+  "machine": "SPEAKER_08"
+ },
+ {
+  "clip_id": "clip_10",
+  "start": 606.65346875,
+  "end": 607.80096875,
+  "machine": "SPEAKER_12"
+ },
+ {
+  "clip_id": "clip_11",
+  "start": 21.91784375,
+  "end": 25.562843750000003,
+  "machine": "SPEAKER_09"
+ },
+ {
+  "clip_id": "clip_12",
+  "start": 25.934093750000002,
+  "end": 27.48659375,
+  "machine": "SPEAKER_09"
+ },
+ {
+  "clip_id": "clip_13",
+  "start": 1133.06909375,
+  "end": 1135.33034375,
+  "machine": "SPEAKER_12"
+ },
+ {
+  "clip_id": "clip_14",
+  "start": 921.23721875,
+  "end": 926.77659375,
+  "machine": "SPEAKER_07"
+ },
+ {
+  "clip_id": "clip_15",
+  "start": 519.4222187500001,
+  "end": 525.62409375,
+  "machine": "SPEAKER_04"
+ },
+ {
+  "clip_id": "clip_16",
+  "start": 890.6597187500001,
+  "end": 898.99596875,
+  "machine": "SPEAKER_02"
+ },
+ {
+  "clip_id": "clip_17",
+  "start": 1266.56284375,
+  "end": 1268.7103437500002,
+  "machine": "SPEAKER_08"
+ },
+ {
+  "clip_id": "clip_18",
+  "start": 1113.1228437500001,
+  "end": 1115.0128437500002,
+  "machine": "SPEAKER_12"
+ },
+ {
+  "clip_id": "clip_19",
+  "start": 998.98034375,
+  "end": 1004.68846875,
+  "machine": "SPEAKER_02"
+ },
+ {
+  "clip_id": "clip_20",
+  "start": 859.62659375,
+  "end": 862.59659375,
+  "machine": "SPEAKER_10"
+ },
+ {
+  "clip_id": "clip_21",
+  "start": 287.95221875000004,
+  "end": 298.21221875000003,
+  "machine": "SPEAKER_04"
+ },
+ {
+  "clip_id": "clip_22",
+  "start": 1023.3265937500001,
+  "end": 1025.2715937500002,
+  "machine": "SPEAKER_08"
+ },
+ {
+  "clip_id": "clip_23",
+  "start": 1019.32721875,
+  "end": 1022.84596875,
+  "machine": "SPEAKER_06"
+ },
+ {
+  "clip_id": "clip_24",
+  "start": 782.4909687500001,
+  "end": 783.67659375,
+  "machine": "SPEAKER_10"
+ },
+ {
+  "clip_id": "clip_25",
+  "start": 704.96721875,
+  "end": 709.0678437500001,
+  "machine": "SPEAKER_04"
+ },
+ {
+  "clip_id": "clip_26",
+  "start": 98.22659375,
+  "end": 99.62721875000001,
+  "machine": "SPEAKER_10"
+ },
+ {
+  "clip_id": "clip_27",
+  "start": 1029.6422187500002,
+  "end": 1031.1990937500002,
+  "machine": "SPEAKER_06"
+ },
+ {
+  "clip_id": "clip_28",
+  "start": 515.56221875,
+  "end": 519.0597187500001,
+  "machine": "SPEAKER_08"
+ },
+ {
+  "clip_id": "clip_29",
+  "start": 581.3197187500001,
+  "end": 583.99034375,
+  "machine": "SPEAKER_12"
+ },
+ {
+  "clip_id": "clip_30",
+  "start": 102.08659375,
+  "end": 105.39846875,
+  "machine": "SPEAKER_12"
+ },
+ {
+  "clip_id": "clip_31",
+  "start": 533.50034375,
+  "end": 537.3353437500001,
+  "machine": "SPEAKER_08"
+ },
+ {
+  "clip_id": "clip_32",
+  "start": 884.32721875,
+  "end": 890.03534375,
+  "machine": "SPEAKER_02"
+ },
+ {
+  "clip_id": "clip_33",
+  "start": 248.02596875,
+  "end": 251.43909375,
+  "machine": "SPEAKER_10"
+ },
+ {
+  "clip_id": "clip_34",
+  "start": 31.671593750000003,
+  "end": 32.852843750000005,
+  "machine": "SPEAKER_09"
+ }
+]
