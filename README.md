@@ -18,7 +18,14 @@
 
 ## 现在到哪一步了
 
-**第 1 集从抽音轨到算指纹已经跑通，分组和导出还没写。** 声纹这条路已经用人工标注验证成立（错误率 7%）。卡了最久的「一条片段里好几个人先后说话」已经解决大半：按字幕行把片段切开，留下 85% 的素材。剩下的洞是「两个人同时出声」，切不开也检测不出。实测数字、下一步做什么、卡在哪，见 [`docs/STATUS.md`](docs/STATUS.md)。
+**整条流程跑通了**，两集能产出按人分好的成品目录（`out/uma_s2/`，44.1 kHz）。卡了最久的「一条片段里好几个人先后说话」用字幕切割解决了，分组好坏分 0.930。**剩下的主要缺口是「两个角色被并成一组」，这类错自动的修不了，要等人工修改界面。** 实测数字、下一步、卡在哪，见 [`docs/STATUS.md`](docs/STATUS.md)。
+
+```bash
+uv run avs probe data/raw/uma_s2_01.flac --name ep01 --subs "字幕.ass"  # 抠人声到音质筛选
+uv run avs embed runs/probe/ep01                                        # 算声音指纹
+uv run avs group runs/probe/ep01 runs/probe/ep02                        # 分组、跨集连接
+uv run avs export runs/groups.json --out out/uma_s2                     # 导出成品
+```
 
 ## 怎么装
 
@@ -44,6 +51,7 @@ uv run avs doctor
 - [`docs/TOOLS.md`](docs/TOOLS.md) —— 用了哪些现成工具，为什么选它
 - [`docs/STATUS.md`](docs/STATUS.md) —— 进度、下一步、卡住的地方
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) —— 做过哪些选择，为什么
+- [`docs/HISTORY.md`](docs/HISTORY.md) —— **试过不行的路**，动手前先扫一眼
 - [`docs/OLD_PROJECT.md`](docs/OLD_PROJECT.md) —— 上一版项目哪里错了
 
 ## 有一个错绝对不能犯
