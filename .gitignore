@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# 环境
+.venv/
+
+# 数据与产物：一律不进 git
+data/
+runs/
+out/
+models/
+*.wav
+*.flac
+*.mp3
+*.mkv
+*.mp4
+*.ckpt
+*.pth
+*.onnx
+
+# 缓存
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 例外：CI 用的极小测试样本必须能进 git
+!tests/fixtures/**/*.wav
+
+# 编辑器 / OS
+.idea/
+.vscode/
+.DS_Store
+desktop.ini

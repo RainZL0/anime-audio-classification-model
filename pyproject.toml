@@ -1,0 +1,100 @@
+[project]
+name = "avs"
+version = "0.1.0"
+description = "Split an anime episode into clean, per-speaker vocal clips for voice/timbre collection"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "audio-separator[gpu]>=0.45.0",
+    "audioread>=3.1.0",
+    "numpy>=2.5.2",
+    "pandas>=2.2",
+    "pyannote-audio>=4.0",
+    "pyarrow>=25.0.1",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pysubs2>=1.9.0",
+    "rich>=15.0.0",
+    "soundfile>=0.14.0",
+    "torch>=2.11,<2.12",
+    "torchaudio>=2.11,<2.12",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+avs = "avs.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+# torch / torchaudio 从 PyTorch 官方 index 装，不走 PyPI 默认轮子。
+# 开发机（Windows，RTX 4060 Laptop 8 GB，driver 616.56）用 CUDA 12.8 轮子；
+# CI（Linux）用 CPU 轮子，否则每次跑都要下载 2.6 GB。
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-cpu", marker = "sys_platform != 'win32'" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-cpu", marker = "sys_platform != 'win32'" },
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14",
+    "mypy>=1.18",
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# 文档里的代码块是说明用的片段，不参与格式化
+exclude = ["docs"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "SIM",      # simplify
+    "PTH",      # use pathlib
+    "RUF",
+]
+# 本项目的注释与文档字符串是中文，全角标点是有意的，不是同形字攻击
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# 音频/ML 生态大量缺 stub，逐库放行而不是全局关掉 strict
+[[tool.mypy.overrides]]
+module = [
+    "audio_separator.*",
+    "pyannote.*",
+    "pysubs2.*",
+    "soundfile.*",
+    "torchaudio.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
