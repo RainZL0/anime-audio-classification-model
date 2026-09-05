@@ -1,0 +1,423 @@
+{
+ "source": "runs\\probe\\ep02\\separated\\uma_s2_02_(vocals)_mel_band_roformer_kim_ft2_bleedless_unwa.flac",
+ "run": "runs\\probe\\ep02",
+ "labelled_on": "2026-09-06",
+ "method": "看画面报名字（avs label --mode names）",
+ "note": "name 是对着视频画面标的，是这个项目里唯一可信的真答案。by_ear 是更早只靠耳朵分组那轮的结果，一半是「听不清」，只作对照。特殊值：__unclear__ = 听不清、__multiple__ = 不止一个人、__not_speech__ = 不是说话。",
+ "clips": [
+  {
+   "clip_id": "clip_14",
+   "start": 8.616,
+   "end": 9.82,
+   "stamp": "00:08.6",
+   "machine": "SPEAKER_03",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_45",
+   "start": 11.788,
+   "end": 15.387,
+   "stamp": "00:11.8",
+   "machine": "SPEAKER_08",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_42",
+   "start": 15.809,
+   "end": 16.961,
+   "stamp": "00:15.8",
+   "machine": "SPEAKER_05",
+   "name": "医生",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_25",
+   "start": 21.16,
+   "end": 23.103,
+   "stamp": "00:21.2",
+   "machine": "SPEAKER_05",
+   "name": "医生",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_08",
+   "start": 178.028,
+   "end": 181.03,
+   "stamp": "02:58.0",
+   "machine": "SPEAKER_03",
+   "name": "路人",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_11",
+   "start": 219.676,
+   "end": 220.9,
+   "stamp": "03:39.7",
+   "machine": "SPEAKER_10",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_33",
+   "start": 239.032,
+   "end": 241.22,
+   "stamp": "03:59.0",
+   "machine": "SPEAKER_03",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_39",
+   "start": 252.19,
+   "end": 253.228,
+   "stamp": "04:12.2",
+   "machine": "SPEAKER_08",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_32",
+   "start": 285.607,
+   "end": 287.59,
+   "stamp": "04:45.6",
+   "machine": "SPEAKER_06",
+   "name": "皇帝",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_38",
+   "start": 290.125,
+   "end": 291.23,
+   "stamp": "04:50.1",
+   "machine": "SPEAKER_06",
+   "name": "皇帝",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_16",
+   "start": 297.014,
+   "end": 298.229,
+   "stamp": "04:57.0",
+   "machine": "SPEAKER_06",
+   "name": "csf",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_12",
+   "start": 301.975,
+   "end": 303.157,
+   "stamp": "05:02.0",
+   "machine": "SPEAKER_06",
+   "name": "皇帝",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_02",
+   "start": 378.48,
+   "end": 379.69,
+   "stamp": "06:18.5",
+   "machine": "SPEAKER_10",
+   "name": "golden boat",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_44",
+   "start": 412.912,
+   "end": 414.81,
+   "stamp": "06:52.9",
+   "machine": "SPEAKER_08",
+   "name": "suzuka",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_20",
+   "start": 442.675,
+   "end": 445.13,
+   "stamp": "07:22.7",
+   "machine": "SPEAKER_09",
+   "name": "suzuka",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_24",
+   "start": 455.858,
+   "end": 457.613,
+   "stamp": "07:35.9",
+   "machine": "SPEAKER_10",
+   "name": "special week",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_00",
+   "start": 481.83,
+   "end": 483.15,
+   "stamp": "08:01.8",
+   "machine": "SPEAKER_01",
+   "name": "路人2",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_43",
+   "start": 489.49,
+   "end": 490.891,
+   "stamp": "08:09.5",
+   "machine": "SPEAKER_01",
+   "name": "路人2",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_01",
+   "start": 492.038,
+   "end": 494.35,
+   "stamp": "08:12.0",
+   "machine": "SPEAKER_08",
+   "name": "漩涡",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_29",
+   "start": 497.637,
+   "end": 498.72,
+   "stamp": "08:17.6",
+   "machine": "SPEAKER_01",
+   "name": "路人2",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_15",
+   "start": 548.62,
+   "end": 551.57,
+   "stamp": "09:08.6",
+   "machine": "SPEAKER_04",
+   "name": "麦昆管家",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_07",
+   "start": 551.73,
+   "end": 553.07,
+   "stamp": "09:11.7",
+   "machine": "SPEAKER_04",
+   "name": "物理治疗师",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_35",
+   "start": 558.57,
+   "end": 559.572,
+   "stamp": "09:18.6",
+   "machine": "SPEAKER_04",
+   "name": "麦昆甜点师",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_06",
+   "start": 560.045,
+   "end": 561.87,
+   "stamp": "09:20.0",
+   "machine": "SPEAKER_04",
+   "name": "麦昆管家",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_17",
+   "start": 562.04,
+   "end": 565.517,
+   "stamp": "09:22.0",
+   "machine": "SPEAKER_04",
+   "name": "麦昆管家",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_05",
+   "start": 572.92,
+   "end": 574.17,
+   "stamp": "09:32.9",
+   "machine": "SPEAKER_10",
+   "name": "麦昆",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_03",
+   "start": 583.22,
+   "end": 584.98,
+   "stamp": "09:43.2",
+   "machine": "SPEAKER_00",
+   "name": "麦昆主治医师",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_27",
+   "start": 718.4,
+   "end": 719.61,
+   "stamp": "11:58.4",
+   "machine": "SPEAKER_11",
+   "name": "didusi",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_26",
+   "start": 719.86,
+   "end": 721.03,
+   "stamp": "11:59.9",
+   "machine": "SPEAKER_11",
+   "name": "didusi",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_34",
+   "start": 722.9,
+   "end": 726.24,
+   "stamp": "12:02.9",
+   "machine": "SPEAKER_11",
+   "name": "didusi",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_10",
+   "start": 727.78,
+   "end": 730.942,
+   "stamp": "12:07.8",
+   "machine": "SPEAKER_11",
+   "name": "didusi",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_28",
+   "start": 732.96,
+   "end": 734.21,
+   "stamp": "12:13.0",
+   "machine": "SPEAKER_10",
+   "name": "Nice Nature",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_19",
+   "start": 737.29,
+   "end": 739.25,
+   "stamp": "12:17.3",
+   "machine": "SPEAKER_11",
+   "name": "didusi",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_21",
+   "start": 915.466,
+   "end": 918.18,
+   "stamp": "15:15.5",
+   "machine": "SPEAKER_03",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_37",
+   "start": 942.112,
+   "end": 943.29,
+   "stamp": "15:42.1",
+   "machine": "SPEAKER_09",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_23",
+   "start": 967.39,
+   "end": 968.892,
+   "stamp": "16:07.4",
+   "machine": "SPEAKER_08",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_40",
+   "start": 987.349,
+   "end": 988.653,
+   "stamp": "16:27.3",
+   "machine": "SPEAKER_09",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_41",
+   "start": 1009.291,
+   "end": 1010.877,
+   "stamp": "16:49.3",
+   "machine": "SPEAKER_09",
+   "name": "teo",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_09",
+   "start": 1019.298,
+   "end": 1020.365,
+   "stamp": "16:59.3",
+   "machine": "SPEAKER_13",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_36",
+   "start": 1043.328,
+   "end": 1045.96,
+   "stamp": "17:23.3",
+   "machine": "SPEAKER_06",
+   "name": "皇帝",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_22",
+   "start": 1068.337,
+   "end": 1069.92,
+   "stamp": "17:48.3",
+   "machine": "SPEAKER_02",
+   "name": "解说",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_13",
+   "start": 1070.34,
+   "end": 1072.3,
+   "stamp": "17:50.3",
+   "machine": "SPEAKER_02",
+   "name": "解说",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_04",
+   "start": 1075.51,
+   "end": 1077.88,
+   "stamp": "17:55.5",
+   "machine": "SPEAKER_07",
+   "name": "解说2",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_30",
+   "start": 1278.51,
+   "end": 1280.27,
+   "stamp": "21:18.5",
+   "machine": "SPEAKER_13",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_18",
+   "start": 1295.6,
+   "end": 1297.69,
+   "stamp": "21:35.6",
+   "machine": "SPEAKER_03",
+   "name": "trainer",
+   "by_ear": null
+  },
+  {
+   "clip_id": "clip_31",
+   "start": 1319.217,
+   "end": 1321.343,
+   "stamp": "21:59.2",
+   "machine": "SPEAKER_09",
+   "name": "teo",
+   "by_ear": null
+  }
+ ]
+}

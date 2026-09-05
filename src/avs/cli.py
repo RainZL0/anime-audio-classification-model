@@ -9,6 +9,8 @@ from typing import Annotated, Any
 
 import typer
 
+from avs.stages.quality import KEEP_RATIO
+
 app = typer.Typer(
     name="avs",
     help="把一部动画拆成按人分好组的纯净人声片段。",
@@ -81,7 +83,7 @@ def label(
     model: Annotated[str, typer.Option(help="pairs 模式按哪个模型的距离分档")] = "redimnet2-b6",
     per_bin: Annotated[int, typer.Option(help="pairs 模式每档抽几对")] = 6,
     per_speaker: Annotated[int, typer.Option(help="groups 模式每个机器分组抽几条")] = 5,
-    keep_ratio: Annotated[float, typer.Option(help="groups 模式只从音质最好的这个比例里抽")] = 0.5,
+    keep_ratio: Annotated[float, typer.Option(help="只从筛选后留下的片段里抽")] = KEEP_RATIO,
     port: Annotated[int, typer.Option(help="本地服务用哪个端口")] = 8765,
 ) -> None:
     """人工标注，用来破掉循环论证。只听 127.0.0.1，音频不出本机。
@@ -100,6 +102,7 @@ def label(
     """
     from avs.stages.label import export_sample, load_sample, pick_sample, save_sample
     from avs.stages.label_server import serve, write_page
+    from avs.stages.quality import select_rows
 
     if mode == "pairs":
         return _label_pairs(run_dir, model, per_bin, port)
@@ -123,9 +126,7 @@ def label(
         sample = load_sample(sample_file)
         typer.echo(f"接着上次的抽样，{len(sample.clips)} 条")
     else:
-        scored = json.loads(quality_file.read_text(encoding="utf-8"))
-        scored.sort(key=lambda q: q["score"], reverse=True)
-        kept = scored[: max(1, round(len(scored) * keep_ratio))]
+        kept = select_rows(json.loads(quality_file.read_text(encoding="utf-8")), keep_ratio)
         sample = pick_sample(kept, per_speaker=per_speaker)
         save_sample(sample, sample_file)
         typer.echo(f"从音质最好的 {len(kept)} 条里抽了 {len(sample.clips)} 条来标")
@@ -155,6 +156,7 @@ def _label_names(run_dir: Path, per_speaker: int, keep_ratio: float, port: int) 
         save_sample,
     )
     from avs.stages.label_server import serve, write_names_page
+    from avs.stages.quality import select_rows
 
     quality_file = run_dir / "quality.json"
     if not quality_file.exists():
@@ -170,9 +172,7 @@ def _label_names(run_dir: Path, per_speaker: int, keep_ratio: float, port: int) 
         sample = load_sample(sample_file)
         typer.echo(f"用已有的抽样，{len(sample.clips)} 条")
     else:
-        scored = json.loads(quality_file.read_text(encoding="utf-8"))
-        scored.sort(key=lambda q: q["score"], reverse=True)
-        kept = scored[: max(1, round(len(scored) * keep_ratio))]
+        kept = select_rows(json.loads(quality_file.read_text(encoding="utf-8")), keep_ratio)
         sample = pick_sample(kept, per_speaker=per_speaker)
         save_sample(sample, sample_file)
         typer.echo(f"从音质最好的 {len(kept)} 条里抽了 {len(sample.clips)} 条")
@@ -284,8 +284,8 @@ def embed(
         str, typer.Option(help="指纹模型：redimnet2-b6 / wespeaker-resnet293 / all")
     ] = "all",
     keep_ratio: Annotated[
-        float, typer.Option(help="只用音质最好的这个比例，跟 probe 保持一致")
-    ] = 0.5,
+        float, typer.Option(help="只用筛选后留下的片段，跟 probe 保持一致")
+    ] = KEEP_RATIO,
     device: Annotated[str, typer.Option(help="cuda 或 cpu")] = "cuda",
 ) -> None:
     """算声音指纹，并量一次「声纹距离能不能把人分开」。
@@ -296,6 +296,7 @@ def embed(
     from avs.embeddings.extract import MODELS, embed_segments
     from avs.evaluation.distance import distance_report, format_report
     from avs.stages.label import apply_labels, load_annotation, load_sample, purity
+    from avs.stages.quality import select_rows
 
     quality_file = run_dir / "quality.json"
     analysis = run_dir / "analysis_16k.wav"
@@ -305,9 +306,8 @@ def embed(
             raise typer.Exit(1)
 
     scored = json.loads(quality_file.read_text(encoding="utf-8"))
-    scored.sort(key=lambda q: q["score"], reverse=True)
-    kept = scored[: max(1, round(len(scored) * keep_ratio))]
-    typer.echo(f"用音质最好的 {len(kept)} 条（共 {len(scored)} 条打过分）")
+    kept = select_rows(scored, keep_ratio)
+    typer.echo(f"用筛选后留下的 {len(kept)} 条（共 {len(scored)} 条打过分）")
 
     # 标注做过了就顺便拿人工标签再算一遍，那份才不是自己证明自己。
     # 优先读 annotations/ 里的归档，它是会进 git 的那一份。
@@ -505,7 +505,7 @@ def probe(
     keep_instrumental: Annotated[bool, typer.Option(help="连伴奏轨一起存下来")] = False,
     skip_diarize: Annotated[bool, typer.Option(help="只做抠人声那一半")] = False,
     precision: Annotated[str, typer.Option(help="抠人声的推理精度：fp32 / fp16 / bf16")] = "fp16",
-    keep_ratio: Annotated[float, typer.Option(help="音质筛选保留比例，越小越严")] = 0.5,
+    keep_ratio: Annotated[float, typer.Option(help="音质筛选保留比例，越小越严")] = KEEP_RATIO,
     vocals_in: Annotated[
         Path | None, typer.Option(help="复用已经抠好的人声轨，跳过抠人声这一步")
     ] = None,

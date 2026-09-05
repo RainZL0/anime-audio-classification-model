@@ -24,11 +24,37 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-KEEP_RATIO = 0.5
+KEEP_RATIO = 0.7
 """默认保留音质最好的这个比例。
 
-第 1 集实测：保留 50% 剩 301 秒，折算整季 13 集约 65 分钟，最大的说话人约 23 分钟。
-收音色一个角色 10 到 30 分钟就够，所以这个留存率对主角是够的。想更保守就调低。
+**这个数从 0.5 改成 0.7 了**（2026-09-06，决策 21）。0.5 是在「片段里还混着好几个人」的年代
+定的，那时候音质分兼着当脏片段的筛子。现在换人那一族已经被字幕切走（4.3b），音质分只需要
+管音质本身，砍一半就砍过头了。
+
+按音质分排名，每一成的中位数，两集是同一个形状：
+
+| 保留到 | 第 1 集 sisdr / pesq | 第 2 集 sisdr / pesq |
+| --- | --- | --- |
+| 50% | 16.1 / 2.58 | 20.2 / 2.80 |
+| 70% | 9.8 / 1.87 | 13.9 / 2.34 |
+| 80% | 5.8 / 1.59 | 10.1 / 1.86 |
+| 90% | -2.5 / 1.19 | 6.7 / 1.37 |
+
+**悬崖在 70% 到 80% 之间**，80% 往后掉得很快，最后一成的 sisdr 直接是负的。改成 0.7 之后
+第 1 集 164 条 364 秒、第 2 集 168 条 333 秒，各比砍一半时多出约 38%。
+"""
+
+MIN_STOI = 0.85
+MIN_PESQ = 1.5
+MIN_SISDR = 5.0
+"""绝对下限，三项都要过。单位分别是无量纲、无量纲、分贝。
+
+**这是兜底，不是主力。** 上面那个比例是相对的：一集整体都很差时，它照样留下最好的 70%，
+哪怕那 70% 全是废的。决策 15 当时就记着这个缺口，说「将来要补一个绝对下限」，这就是。
+
+数值是照着上面那张表定的，落在悬崖下面一点：正常的一集里它几乎不起作用（第 1 集只多砍
+5 条、第 2 集 2 条），只有素材真的坏掉时才会咬住。**它没有在真的坏素材上验过**，因为手上
+还没有那样的一集。
 """
 
 MIN_SECONDS = 0.5
@@ -117,16 +143,50 @@ def _add_composite(scored: list[Quality]) -> list[Quality]:
     ]
 
 
+def _above_floor(stoi: float, pesq: float, sisdr: float) -> bool:
+    """三项绝对下限都过了没有。见 `MIN_STOI` 那段说明。
+
+    这里只写一遍，是因为「留哪些」这件事有两个入口（`keep_best` 吃打过分的对象，
+    `select_rows` 吃 `quality.json` 里的原始行），两边必须说一样的话。
+    """
+    return stoi >= MIN_STOI and pesq >= MIN_PESQ and sisdr >= MIN_SISDR
+
+
+def passes_floor(q: Quality) -> bool:
+    """这条片段过没过绝对下限。"""
+    return _above_floor(q.stoi, q.pesq, q.sisdr)
+
+
+def select_rows(rows: list[dict[str, Any]], keep_ratio: float = KEEP_RATIO) -> list[dict[str, Any]]:
+    """跟 `keep_best` 同一套规矩，但吃 `quality.json` 里读出来的原始行。
+
+    给 `avs embed` 和 `avs label` 用。它们要的是「这一集最后留下哪些片段」，答案必须跟
+    管线里筛出来的完全一致，所以不能各自再写一遍排序和门槛。
+    """
+    ordered = sorted(rows, key=lambda r: -float(r["score"]))
+    cut = max(1, int(len(ordered) * keep_ratio)) if ordered else 0
+    return [
+        r
+        for r in ordered[:cut]
+        if _above_floor(float(r["stoi"]), float(r["pesq"]), float(r["sisdr"]))
+    ]
+
+
 def keep_best(
     scored: list[Quality], keep_ratio: float = KEEP_RATIO
 ) -> tuple[list[Quality], list[Quality]]:
     """留下音质最好的一部分，其余淘汰。返回 (留下的, 淘汰的)。
 
+    两道关，都要过：先按分数排名留下前 `keep_ratio`，再逐条过一遍绝对下限。前者管「这一集
+    里哪些相对更好」，后者管「好到能用没有」—— 只有前者的话，一集整体都差时它照样留下 70%。
+
     淘汰的也带回去，不要直接丢：万一比例定错了能捞回来，这是 HOW_IT_WORKS 4.7 的规矩。
     """
     ordered = sorted(scored, key=lambda q: -q.score)
     cut = max(1, int(len(ordered) * keep_ratio)) if ordered else 0
-    return ordered[:cut], ordered[cut:]
+    kept = [q for q in ordered[:cut] if passes_floor(q)]
+    rejected = [q for q in ordered[:cut] if not passes_floor(q)] + ordered[cut:]
+    return kept, rejected
 
 
 def summarize(kept: list[Quality], rejected: list[Quality]) -> dict[str, Any]:
