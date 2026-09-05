@@ -1,0 +1,16 @@
+# 统一仓库内为 LF，检出时由 core.autocrlf 决定工作区形态
+* text=auto eol=lf
+
+# 二进制
+*.wav binary
+*.flac binary
+*.mp3 binary
+*.mkv binary
+*.mp4 binary
+*.ckpt binary
+*.pth binary
+*.onnx binary
+*.parquet binary
+
+# 锁文件不参与 diff 展开
+uv.lock -diff linguist-generated
