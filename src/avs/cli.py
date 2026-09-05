@@ -382,6 +382,69 @@ def embed(
 
 
 @app.command()
+def multi(
+    run_dir: Annotated[Path, typer.Argument(help="probe 跑出来的目录，比如 runs/probe/ep01_v4")],
+    device: Annotated[str, typer.Option(help="cuda 或 cpu")] = "cuda",
+    only: Annotated[str, typer.Option(help="只跑某几个候选，逗号隔开，留空跑全部")] = "",
+) -> None:
+    """试几种办法自动认出「这条里不止一个人」，拿人工标注当尺子量它们准不准。
+
+    这是目前的真瓶颈：音质筛选留下的片段里仍有四分之一有多个人说话。人工标注做完之后，
+    这件事第一次能被量出来。
+
+    **看结果时先看「时长配平」那一列。** 多人片段普遍比单人片段长，光看时长就能拿到 0.84 分，
+    所以一个办法只有在长度接近的片段之间还分得开，才算真有本事。
+    """
+    from avs.evaluation import detectors
+    from avs.evaluation.multi_speaker import evaluate, format_report, load_truth
+
+    archive = ANNOTATIONS / f"{run_dir.name}.json"
+    if not archive.exists():
+        typer.echo(f"找不到人工标注 {archive}，先跑 avs label --mode names")
+        raise typer.Exit(1)
+    analysis = run_dir / "analysis_16k.wav"
+    quality_file = run_dir / "quality.json"
+    for path in (analysis, quality_file):
+        if not path.exists():
+            typer.echo(f"找不到 {path}，先跑一次 avs probe")
+            raise typer.Exit(1)
+
+    truth = load_truth(archive)
+    multiple = sum(t.is_multiple for t in truth)
+    typer.echo(
+        f"尺子：{len(truth)} 条人工标注，其中 {multiple} 条不止一个人、"
+        f"{len(truth) - multiple} 条确认是单人（来自 {archive}）"
+    )
+    if multiple < 3:
+        typer.echo("多人片段太少，量不出东西来，先去多标几条")
+        raise typer.Exit(1)
+
+    wanted = {name.strip() for name in only.split(",") if name.strip()}
+    candidates: dict[str, dict[int, float]] = {"duration": detectors.duration_scores(truth)}
+    for key in ("score", "pesq", "sisdr"):
+        candidates[f"squim_{key}"] = detectors.squim_scores(quality_file, truth, key)
+
+    if not wanted or any(w.startswith("aesthetics") for w in wanted):
+        typer.echo("跑 Audiobox-Aesthetics ……")
+        candidates.update(detectors.aesthetics_scores(analysis, truth, device=device))
+    if not wanted or any(w.startswith("selfsim") for w in wanted):
+        typer.echo("算片段内部的声纹一致性 ……")
+        candidates.update(detectors.selfsim_scores(analysis, truth, device=device))
+
+    rows = [
+        evaluate(name, scores, truth)
+        for name, scores in candidates.items()
+        if not wanted or name in wanted
+    ]
+    rows.sort(key=lambda r: r["auc_length_matched"] or 0.0, reverse=True)
+
+    out = run_dir / "multi_speaker.json"
+    out.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    typer.echo("\n" + format_report(rows))
+    typer.echo(f"\n结果 -> {out}")
+
+
+@app.command()
 def probe(
     audio: Annotated[Path, typer.Argument(help="原始音轨，比如 data/raw/uma_s2_01.flac")],
     minutes: Annotated[float, typer.Option(help="只跑开头多少分钟，0 表示整集")] = 0.0,
