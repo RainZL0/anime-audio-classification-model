@@ -18,17 +18,7 @@
 
 ## 状态
 
-早期开发中。当前完成到 M1（工程骨架），管线尚未实现。
-
-| 里程碑 | 内容 | 状态 |
-| --- | --- | --- |
-| M0 | 仓库治理 | 完成 |
-| M1 | 工程骨架：uv、包结构、CLI、CI | 完成 |
-| M2 | 纵向打通：分离 → diarize → 嵌入 → 聚类 → 导出 | 进行中 |
-| M3 | 跨集说话人链接、阈值标定、长尾归并 | |
-| M4 | review 界面（命名 / 合并 / 拆分） | |
-| M5 | 质量闸门、双轨导出 | |
-| M6 | few-shot 通道、评估、打包 | |
+**M1（工程骨架）完成，管线尚未实现。** 详细进度、下一个动作与阻塞项见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
 ## 环境
 
@@ -39,27 +29,23 @@ uv sync
 uv run avs doctor
 ```
 
-`doctor` 会报告 CUDA 可用性与各关键依赖的加载情况。
+`doctor` 会报告 CUDA 可用性与各关键依赖的加载情况。开发机配置为 Windows + CUDA 12.8 轮子，CI（Linux）自动改用 CPU 轮子。
 
-开发机配置为 Windows + CUDA 12.8 轮子，CI（Linux）自动改用 CPU 轮子，见 `pyproject.toml` 的 `tool.uv.sources`。
+diarization 用的 `pyannote/speaker-diarization-community-1` 是 gated 模型，首次使用前需在 HuggingFace 上接受条款并配置 token。
 
-## 设计文档
+## 文档
 
-- [`docs/DESIGN.md`](docs/DESIGN.md)：管线设计、数据模型、已知失败模式、评估方法
-- [`docs/TOOLING.md`](docs/TOOLING.md)：现成工具调研，哪些直接用、哪些自己写
-- [`docs/PRIOR_ART_AUDIT.md`](docs/PRIOR_ART_AUDIT.md)：前身项目 `anime-audio-classification-model` 的问题审计，作为「不要再犯」的记录
+从 [`docs/README.md`](docs/README.md) 进，那里有索引和各文档的职责划分。
 
-## 核心技术选择
+- [`docs/DESIGN.md`](docs/DESIGN.md)：管线结构、数据模型、失败模式、评估方法
+- [`docs/TOOLING.md`](docs/TOOLING.md)：选型的唯一事实来源，以及现成工具调研
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)：进度的唯一事实来源
+- [`docs/DECISIONS.md`](docs/DECISIONS.md)：决策记录，「为什么不那样做」
+- [`docs/PRIOR_ART_AUDIT.md`](docs/PRIOR_ART_AUDIT.md)：前身项目的问题清单，已冻结
 
-| 环节 | 选定 |
-| --- | --- |
-| 人声分离 | `audio-separator` + Mel-Band Roformer |
-| 说话人分离 | `pyannote/speaker-diarization-community-1` |
-| 说话人嵌入 | `wespeaker-voxceleb-resnet293-LM`，对照组 ReDimNet-B2 |
-| 聚类 | 两层：集内用 diarization 结果，跨集对 cluster 质心做 AHC |
-| 音质闸门 | DNSMOS P.835 |
+## 一条贯穿全流程的红线
 
-**一条贯穿全流程的红线**：16 kHz 只用于分析，成品永远从原始采样率音轨按时间戳切。音色模型多在 40 到 48 kHz 训练，搞错会让成品静默报废。
+16 kHz 只用于分析，成品永远从原始采样率音轨按时间戳切。音色模型多在 40 到 48 kHz 训练，搞错会让成品**静默报废**：听感上不明显，流程里也不报错。
 
 ## 许可
 
