@@ -9,6 +9,7 @@ from typing import Annotated, Any
 
 import typer
 
+from avs.stages.cluster import MISC_SECONDS, THRESHOLD
 from avs.stages.quality import KEEP_RATIO
 
 app = typer.Typer(
@@ -490,6 +491,126 @@ def _split_by_subtitles(
         f"落在字幕之外整条退回的 {stats['dropped']} 段"
     )
     return list(pieces)
+
+
+@app.command()
+def group(
+    run_dirs: Annotated[list[Path], typer.Argument(help="要一起分组的 probe 目录，可以给多集")],
+    threshold: Annotated[
+        float, typer.Option(help="合并的分界线，越小越不容易把两个人并到一起")
+    ] = THRESHOLD,
+    model: Annotated[str, typer.Option(help="用哪个模型的指纹")] = "redimnet2-b6",
+    misc_seconds: Annotated[
+        float, typer.Option(help="总时长不到这么久的组并进 _misc")
+    ] = MISC_SECONDS,
+    out: Annotated[Path, typer.Option(help="分组结果写到哪")] = Path("runs/groups.json"),
+) -> None:
+    """把片段按人归到一起，跨集也连上。快，可以反复调分界线重跑。
+
+    先跑 `avs embed` 把指纹算出来。分组本身只花几秒，所以**分界线不合适就改了重跑**，
+    不用重新算指纹，也不用重新导出。
+    """
+    import numpy as np
+
+    from avs.embeddings.extract import Embedded
+    from avs.stages.cluster import assign, centroids, collect, link
+    from avs.stages.cluster import summarize as summarize_groups
+
+    runs = []
+    for run_dir in run_dirs:
+        vectors_file = run_dir / f"embeddings_{model}.npy"
+        meta_file = run_dir / f"embeddings_{model}.json"
+        if not (vectors_file.exists() and meta_file.exists()):
+            typer.echo(f"找不到 {run_dir} 的指纹，先跑 avs embed {run_dir}")
+            raise typer.Exit(1)
+        meta = [Embedded(**item) for item in json.loads(meta_file.read_text(encoding="utf-8"))]
+        runs.append((run_dir.name, meta, np.load(vectors_file)))
+        typer.echo(f"{run_dir.name}：{len(meta)} 条片段")
+
+    groups = collect(runs)
+    points = centroids(groups, runs)
+    labels = link(points, threshold)
+    assigned = assign(groups, labels, misc_seconds)
+    report = summarize_groups(assigned, groups)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(
+            {
+                "threshold": threshold,
+                "model": model,
+                "runs": {r.name: str(r) for r in run_dirs},
+                "summary": report,
+                "clips": {
+                    name: [
+                        {"episode": c.episode, "local": c.local, "start": c.start, "end": c.end}
+                        for c in clips
+                    ]
+                    for name, clips in assigned.items()
+                },
+            },
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+
+    typer.echo(
+        f"\n{report['groups_in']} 个机器分组 -> 合并成 {report['speakers_out']} 个人"
+        f"（分界线 {threshold}）"
+    )
+    for row in report["speakers"]:
+        span = "、".join(row["episodes"])
+        typer.echo(
+            f"  {row['name']:<12} {row['clips']:>4} 条  {row['total_sec']:>7.1f} 秒  来自 {span}"
+        )
+    typer.echo(f"\n结果 -> {out}")
+
+
+@app.command()
+def export(
+    groups_file: Annotated[Path, typer.Argument(help="avs group 写出来的 groups.json")],
+    out: Annotated[Path, typer.Option(help="成品导到哪")] = Path("out"),
+    only: Annotated[str, typer.Option(help="只导某几组，逗号隔开，留空全导")] = "",
+) -> None:
+    """按分好的组导出成品 wav，一组一个目录。
+
+    **从原始采样率的人声轨上切**，不是 16 kHz 的分析副本 —— 这是这个项目唯一一个
+    「听不出来、也不报错，但会毁掉成品」的错误，所以这里会主动检查并拒绝。
+    响度统一到 -23 LUFS，峰值溢出就整体压回去，不削顶。
+    """
+    from avs.stages.cluster import Clip
+    from avs.stages.export import export as export_clips
+    from avs.stages.export import summarize as summarize_export
+    from avs.stages.export import write_manifest
+
+    if not groups_file.exists():
+        typer.echo(f"找不到 {groups_file}，先跑 avs group")
+        raise typer.Exit(1)
+    data = json.loads(groups_file.read_text(encoding="utf-8"))
+
+    wanted = {name.strip() for name in only.split(",") if name.strip()}
+    assigned = {
+        name: [Clip(**c) for c in clips]
+        for name, clips in data["clips"].items()
+        if not wanted or name in wanted
+    }
+    if not assigned:
+        typer.echo(f"没有要导的组，{groups_file} 里有：{'、'.join(data['clips'])}")
+        raise typer.Exit(1)
+
+    vocals = {episode: _vocals_of(Path(run)) for episode, run in data["runs"].items()}
+
+    out.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"导出到 {out} ……")
+    written = export_clips(assigned, vocals, out)
+    report = summarize_export(written)
+    manifest = write_manifest(written, out)
+
+    typer.echo(f"\n导出 {report['files']} 条，共 {report['total_sec']} 秒")
+    for row in report["speakers"]:
+        typer.echo(f"  {row['speaker']:<12} {row['clips']:>4} 条  {row['total_sec']:>7.1f} 秒")
+    typer.echo(f"\n对照表 -> {manifest}")
 
 
 @app.command()

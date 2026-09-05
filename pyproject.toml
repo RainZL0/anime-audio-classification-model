@@ -14,6 +14,7 @@ dependencies = [
     "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "pyloudnorm>=0.2.0",
     "pysubs2>=1.9.0",
     "rich>=15.0.0",
     "soundfile>=0.14.0",
@@ -90,6 +91,9 @@ warn_unreachable = true
 module = [
     "audio_separator.*",
     "audiobox_aesthetics.*",
+    "pandas.*",
+    "pyloudnorm.*",
+    "sklearn.*",
     "pyannote.*",
     "pysubs2.*",
     "soundfile.*",
