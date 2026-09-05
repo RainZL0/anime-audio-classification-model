@@ -1,5 +1,24 @@
 # anime-voice-sorter
 
+把一部动画拆成按人分好组的纯净人声片段，用来收集角色音色。
+
+## 接手先读这三样
+
+1. [`docs/STATUS.md`](docs/STATUS.md) —— 现在到哪了、卡在哪、下一步做什么。**先读「一句话」
+   和「下一步」两节**，其余是留档。
+2. [`docs/README.md`](docs/README.md) —— 文档导航，以及**每份文档管什么**。改文档前先看这个，
+   一件事只写在一个地方。
+3. [`docs/DECISIONS.md`](docs/DECISIONS.md) —— 做过哪些选择。**已经写下的条目不修改**，
+   推翻了就往后加一条，再把旧那条标成「已被第 N 条取代」。
+
+不认识的词查 [`docs/GLOSSARY.md`](docs/GLOSSARY.md)。
+
+## 改完代码要过的四项检查
+
+```bash
+uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q
+```
+
 ## 表达风格（对所有输出生效）
 
 聊天回复、文档、代码注释、提交信息，全部适用。

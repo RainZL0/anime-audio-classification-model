@@ -11,7 +11,7 @@
 
 想知道「为什么不用另一种做法」，看 [`DECISIONS.md`](DECISIONS.md)。
 
-准备动手写代码，直接看 [`STATUS.md`](STATUS.md) 的「下一步该做什么」。
+准备动手写代码，直接看 [`STATUS.md`](STATUS.md) 的「下一步」。
 
 ## 每份文档管什么
 

@@ -2,7 +2,7 @@
 
 > 具体用哪个库、哪个模型，只在这份文档里写，别处不要重复。
 > 流程怎么走见 [`HOW_IT_WORKS.md`](HOW_IT_WORKS.md)，进度见 [`STATUS.md`](STATUS.md)，选择的理由见 [`DECISIONS.md`](DECISIONS.md)。不认识的词查 [`GLOSSARY.md`](GLOSSARY.md)。
-> 最后更新：2026-09-06
+> 最后更新：2026-09-06（当天第二次，见第 7 节）
 
 ## 调研结论
 
@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | 抠人声 | **Mel-Band Roformer**，检查点 `kimmel_unwa_ft2_bleedless.ckpt`（在 `audio-separator` 里叫 `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`） | `bleedless` 是指「串音少」（见 [`GLOSSARY.md`](GLOSSARY.md)），正合我们的取舍：宁可人声损失一点，也不要让背景音乐漏进成品。这个检查点是 TTSizer 用的。**选它的依据只有这两条，拿不出任何质量数字**，复查见第 6.1 节 |
 | 切段认人 | **`pyannote/speaker-diarization-community-1`** | 比上一版 3.1 好在「判断这段是谁」和「一共有几个人」上，切段本身的准确度持平，另外多了一个 exclusive 模式。**别误解这个模式**：它只是把同时说话人数强行截到 1、让标签不再重叠，音频里两个人还在，不能拿它当「已经没有重叠」用，细节见决策 14 |
-| 声音指纹 | **`wespeaker-voxceleb-resnet293-LM`**，另跑一个 **ReDimNet-B2** 做对照 | resnet293 跟 pyannote 内部用的是同一套向量空间（pyannote 3.1 内部用的是较弱的 resnet34），所以两边能共用。另外要提醒的是：这类模型在标准评测集上已经卷到很难分高下了（最好的错误率约 0.17%），而它们都是拿真人说话训练的，到了日语动画配音这个场景，排名完全可能反过来。**所以必须两个都跑，用自己的数据选** |
+| 声音指纹 | **ReDimNet2 B6**（前沿臂），另跑 **`wespeaker-voxceleb-resnet293-LM`**做对照（稳妥臂）。**已实测选定，见决策 17** | resnet293 跟 pyannote 内部用的是同一套向量空间（pyannote 3.1 内部用的是较弱的 resnet34），所以两边能共用。另外要提醒的是：这类模型在标准评测集上已经卷到很难分高下了（最好的错误率约 0.17%），而它们都是拿真人说话训练的，到了日语动画配音这个场景，排名完全可能反过来。**所以必须两个都跑，用自己的数据选** |
 | 音质打分 | **实际用的是 torchaudio 自带的 `SQUIM`**（决策 15），DNSMOS 退为备选 | 选 SQUIM 是因为不用额外授权、torchaudio 已经装了。但它针对的是电话噪声、编码损伤这类问题，不是「背景有一群人在喊」，所以只是够用，不是最合适的。替代候选见第 6.4 节 |
 | 静音检测 | `silero-vad` | |
 
@@ -171,7 +171,34 @@ DiariZen（`BUTSpeechFIT/DiariZen`）537 个星，2026-01 还在更新，有现�
 - **Speaker Diarization of Scripted Audiovisual Content**（arXiv 2308.02160）：直接针对影视剧这类有剧本的内容做说话人分段。它点了一件跟我们有关的事：**说话人多的时候，谱聚类会严重低估人数。** 第 5 阶段定相似度分界线时可以拿它当先验。
 - **`voxmap-studio` 的仓库仍然找不到**，详见 [`STATUS.md`](STATUS.md) 的未决问题。
 
-## 7. 参考链接
+## 7. 指纹模型：实测选定（2026-09-06）
+
+第 6 节的复查只看了抠人声、切段认人、音质筛选三步，没查声音指纹。这次补上，而且**跑了真数据**，
+不是照排行榜挑的。决定和理由见决策 17。
+
+| 模型 | 声纹错误率（VoxCeleb1-O） | 参数量 | 状态 |
+| --- | --- | --- | --- |
+| **ReDimNet2 B6** | **0.287%** | 12.3M | **选定，前沿臂** |
+| WeSpeaker ResNet293-LM | 0.447% | 大得多 | 选定，稳妥臂 |
+| ReDimNet B2（原计划的对照） | 0.57% | 3.6M | 被 ReDimNet2 取代 |
+
+ReDimNet2 是 Interspeech 2026 的，2026-07-01 发布，2026-07-03 就被 WeSpeaker 收编，
+这比它 87 个星更能说明被采纳的程度。MIT 许可，只要 torch 和 torchaudio。
+
+**在我们自己的素材上，两个的差距比公开评测小得多**：公开评测差三分之一，实测只差
+0.861 对 0.844（分得开程度）。方向一致，幅度被压扁了。这正是第 2 节那条「必须两个都跑，
+用自己的数据选」的意义，别指望换模型带来大改善。
+
+**两个用起来的坑，代码注释里也写了：**
+
+1. **ReDimNet2 只能走 `torch.hub`，没有 pip 包。** 它会从 GitHub 拉代码并执行，必须显式传
+   `trust_repo=True`，否则脚本会卡在等你敲确认。
+2. **WeSpeaker 那条走 onnxruntime，本机的 onnxruntime-gpu 跟 torch 的 CUDA 版本对不上**
+   （见 `STATUS.md` 的踩坑记录），所以固定按 CPU 跑。90 条片段几秒钟，不值得为它折腾版本。
+   另外 pyannote 的加载器默认找 `speaker-embedding.onnx`，而那个仓库里文件叫
+   `voxceleb_resnet293_LM.onnx`，得自己先下下来再把本地路径递给它。
+
+## 8. 参考链接
 
 - [Amphion / Emilia-Pipe](https://github.com/open-mmlab/Amphion/tree/main/preprocessors/Emilia)、[Emilia 论文](https://arxiv.org/pdf/2407.05361)
 - [TTSizer](https://github.com/taresh18/TTSizer)
@@ -180,4 +207,5 @@ DiariZen（`BUTSpeechFIT/DiariZen`）537 个星，2026-01 还在更新，有现�
 - [pyannote community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)、[关于跨文件说话人的讨论](https://github.com/pyannote/pyannote-audio/discussions/1085)
 - [Mel-Band RoFormer 论文](https://arxiv.org/pdf/2310.01809)、[BS-RoFormer 论文](https://arxiv.org/pdf/2309.02612)、[MVSEP 算法对比榜](https://mvsep.com/en/algorithms)
 - [说话人分段资料汇总](https://github.com/wq2012/awesome-diarization)
+- 指纹模型：[ReDimNet2](https://github.com/PalabraAI/redimnet2)、[ReDimNet](https://github.com/IDRnD/redimnet)、[WeSpeaker ResNet293-LM](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM)
 - 2026-09-06 复查新增：[MVSEP 多曲目排行榜](https://mvsep.com/quality_checker/multisong_leaderboard?sort=vocals)、[MSST Bible 社区手册](https://msst-bible.pages.dev/)、[DiariZen](https://github.com/BUTSpeechFIT/DiariZen)、[Audiobox-Aesthetics](https://github.com/facebookresearch/audiobox-aesthetics)、[AudioMOS 挑战赛 2025](https://arxiv.org/pdf/2509.01336)、[有剧本内容的说话人分段](https://arxiv.org/pdf/2308.02160)、[AniSpeech](https://huggingface.co/datasets/ShoukanLabs/AniSpeech)、[分段模型基准与失效模式 2026](https://kili-technology.com/blog/speaker-diarization-models-guide-benchmarks-and-failure-modes-2026)
