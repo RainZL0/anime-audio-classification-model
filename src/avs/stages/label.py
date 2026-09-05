@@ -269,6 +269,72 @@ def pairs_report(pairs: list[Pair], answers: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def export_annotation(
+    path: Path,
+    sample: Sample,
+    names: dict[str, str],
+    source: str,
+    run: str,
+    by_ear: dict[str, str] | None = None,
+) -> None:
+    """把一次标注归档成一个自带说明的文件，存进仓库跟踪的 `annotations/`。
+
+    **为什么要单独存一份。** 干活时的文件在 `runs/` 底下，而 `runs/` 是被 git 忽略的，
+    因为里面都是能重跑出来的产物。人工标注不是产物，它不可再生，删了就没了。所以归档
+    一份到会被跟踪的地方。
+
+    格式是自包含的：一条片段的时间、机器给的标签、人工给的名字都在同一行，接手的人
+    不用去 join 另一个文件。`by_ear` 是更早那轮只靠耳朵标的，留着当对照，别当真答案用。
+    """
+    from datetime import date
+
+    ear = by_ear or {}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "source": source,
+                "run": run,
+                "labelled_on": date.today().isoformat(),
+                "method": "看画面报名字（avs label --mode names）",
+                "note": (
+                    "name 是对着视频画面标的，是这个项目里唯一可信的真答案。"
+                    "by_ear 是更早只靠耳朵分组那轮的结果，一半是「听不清」，只作对照。"
+                    f"特殊值：{'、'.join(f'{k} = {v}' for k, v in SPECIAL.items())}。"
+                ),
+                "clips": [
+                    {
+                        "clip_id": c.clip_id,
+                        "start": round(c.start, 3),
+                        "end": round(c.end, 3),
+                        "stamp": stamp(c.start),
+                        "machine": c.machine,
+                        "name": names.get(c.clip_id),
+                        "by_ear": ear.get(c.clip_id),
+                    }
+                    for c in sorted(sample.clips, key=lambda x: x.start)
+                ],
+            },
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+
+
+def load_annotation(path: Path) -> tuple[Sample, dict[str, str]]:
+    """读回归档，还原成（抽样, 人工标签）。跳过没标的。"""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    sample = Sample(
+        clips=[
+            Clip(clip_id=c["clip_id"], start=c["start"], end=c["end"], machine=c["machine"])
+            for c in data["clips"]
+        ]
+    )
+    names = {c["clip_id"]: c["name"] for c in data["clips"] if c.get("name")}
+    return sample, names
+
+
 def save_sample(sample: Sample, path: Path) -> None:
     """把抽样结果连同机器标签存下来。机器标签只留在这个文件里，不进网页。"""
     path.write_text(

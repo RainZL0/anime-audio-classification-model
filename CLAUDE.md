@@ -13,6 +13,8 @@
 
 不认识的词查 [`docs/GLOSSARY.md`](docs/GLOSSARY.md)。
 
+人工标注在 [`annotations/`](annotations/)，那是目前唯一的真答案，会进 git；`runs/`、`data/`、`models/`、`out/` 都被忽略，里面的东西删了能重跑。
+
 ## 改完代码要过的四项检查
 
 ```bash

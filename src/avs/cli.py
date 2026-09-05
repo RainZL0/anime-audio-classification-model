@@ -47,6 +47,19 @@ def doctor() -> None:
             typer.echo(f"{mod:<15} FAILED: {exc}")
 
 
+ANNOTATIONS = Path("annotations")
+"""人工标注归档在这。`runs/` 被 git 忽略，而人工标注不可再生，所以单独放一份。"""
+
+
+def _source_of(run_dir: Path) -> str:
+    """这次测试用的是哪个音轨。人声轨的路径里带着它，够归档用了。"""
+    stats_file = run_dir / "stats.json"
+    if not stats_file.exists():
+        return str(run_dir)
+    artifacts = json.loads(stats_file.read_text(encoding="utf-8"))["artifacts"]
+    return str(artifacts.get("vocals", run_dir))
+
+
 def _vocals_of(run_dir: Path) -> Path:
     stats_file = run_dir / "stats.json"
     if not stats_file.exists():
@@ -133,7 +146,14 @@ def label(
 
 def _label_names(run_dir: Path, per_speaker: int, keep_ratio: float, port: int) -> None:
     """对着画面报名字。真答案来自视频，不靠耳朵，所以标出来的东西最可信。"""
-    from avs.stages.label import by_time, export_sample, load_sample, pick_sample, save_sample
+    from avs.stages.label import (
+        by_time,
+        export_annotation,
+        export_sample,
+        load_sample,
+        pick_sample,
+        save_sample,
+    )
     from avs.stages.label_server import serve, write_names_page
 
     quality_file = run_dir / "quality.json"
@@ -171,7 +191,20 @@ def _label_names(run_dir: Path, per_speaker: int, keep_ratio: float, port: int) 
     typer.echo(f"打开 http://127.0.0.1:{port}/ 开始标，标完按 Ctrl+C 停掉服务")
     with contextlib.suppress(KeyboardInterrupt):
         serve(clip_dir, names_file, port)
-    typer.echo(f"\n停了。结果在 {names_file}")
+
+    # runs/ 是被 git 忽略的，人工标注不可再生，所以停下来时归档一份到会被跟踪的地方
+    names = json.loads(names_file.read_text(encoding="utf-8")) if names_file.exists() else {}
+    ear_file = run_dir / "labels_groups.json"
+    archive = ANNOTATIONS / f"{run_dir.name}.json"
+    export_annotation(
+        archive,
+        sample,
+        names,
+        source=str(_source_of(run_dir)),
+        run=str(run_dir),
+        by_ear=json.loads(ear_file.read_text(encoding="utf-8")) if ear_file.exists() else None,
+    )
+    typer.echo(f"\n停了。标了 {len(names)} 条，归档到 {archive}（这份会进 git）")
     return None
 
 
@@ -262,7 +295,7 @@ def embed(
     """
     from avs.embeddings.extract import MODELS, embed_segments
     from avs.evaluation.distance import distance_report, format_report
-    from avs.stages.label import apply_labels, load_sample, purity
+    from avs.stages.label import apply_labels, load_annotation, load_sample, purity
 
     quality_file = run_dir / "quality.json"
     analysis = run_dir / "analysis_16k.wav"
@@ -277,17 +310,17 @@ def embed(
     typer.echo(f"用音质最好的 {len(kept)} 条（共 {len(scored)} 条打过分）")
 
     # 标注做过了就顺便拿人工标签再算一遍，那份才不是自己证明自己。
-    # names.json 优先：它的答案来自视频，比靠耳朵分组的 labels.json 可信。
+    # 优先读 annotations/ 里的归档，它是会进 git 的那一份。
     sample_file = run_dir / "label_sample.json"
+    archive = ANNOTATIONS / f"{run_dir.name}.json"
     human = None
-    for source, note in (
-        (run_dir / "names.json", "看画面标的"),
-        (run_dir / "labels.json", "听音标的"),
-    ):
-        if source.exists() and sample_file.exists():
-            human = (source, load_sample(sample_file), json.loads(source.read_text("utf-8")))
-            typer.echo(f"找到人工标注 {len(human[2])} 条（{note}，来自 {source.name}），会一并算")
-            break
+    if archive.exists():
+        human = (archive, *load_annotation(archive))
+        typer.echo(f"找到人工标注 {len(human[2])} 条（看画面标的，来自 {archive}），会一并算")
+    elif (run_dir / "names.json").exists() and sample_file.exists():
+        source = run_dir / "names.json"
+        human = (source, load_sample(sample_file), json.loads(source.read_text("utf-8")))
+        typer.echo(f"找到人工标注 {len(human[2])} 条（{source} 还没归档，先用着）")
 
     wanted = list(MODELS) if model == "all" else [model]
     for name in wanted:

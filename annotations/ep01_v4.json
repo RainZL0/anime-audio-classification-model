@@ -1,0 +1,324 @@
+{
+ "source": "runs\\probe\\ep01\\separated\\uma_s2_01_(vocals)_mel_band_roformer_kim_ft2_bleedless_unwa.flac",
+ "run": "runs\\probe\\ep01_v4",
+ "labelled_on": "2026-09-06",
+ "method": "看画面报名字（avs label --mode names）",
+ "note": "name 是对着视频画面标的，是这个项目里唯一可信的真答案。by_ear 是更早只靠耳朵分组那轮的结果，一半是「听不清」，只作对照。特殊值：__unclear__ = 听不清、__multiple__ = 不止一个人、__not_speech__ = 不是说话。",
+ "clips": [
+  {
+   "clip_id": "clip_03",
+   "start": 5.38,
+   "end": 8.165,
+   "stamp": "00:05.4",
+   "machine": "SPEAKER_09",
+   "name": "旁白",
+   "by_ear": "A"
+  },
+  {
+   "clip_id": "clip_06",
+   "start": 9.329,
+   "end": 17.176,
+   "stamp": "00:09.3",
+   "machine": "SPEAKER_09",
+   "name": "旁白",
+   "by_ear": "A"
+  },
+  {
+   "clip_id": "clip_11",
+   "start": 21.918,
+   "end": 25.563,
+   "stamp": "00:21.9",
+   "machine": "SPEAKER_09",
+   "name": "旁白",
+   "by_ear": "A"
+  },
+  {
+   "clip_id": "clip_12",
+   "start": 25.934,
+   "end": 27.487,
+   "stamp": "00:25.9",
+   "machine": "SPEAKER_09",
+   "name": "旁白",
+   "by_ear": "A"
+  },
+  {
+   "clip_id": "clip_34",
+   "start": 31.672,
+   "end": 32.853,
+   "stamp": "00:31.7",
+   "machine": "SPEAKER_09",
+   "name": "旁白",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_26",
+   "start": 98.227,
+   "end": 99.627,
+   "stamp": "01:38.2",
+   "machine": "SPEAKER_10",
+   "name": "丸善斯基",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_30",
+   "start": 102.087,
+   "end": 105.398,
+   "stamp": "01:42.1",
+   "machine": "SPEAKER_12",
+   "name": "__multiple__",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_05",
+   "start": 235.471,
+   "end": 236.673,
+   "stamp": "03:55.5",
+   "machine": "SPEAKER_03",
+   "name": "teo",
+   "by_ear": "B"
+  },
+  {
+   "clip_id": "clip_33",
+   "start": 248.026,
+   "end": 251.439,
+   "stamp": "04:08.0",
+   "machine": "SPEAKER_10",
+   "name": "__multiple__",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_21",
+   "start": 287.952,
+   "end": 298.212,
+   "stamp": "04:48.0",
+   "machine": "SPEAKER_04",
+   "name": "__multiple__",
+   "by_ear": "__multiple__"
+  },
+  {
+   "clip_id": "clip_01",
+   "start": 355.098,
+   "end": 357.853,
+   "stamp": "05:55.1",
+   "machine": "SPEAKER_02",
+   "name": "老师",
+   "by_ear": "A"
+  },
+  {
+   "clip_id": "clip_00",
+   "start": 373.964,
+   "end": 382.233,
+   "stamp": "06:14.0",
+   "machine": "SPEAKER_04",
+   "name": "__multiple__",
+   "by_ear": "__multiple__"
+  },
+  {
+   "clip_id": "clip_02",
+   "start": 397.268,
+   "end": 398.517,
+   "stamp": "06:37.3",
+   "machine": "SPEAKER_10",
+   "name": "teo",
+   "by_ear": "B"
+  },
+  {
+   "clip_id": "clip_08",
+   "start": 498.008,
+   "end": 499.43,
+   "stamp": "08:18.0",
+   "machine": "SPEAKER_02",
+   "name": "teo",
+   "by_ear": "B"
+  },
+  {
+   "clip_id": "clip_28",
+   "start": 515.562,
+   "end": 519.06,
+   "stamp": "08:35.6",
+   "machine": "SPEAKER_08",
+   "name": "trainer",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_15",
+   "start": 519.422,
+   "end": 525.624,
+   "stamp": "08:39.4",
+   "machine": "SPEAKER_04",
+   "name": "__multiple__",
+   "by_ear": "__multiple__"
+  },
+  {
+   "clip_id": "clip_31",
+   "start": 533.5,
+   "end": 537.335,
+   "stamp": "08:53.5",
+   "machine": "SPEAKER_08",
+   "name": "trainer",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_09",
+   "start": 555.99,
+   "end": 559.965,
+   "stamp": "09:16.0",
+   "machine": "SPEAKER_08",
+   "name": "trainer",
+   "by_ear": "D"
+  },
+  {
+   "clip_id": "clip_29",
+   "start": 581.32,
+   "end": 583.99,
+   "stamp": "09:41.3",
+   "machine": "SPEAKER_12",
+   "name": "__multiple__",
+   "by_ear": "__multiple__"
+  },
+  {
+   "clip_id": "clip_10",
+   "start": 606.653,
+   "end": 607.801,
+   "stamp": "10:06.7",
+   "machine": "SPEAKER_12",
+   "name": "皇帝",
+   "by_ear": "E"
+  },
+  {
+   "clip_id": "clip_25",
+   "start": 704.967,
+   "end": 709.068,
+   "stamp": "11:45.0",
+   "machine": "SPEAKER_04",
+   "name": "红毛",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_24",
+   "start": 782.491,
+   "end": 783.677,
+   "stamp": "13:02.5",
+   "machine": "SPEAKER_10",
+   "name": "理发师",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_04",
+   "start": 785.917,
+   "end": 790.473,
+   "stamp": "13:05.9",
+   "machine": "SPEAKER_04",
+   "name": "__multiple__",
+   "by_ear": "__multiple__"
+  },
+  {
+   "clip_id": "clip_20",
+   "start": 859.627,
+   "end": 862.597,
+   "stamp": "14:19.6",
+   "machine": "SPEAKER_10",
+   "name": "橙毛",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_32",
+   "start": 884.327,
+   "end": 890.035,
+   "stamp": "14:44.3",
+   "machine": "SPEAKER_02",
+   "name": "__multiple__",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_16",
+   "start": 890.66,
+   "end": 898.996,
+   "stamp": "14:50.7",
+   "machine": "SPEAKER_02",
+   "name": "解说员",
+   "by_ear": "F"
+  },
+  {
+   "clip_id": "clip_14",
+   "start": 921.237,
+   "end": 926.777,
+   "stamp": "15:21.2",
+   "machine": "SPEAKER_07",
+   "name": "__multiple__",
+   "by_ear": "D"
+  },
+  {
+   "clip_id": "clip_19",
+   "start": 998.98,
+   "end": 1004.688,
+   "stamp": "16:39.0",
+   "machine": "SPEAKER_02",
+   "name": "__unclear__",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_23",
+   "start": 1019.327,
+   "end": 1022.846,
+   "stamp": "16:59.3",
+   "machine": "SPEAKER_06",
+   "name": "对手训练员",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_22",
+   "start": 1023.327,
+   "end": 1025.272,
+   "stamp": "17:03.3",
+   "machine": "SPEAKER_08",
+   "name": "trainer",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_27",
+   "start": 1029.642,
+   "end": 1031.199,
+   "stamp": "17:09.6",
+   "machine": "SPEAKER_06",
+   "name": "对手训练员",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_07",
+   "start": 1032.372,
+   "end": 1034.384,
+   "stamp": "17:12.4",
+   "machine": "SPEAKER_06",
+   "name": "对手训练员",
+   "by_ear": "C"
+  },
+  {
+   "clip_id": "clip_18",
+   "start": 1113.123,
+   "end": 1115.013,
+   "stamp": "18:33.1",
+   "machine": "SPEAKER_12",
+   "name": "皇帝",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_13",
+   "start": 1133.069,
+   "end": 1135.33,
+   "stamp": "18:53.1",
+   "machine": "SPEAKER_12",
+   "name": "皇帝",
+   "by_ear": "__unclear__"
+  },
+  {
+   "clip_id": "clip_17",
+   "start": 1266.563,
+   "end": 1268.71,
+   "stamp": "21:06.6",
+   "machine": "SPEAKER_08",
+   "name": "trainer",
+   "by_ear": "__unclear__"
+  }
+ ]
+}
