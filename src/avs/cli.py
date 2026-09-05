@@ -117,6 +117,26 @@ def references(
 
 
 @app.command()
+def diagnose(
+    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
+    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    out: Annotated[Path, typer.Option(help="新的诊断输出目录")],
+    groups: Annotated[Path | None, typer.Option(help="当前分组文件，用于区分组内/组间错误")] = None,
+) -> None:
+    """用两模型缓存和人工标签做近邻与距离诊断，导出可试听错误实例。"""
+    from avs.embeddings.extract import MODELS
+    from avs.evaluation.diagnose import diagnose as run_diagnosis
+
+    result = run_diagnosis(episodes, annotation, list(MODELS), out, groups)
+    for model, own in result["models"].items():
+        typer.echo(
+            f"{model}: {own['retrieval']['queries']} 次查询，"
+            f"Top-1 同角色 {own['retrieval']['top1_hit_rate']}"
+        )
+    typer.echo(f"诊断 -> {out}")
+
+
+@app.command()
 def export(groups: Path, out: Annotated[Path, typer.Option(help="新的音频目录")]) -> None:
     """从原采样率人声轨导出每个身份组，不设音质门槛。"""
     result = pipeline.export_groups(groups, out)

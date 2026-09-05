@@ -44,6 +44,14 @@ uv run avs references runs/groups/uma.json --annotation annotations/ep01_v4.json
 
 每角色分别取 1/2 条参考，各重复 20 次划分。报告中的基线和参考方法始终用同一批剩余片段评分；参考候选带有已用标签 ID，`evaluate` 会自动排除它们。输出仅为实验候选，当前实测不足以替换默认分组。
 
+嵌入诊断（固定片段，两模型缓存，不重跑音频模型；`--groups` 可选，用来区分组内与组间错误）：
+
+```powershell
+uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --groups runs/groups/uma.json --out runs/diagnosis-next
+```
+
+输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
+
 ```powershell
 uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
 ```
