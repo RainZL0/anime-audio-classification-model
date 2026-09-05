@@ -24,7 +24,7 @@ uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01_v4.j
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
-重新调分组只需再跑 `group`；`--method` 可选 average（默认）、single、complete、mutual_knn，已实测都不超过 average。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
+重新调分组只需再跑 `group`；`--method` 可选 average（默认）、single、complete、mutual_knn、two_stage。前三种已实测都不超过 average；two_stage 先分长片段再挂短片段，是旧标签上唯一有改善的候选，等待新标签验证后才会成为默认。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
 
 固定片段比较两个模型（阈值 0.20—0.90，步长 0.01，保留错合与漏合完整曲线）：
 

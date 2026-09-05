@@ -64,7 +64,7 @@ def group(
     threshold: float = 0.5,
     model: str = "redimnet2-b6",
     method: Annotated[
-        str, typer.Option(help="连接规则：average/single/complete/mutual_knn")
+        str, typer.Option(help="连接规则：average/single/complete/mutual_knn/two_stage")
     ] = "average",
 ) -> None:
     """只读取缓存进行全局分组，小组保留；可以反复调整阈值和连接规则。"""
