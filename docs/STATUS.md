@@ -14,7 +14,7 @@
 | 新字幕流程 | 已实现对齐后直接按字幕行切；尚未在这两集重跑，未验证它能改善身份区分 |
 | 嵌入 | ReDimNet2 B6 与 WeSpeaker ResNet293 的全量缓存均已完成 |
 | 分组 | 当前使用 ReDimNet、全局平均连接、距离 0.50；100 组，48 个单条组，0 条未归属，仍有碎组 |
-| 人工对照 | 62 条时间精确匹配的身份标签，覆盖 25 个角色；其中 12 个角色有 2 条以上标签。两集分别标注，跨集同一角色必须同名（`红毛` 已统一为 `Nice Nature`） |
+| 人工对照 | 旧归档 62 条时间精确匹配的标签，覆盖 25 个角色，已退出验收，仅作词表与参考音。两集全量重标尚未开始（485 条待标） |
 | 嵌入诊断 | 已完成，固定片段与两模型缓存；结论见下 |
 | 连接规则 | single/complete/mutual_knn 都不超过 average；针对短片段的 two_stage 零错合下明显更好，候选已生成，未替换默认 |
 | 短片段重切 | 闸门核对未通过：整句字幕只比短片段长约 0.1 秒，此路停止 |
@@ -47,23 +47,27 @@
 
 **针对短片段的两段式分组是目前唯一有改善的候选。** 长片段先平均连接，短片段再挂到明显最近的组，挂不上的短片段之间再连一次。同阈值 0.50 下由 67 / 0 / 51（正确 / 错合 / 漏合）变为 86 / 0 / 32，`teo` 从 5 组减到 3 组，`皇帝` 与 `Nice Nature` 各合成 1 组；0.51 可到 94 / 0 / 24，但 0.52 起错合陡增到 16 对。分界 1.5 秒与领先幅度 0.05 来自同一批标签，整条曲线也是同批标签上的探索，因此候选没有替换默认分组。见 [EXPERIMENTS.md](EXPERIMENTS.md#两段式分组)。
 
-## 下一步：用新标签验证两段式候选
+## 下一步：两集全量重标，再验证两段式候选
 
 **尚未实施。** 候选在旧标签上零错合且多找回 19 对，但分界、幅度和阈值都用了这批标签；在换掉默认分组之前必须用没参与过探索的标签检验，重点是错合。
 
-1. **跨集角色名，两条待听。** 两集是分别标注的。已确认：ep01 的 `红毛` 就是 ep02 的 `Nice Nature`（已统一）；ep02 的解说是两个人，`解说` 与 `解说2` 已改名为 `解说A` 与 `解说B`。仍未定：ep01 的 `解说员` 属于 A 还是 B，以及 ep01 的 `橙毛` 是谁，标注者要重听才能确认。两者各只有 1 条标签，按现有约定不作同人检索查询，当前错合又是 0，所以它们现在不影响任何数字；即便日后确认是跨集同一角色，代价也只是漏合多算，不会把成绩报高。因此不单独安排重听，并入第 2 步一起做。
-2. **给候选改动的片段补标签。标注计划已生成，等人工标注。** 两段式把 123 条短片段挂进了多条组，其中 103 条还没有任何标签（ep01 48 条、ep02 55 条，共约 129 秒），71 条在两套分组里归属不同。范围由 `avs label-plan` 划定并存在 `runs/label-plan.json`，只收还没被人工归档覆盖的片段，所以新旧归档不会给同一条片段两个名字。标注命令：
+2026-09-06 改了做法：不再抽样补标，两集 485 条片段全部重标。抽样每条都要重新定位画面，力气大半花在找位置上；而且抽样范围只覆盖候选改动的那部分，别处混没混人始终看不到。整集连着标反而更省力，得到的也是完整验收集而不是一个切片。
+
+1. **两集各标一遍，全量。** 对照画面报名字，顺着时间往下走。
 
    ```powershell
-   uv run avs label runs/episodes/ep01 --archive annotations/ep01-short.json --plan runs/label-plan.json
-   uv run avs label runs/episodes/ep02 --archive annotations/ep02-short.json --plan runs/label-plan.json
+   uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
+   uv run avs label runs/episodes/ep02 --archive annotations/ep02-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
    ```
 
-   对照画面报名字，不看机器分组结果标注，跨集同一角色用同一个名字。标不完可以停，未标的留空不影响评分。顺便确认第 1 步那两条：`橙毛` 在 14:19.6，`解说员` 在 14:50.7，都在 ep01；确认后改 `annotations/ep01_v4.json` 并补 `renamed` 记录，不要在新归档里重标它们。
-3. **两套分组在新标签上同口径评分。** 只用 `annotations/ep01-short.json` 与 `ep02-short.json` 跑 `evaluate` 与 `diagnose`，错合与漏合一起报，并按短片段/跨集分层；旧标签的成绩不再计入验收。
+   页面词表来自旧归档的 27 个角色名，每个名字下的旧片段可以回放，用来想起这个名字是谁。跨集同一角色必须同名。标不完可以停，未标的留空。顺便定下两个悬案：ep01 的 `解说员` 属于 `解说A` 还是 `解说B`，以及 `橙毛` 是谁。
+2. **旧标签退出验收。** `ep01_v4.json` 与 `ep02.json` 的逐条标签不再计入评分，文件保留作词表和参考音。评估只用两份 `-full` 归档。
+3. **两套分组在新标签上同口径评分。** 跑 `evaluate` 与 `diagnose`，错合与漏合一起报，并按短片段/跨集分层。全量标注之后，未标注片段是否混人这个一直悬着的问题也能一并回答。
 4. **决定是否替换默认。** 新标签上错合不增加、漏合减少才替换默认分组与导出；若短片段挂组带来混人，退回 average 并把两段式记为失败。
 5. **试听错误实例。** `runs/diagnosis/examples/`，确认远距离同人对里是否有喊叫、残留或边界异常。
 6. **新集。** 第 3 集起用新流程（整句字幕切段）准备，先按同样方法标注，再作为独立验证。
+
+`avs label-plan` 与 `runs/label-plan.json` 是抽样补标那条路留下的，全量重标之后用不上了，留着备查。
 
 ## 当前文件
 
@@ -75,8 +79,8 @@
 | 嵌入诊断报告、逐配对距离、错误实例 | `runs/diagnosis/report.json`、`pairs-<model>.json`、`examples/` |
 | 连接规则对照、两段式曲线 | `runs/comparison-methods.json`、`runs/comparison-two-stage.json` |
 | 两段式候选、评分与诊断 | `runs/groups/uma-two-stage.json`、`uma-two-stage-evaluation.json`、`runs/diagnosis-two-stage/` |
-| 下一轮标注范围 | `runs/label-plan.json` |
+| 全量重标归档 | `annotations/ep01-full.json`、`ep02-full.json` |
 | 人工身份与旧现场记录 | `annotations/ep01_v4.json`、`annotations/ep02.json`、`annotations/legacy/` |
 | 已完成实验的报告索引 | [EXPERIMENTS.md](EXPERIMENTS.md) |
 
-最近代码检查：Ruff、格式检查、Mypy 与 39 项测试通过。
+最近代码检查：Ruff、格式检查、Mypy 与 44 项测试通过。
