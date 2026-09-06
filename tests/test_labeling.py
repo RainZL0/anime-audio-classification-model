@@ -236,3 +236,22 @@ def test_all_clips_sample_takes_the_whole_episode_in_time_order(tmp_path: Path) 
     assert "seed" not in data and "plan" not in data
     with pytest.raises(ValueError, match="只能选一个"):
         build_sample(directory, tmp_path / "clash.json", 2, tmp_path / "plan.json", every=True)
+
+
+def test_known_names_also_reads_a_plain_name_list(tmp_path: Path) -> None:
+    archive = tmp_path / "a.json"
+    roster = tmp_path / "names.json"
+    write_json(archive, {"source": "a.wav", "clips": [{"name": "teo"}, {"name": "teo"}]})
+    write_json(roster, {"names": ["皇帝", "teo", "__unclear__"]})
+    # 归档里的名字按条数在前，词表补上没标过的，重复的不再出现一次。
+    assert known_names([archive, roster]) == ["teo", "皇帝"]
+    assert known_names([roster]) == ["皇帝", "teo"]
+
+
+def test_reference_clips_ignore_a_name_list_with_no_segments(tmp_path: Path) -> None:
+    root = tmp_path / "episodes"
+    root.mkdir()
+    directory, _ = make_episode(root, "ep1")
+    roster = tmp_path / "names.json"
+    write_json(roster, {"names": ["teo"]})
+    assert reference_clips([roster], directory) == {}
