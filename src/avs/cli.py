@@ -142,6 +142,27 @@ def diagnose(
 
 
 @app.command()
+def coverage(
+    episode: Path,
+    subtitle: Annotated[Path, typer.Option(help="这一集的 ASS 字幕")],
+    out: Annotated[Path, typer.Option(help="新的核对输出目录")],
+    pad: Annotated[float, typer.Option(help="切音频时前后各留几秒，便于听清")] = 0.0,
+) -> None:
+    """找出字幕里没有对应片段的台词，按原因切成音频供试听。"""
+    from avs.evaluation.coverage import coverage as check
+
+    report = check(episode, subtitle, out, pad)
+    own = report["summary"]
+    typer.echo(
+        f"{report['episode']}：对白 {own['dialogue_lines']} 行，"
+        f"有片段 {own['lines_with_clip']} 行，没片段 {own['lines_without_clip']} 行"
+        f"（短于 {report['floor_seconds']} 秒 {own['below_floor']} 行，"
+        f"够长却没切出 {own['no_speech_found']} 行）"
+    )
+    typer.echo(f"偏移 {report['offset_seconds']:+.2f} 秒，音频与清单 -> {out}")
+
+
+@app.command()
 def export(groups: Path, out: Annotated[Path, typer.Option(help="新的音频目录")]) -> None:
     """从原采样率人声轨导出每个身份组，不设音质门槛。"""
     result = pipeline.export_groups(groups, out)

@@ -12,8 +12,8 @@ STEP = 0.01
 MIN_OVERLAP_RATIO = 0.6
 
 
-def load_lines(path: Path) -> list[tuple[float, float]]:
-    """读一个 ASS 字幕文件，只挑出对白行的时间，按时间排好。
+def load_dialogue(path: Path) -> list[dict[str, Any]]:
+    """读一个 ASS 字幕文件，只挑出对白行，按时间排好，带上台词正文。
 
     挑的规矩见 `DIALOGUE_STYLE` 和 `MAX_LINE`。另外还会扔掉两种东西：正文是空的
     （那种整行都是排版指令），以及字幕组用来分段的 `====` 分隔行。
@@ -22,7 +22,11 @@ def load_lines(path: Path) -> list[tuple[float, float]]:
 
     subs = pysubs2.load(str(path))
     lines = [
-        (event.start / 1000.0, event.end / 1000.0)
+        {
+            "start": event.start / 1000.0,
+            "end": event.end / 1000.0,
+            "text": event.plaintext.strip(),
+        }
         for event in subs
         if event.style == DIALOGUE_STYLE
         and event.end > event.start
@@ -30,7 +34,12 @@ def load_lines(path: Path) -> list[tuple[float, float]]:
         and event.plaintext.strip()
         and "====" not in event.plaintext
     ]
-    return sorted(lines)
+    return sorted(lines, key=lambda line: (line["start"], line["end"]))
+
+
+def load_lines(path: Path) -> list[tuple[float, float]]:
+    """对白行的时间，按时间排好。切段只关心时间，正文见 `load_dialogue`。"""
+    return [(line["start"], line["end"]) for line in load_dialogue(path)]
 
 
 def _mask(spans: list[tuple[float, float]], length: int) -> Any:

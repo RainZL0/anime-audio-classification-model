@@ -52,6 +52,14 @@ uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotatio
 
 输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
 
+对白覆盖核对（字幕里哪些台词根本没有片段）：
+
+```powershell
+uv run avs coverage runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep02 --pad 0.3
+```
+
+现有片段是「字幕范围 ∩ 检测到有人说话」，还带 1 秒下限，所以片段数远少于字幕对白行数。`coverage` 把没有片段的台词切成音频，按原因分到 `below_floor`（行本身短于 1 秒，不可能切出合格片段）和 `no_speech_found`（行够长却没切出来）两个目录，另出 `lines.txt` 和 `report.json`。偏移取片段与字幕行边界差的众数，不需要当初的语音检测结果。
+
 ```powershell
 uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json
 uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
