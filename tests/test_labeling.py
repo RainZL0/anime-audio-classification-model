@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from avs.labeling import build_plan, build_sample
+from avs.labeling import _roster_archives, build_plan, build_sample, known_names
 from avs.project import read_json, segment_rows, write_json
 
 # 0.5 秒的算短片段，2 秒的算长片段；分界取自 avs.stages.cluster.SHORT_SECONDS。
@@ -147,3 +147,34 @@ def test_sample_refuses_a_plan_made_for_other_segments(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="计划里没有 ep1"):
         build_sample(directory, tmp_path / "ep1-short.json", 1, out)
+
+
+def test_known_names_drops_special_labels_and_deduplicates(tmp_path: Path) -> None:
+    first = tmp_path / "a.json"
+    second = tmp_path / "b.json"
+    write_json(first, {"source": "a.wav", "clips": [{"name": "teo"}, {"name": "__unclear__"}]})
+    write_json(second, {"source": "b.wav", "clips": [{"name": "teo"}, {"name": "皇帝"}, {}]})
+    assert known_names([first, second]) == ["teo", "皇帝"]
+
+
+def test_roster_falls_back_to_the_archives_the_plan_recorded(tmp_path: Path) -> None:
+    directory, rows = make_episode(tmp_path, "ep1")
+    candidate = tmp_path / "candidate.json"
+    baseline = tmp_path / "baseline.json"
+    make_groups(candidate, directory, rows, ["speaker_001"] * 5)
+    make_groups(baseline, directory, rows, ["speaker_002"] * 5)
+    annotation = tmp_path / "truth.json"
+    write_json(
+        annotation,
+        {"source": f"{directory / 'ep1.wav'}", "clips": [dict(rows[0], name="teo")]},
+    )
+    out = tmp_path / "plan.json"
+    build_plan(candidate, baseline, [annotation], out)
+
+    assert known_names(_roster_archives(None, out)) == ["teo"]
+    assert _roster_archives([annotation], None) == [annotation]
+    assert _roster_archives(None, None) == []
+
+    annotation.unlink()
+    with pytest.raises(ValueError, match="已不在原处"):
+        _roster_archives(None, out)
