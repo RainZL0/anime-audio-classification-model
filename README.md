@@ -58,6 +58,15 @@ uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
 
 `label` 从全量片段随机抽样，按时间顺序展示，对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。
 
+验收一个候选分组时不必整集重标，先划出它改动过的范围：
+
+```powershell
+uv run avs label-plan --candidate runs/groups/uma-two-stage.json --baseline runs/groups/uma.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/label-plan.json
+uv run avs label runs/episodes/ep01 --archive annotations/ep01-short.json --plan runs/label-plan.json
+```
+
+`label-plan` 只挑候选挂进多条组、又还没被任何人工归档覆盖的短片段，并标出哪些在两套分组里归属不同（`reason` 为 `moved`）。`label --plan` 只取该集计划里的片段，仍按时间顺序展示，因为标注者是顺着画面找人，来回跳时间点比多标几条还慢。计划不安排已标过的片段，新旧归档不会给同一条片段两个名字。
+
 导出回到原始采样率的人声轨；16 kHz 副本只用于分析。短于 1 秒、没有可靠声纹的片段保留在 `_unassigned`，不会被安静丢弃。
 
 [文档导航](docs/README.md) · [人工标注](annotations/README.md)
