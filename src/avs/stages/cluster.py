@@ -20,6 +20,58 @@ SHORT_SECONDS = 1.5
 ATTACH_MARGIN = 0.05
 """短片段挂组时最近组必须领先第二近的组的余弦距离；与参考实验的领先幅度一致。"""
 
+POOL_QUANTILE = 0.01
+"""按池子定分界线时取的分位：池子里全部配对距离由近到远排开，取第 1% 那个距离。
+
+取这么低的分位是因为它跟着「同一角色的配对占全部配对的比例」走。池子里角色越多，
+靠得很近的那一小撮配对就越稀，这个距离就越大，方向正好和分界线需要挪动的方向一致。
+中位数之类的高分位几乎全是不同角色的配对，池子变大也不动，用不上。"""
+
+POOL_MULTIPLIERS = {"anime-va": 1.275}
+"""按池子定分界线时乘的倍数，一个模型一个。乘出来的值就是分界线。
+
+1.275 是这样定出来的：现在三集 1176 条片段拼成的池子上，它正好乘出 anime-va 现用的 0.70。
+**所以今天这条规则和固定 0.70 分组结果一样，语料继续长大才开始分岔**，分岔的方向是分界线
+跟着池子往外挪，抵消掉「池子越大合并越保守」。
+
+倍数决定的是松紧，跟能不能稳住是两回事。倍数取 1.38（在只有第 3 集时乘出 0.70）也一样稳，
+但那是个松得多的位置：第 3 集连上的从 2095 涨到 3075，第 1 集的错误合并却从 11 涨到 155。
+错误合并是这个项目里更贵的那种错，所以取保守的那个。
+
+**这个倍数是在已有三集的标签上挑的，还没有独立检验。** 见 EXPERIMENTS.md。"""
+
+MAX_QUANTILE_PAIRS = 20_000_000
+"""算分位时最多用多少对距离。再多就随机抽这么多对，免得整张距离表撑爆内存。
+13 集大约 5000 条片段、1250 万对，还在这个数以内。"""
+
+
+def pool_threshold(vectors: Any, multiplier: float, quantile: float = POOL_QUANTILE) -> float:
+    """按池子自己的距离定分界线，而不是记死一个数。
+
+    固定分界线会随片段池变大而失准：同一个数，池子越大合并越保守（见 HISTORY.md）。
+    这里改成先看这个池子内部的距离长什么样，再按同一个比例定分界线。
+    """
+    import numpy as np
+
+    if not 0 < quantile < 1:
+        raise ValueError("分位必须在 0 和 1 之间")
+    if not multiplier > 0:
+        raise ValueError("倍数必须大于 0")
+    if len(vectors) < 2:
+        raise ValueError("至少要两条片段才能量池子内部的距离")
+    total = len(vectors) * (len(vectors) - 1) // 2
+    if total <= MAX_QUANTILE_PAIRS:
+        from scipy.spatial.distance import pdist
+
+        distances = pdist(vectors, metric="cosine")
+    else:
+        rng = np.random.default_rng(0)
+        rows = rng.integers(0, len(vectors), MAX_QUANTILE_PAIRS)
+        cols = rng.integers(0, len(vectors) - 1, MAX_QUANTILE_PAIRS)
+        cols += cols >= rows  # 不要拿片段和自己配对，那个距离恒为 0
+        distances = 1 - np.einsum("ij,ij->i", vectors[rows], vectors[cols])
+    return float(np.quantile(distances, quantile) * multiplier)
+
 
 def cluster(
     vectors: Any, threshold: float = 0.5, method: str = "average", durations: Any = None

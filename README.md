@@ -35,7 +35,7 @@ uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
-`group` 不指定 `--threshold` 时用该模型自己的默认分界线并把它打印出来。`--model` 可选 `anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`；**换模型必须重新扫分界线**，不同模型的相似度刻度不通用。
+`group` 不指定 `--threshold` 时用该模型自己的默认分界线并把它打印出来。`--relative` 改成**按池子自己的距离定分界线**：分界线 = 1.275 × 这个池子内全部配对距离的第 1 百分位，池子变大它会跟着往外挪，抵消掉「池子越大合并越保守」。倍数定在现在三集 1176 条的池子上正好乘出 0.70，所以今天两种做法分出来的组完全一样；**倍数是在已有标签上挑的，还没有独立检验，默认仍是固定分界线**。`--model` 可选 `anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`；**换模型必须重新扫分界线**，不同模型的相似度刻度不通用。
 
 `--method` 除默认的 `average`（按整组平均距离合并）外还有 `single`、`complete`、`mutual_knn`、`two_stage`，都已实测不如 `average`，留着只为可复算。
 
@@ -85,6 +85,14 @@ uv run avs compare runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --an
 ```
 
 会先核验各模型覆盖同一批片段。`--low` / `--high` 必须按模型的相似度刻度给，默认的 0.20 至 0.90 是给 `redimnet2-b6` 定的，对 `anime-va` 几乎全无意义。用人工标签挑出来的分界线只能算探索，要另找一份没参与过的数据检验。
+
+量成绩随片段池变大怎么变：
+
+```powershell
+uv run avs drift runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --scored ep03 --annotation annotations/ep03-full.json --out runs/drift-next.json --steps 9 --seeds 8
+```
+
+被打分的那一集始终整集在池子里，只往池子里加别的集的片段，`--steps` 决定分几档、`--seeds` 决定每档随机抽几遍。这样每一档面对同一批标签、同一批配对，成绩能直接比。报告并排给两条线：固定分界线，和按池子定分界线。**要看的是错误合并稳不稳，不是连上多少对**：两个数一起往下掉说明分界线偏紧了，不是认错了人。`--multiplier` 可以试别的松紧。
 
 只比同一角色和不同角色的配对分不分得开，不做分组：
 

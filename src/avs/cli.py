@@ -87,11 +87,20 @@ def group(
     method: Annotated[
         str, typer.Option(help="连接规则：average/single/complete/mutual_knn/two_stage")
     ] = "average",
+    relative: Annotated[
+        bool,
+        typer.Option("--relative", help="分界线按这个池子自己的距离算，不用固定值；尚未独立检验"),
+    ] = False,
 ) -> None:
     """只读取缓存进行全局分组，小组保留；可以反复调整阈值和连接规则。"""
     from avs.embeddings.extract import DEFAULT_THRESHOLDS
 
-    if threshold is None:
+    if relative:
+        if threshold is not None:
+            raise typer.BadParameter("--relative 自己算分界线，不能同时给 --threshold")
+        threshold = pipeline.relative_threshold(episodes, model)
+        typer.echo(f"按池子算出的分界线 {threshold:.4f}（固定值是 {DEFAULT_THRESHOLDS[model]}）")
+    elif threshold is None:
         threshold = DEFAULT_THRESHOLDS.get(model, 0.5)
         typer.echo(f"未指定阈值，用 {model} 的默认值 {threshold}")
     result = pipeline.group(episodes, out, threshold, model, method)
@@ -137,6 +146,46 @@ def compare(
     grid = [i / 100 for i in range(round(low * 100), round(high * 100) + 1)]
     result = compare_models(episodes, annotation, model or list(MODELS), grid, out, method)
     typer.echo(f"比较 {len(result['results'])} 个设置 -> {out}")
+
+
+@app.command()
+def drift(
+    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
+    scored: Annotated[str, typer.Option(help="被打分的那一集集名，它始终整集在池子里")],
+    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    out: Annotated[Path, typer.Option(help="新的漂移报告 JSON")],
+    model: str = "anime-va",
+    threshold: Annotated[
+        float | None, typer.Option(help="要考察的固定分界线，省略用模型默认值")
+    ] = None,
+    multiplier: Annotated[
+        float | None, typer.Option(help="按池子定分界线时乘的倍数，省略用模型默认值")
+    ] = None,
+    steps: Annotated[int, typer.Option(help="池子大小取几档")] = 7,
+    seeds: Annotated[int, typer.Option(help="每档抽几遍别的集的片段")] = 8,
+) -> None:
+    """量成绩随片段池变大怎么变，对比固定分界线和按池子定分界线两种做法。
+
+    被打分的那一集始终整集在池子里，只往里加别的集的片段。每一档面对同一批标签、同一批配对，
+    所以成绩可以直接比。要看的是错误合并稳不稳，不是连上多少对。
+    """
+    from avs.evaluation.drift import drift as run_drift
+
+    report = run_drift(
+        episodes, scored, annotation, out, model, threshold, multiplier, steps=steps, seeds=seeds
+    )
+    typer.echo(f"{report['labeled_clips']} 条标签、{report['roles']} 个角色，打分只看 {scored}")
+    typer.echo("每行是一档池子，两种定分界线的做法并排；要看的是错误合并稳不稳")
+    for row in report["summary"]:
+        typer.echo(
+            f"片段池 {row['pool_clips']:>5} 条："
+            f"固定 {row['fixed_threshold']:.3f} 连上 {row['fixed_correct_pairs']:.0f}"
+            f" 错误合并 {row['fixed_false_merges']:.0f}"
+            f"；按池子定 {row['relative_threshold']:.4f}"
+            f" 连上 {row['relative_correct_pairs']:.0f}"
+            f" 错误合并 {row['relative_false_merges']:.0f}"
+        )
+    typer.echo(f"报告 -> {out}")
 
 
 @app.command()

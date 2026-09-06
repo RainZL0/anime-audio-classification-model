@@ -196,6 +196,19 @@ def load_embeddings(
     return records, vectors
 
 
+def relative_threshold(directories: list[Path], model: str = ANIME_VA) -> float:
+    """按这些集拼成的池子自己的距离算分界线。见 stages/cluster.py 的 pool_threshold。"""
+    import numpy as np
+
+    from avs.stages.cluster import POOL_MULTIPLIERS, pool_threshold
+
+    if model not in POOL_MULTIPLIERS:
+        raise ValueError(f"{model} 还没有按池子定分界线用的倍数，先用 avs drift 量一个出来")
+    matrices = [load_embeddings(directory, model)[1] for directory in directories]
+    vectors = np.concatenate([m for m in matrices if len(m)]) if matrices else np.empty((0, 0))
+    return pool_threshold(vectors, POOL_MULTIPLIERS[model])
+
+
 def group(
     directories: list[Path],
     out: Path,
