@@ -161,11 +161,14 @@ def label(
         list[Path] | None,
         typer.Option(help="页面词表用的已有归档，可重复；默认取计划里记的那几份"),
     ] = None,
+    every: Annotated[
+        bool, typer.Option("--all", help="标这一集的全部片段，按时间顺序；忽略 --count")
+    ] = False,
 ) -> None:
-    """抽样或按计划取片段，对照画面标角色名，逐条存入归档。"""
+    """抽样、按计划或整集取片段，对照画面标角色名，逐条存入归档。"""
     from avs.labeling import run
 
-    run(episode, archive, count, port, plan, known)
+    run(episode, archive, count, port, plan, known, every)
 
 
 @app.command()

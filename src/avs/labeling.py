@@ -86,11 +86,17 @@ def build_plan(
 
 
 def build_sample(
-    directory: Path, archive: Path, count: int, plan: Path | None = None
+    directory: Path,
+    archive: Path,
+    count: int,
+    plan: Path | None = None,
+    every: bool = False,
 ) -> dict[str, Any]:
     episode, rows = load_episode(directory)
     if count < 1:
         raise ValueError("抽样条数必须为正数")
+    if every and plan is not None:
+        raise ValueError("整集标和按计划标只能选一个")
     if archive.exists():
         data: dict[str, Any] = read_json(archive)
         source = str(data["source"]).replace("\\", "/").rsplit("/", 1)[-1]
@@ -100,10 +106,14 @@ def build_sample(
         if any(time_key(c) not in times for c in data["clips"]):
             raise ValueError("已有标注包含旧切段，换一个归档文件名以保留旧标签")
         return data
-    if plan is None:
+    if every:
+        chosen = list(rows)
+        method = "整集全部片段按时间顺序，对照画面确认身份"
+        extra: dict[str, Any] = {}
+    elif plan is None:
         chosen = random.Random(0).sample(rows, min(count, len(rows)))
         method = "全量片段随机抽样，对照画面确认身份"
-        extra: dict[str, Any] = {"seed": 0}
+        extra = {"seed": 0}
     else:
         chosen, extra = _plan_rows(plan, episode, rows)
         method = "按计划标候选分组改动的短片段，对照画面确认身份"
@@ -221,13 +231,14 @@ def run(
     port: int,
     plan: Path | None = None,
     known: list[Path] | None = None,
+    every: bool = False,
 ) -> None:
     import soundfile as sf
 
     from avs.label_page import PAGE_NAMES
 
     archives = _roster_archives(known, plan)
-    data = build_sample(directory, archive, count, plan)
+    data = build_sample(directory, archive, count, plan, every)
     roster = known_names(archives)
     history = reference_clips(archives, directory)
     episode, _ = load_episode(directory)

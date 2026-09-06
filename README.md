@@ -53,10 +53,11 @@ uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotatio
 输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
 
 ```powershell
+uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
 uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
 ```
 
-`label` 从全量片段随机抽样，按时间顺序展示，对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。
+`label` 对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。`--all` 标这一集的全部片段，按时间顺序连着走；不给 `--all` 就随机抽 `--count` 条。整集连着标其实更省力：顺着画面往下看，不用为每条重新定位，也不必猜这一条属不属于抽样范围。`--known` 指定页面词表和参考音的来源归档。
 
 验收一个候选分组时不必整集重标，先划出它改动过的范围：
 

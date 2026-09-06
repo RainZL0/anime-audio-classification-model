@@ -227,3 +227,12 @@ def test_reference_clips_skip_archives_whose_audio_is_gone(tmp_path: Path) -> No
     stray = tmp_path / "stray.json"
     write_json(stray, {"source": "somewhere/else.wav", "clips": [dict(rows[0], name="teo")]})
     assert reference_clips([stray], directory) == {}
+
+
+def test_all_clips_sample_takes_the_whole_episode_in_time_order(tmp_path: Path) -> None:
+    directory, rows = make_episode(tmp_path, "ep1")
+    data = build_sample(directory, tmp_path / "ep1-full.json", count=2, every=True)
+    assert [c["clip_id"] for c in data["clips"]] == [row["id"] for row in rows]
+    assert "seed" not in data and "plan" not in data
+    with pytest.raises(ValueError, match="只能选一个"):
+        build_sample(directory, tmp_path / "clash.json", 2, tmp_path / "plan.json", every=True)
