@@ -157,11 +157,15 @@ def label(
     plan: Annotated[
         Path | None, typer.Option(help="标注计划；给了就只标计划里的片段，忽略 --count")
     ] = None,
+    known: Annotated[
+        list[Path] | None,
+        typer.Option(help="页面词表用的已有归档，可重复；默认取计划里记的那几份"),
+    ] = None,
 ) -> None:
     """抽样或按计划取片段，对照画面标角色名，逐条存入归档。"""
     from avs.labeling import run
 
-    run(episode, archive, count, port, plan)
+    run(episode, archive, count, port, plan, known)
 
 
 @app.command()

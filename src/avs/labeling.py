@@ -121,6 +121,20 @@ def build_sample(
     return data
 
 
+def known_names(archives: list[Path]) -> list[str]:
+    """已有归档里出现过的角色名，去掉特殊标签。只做页面词表，不参与任何评分。
+
+    按旧标签里出现的条数从多到少排，常用角色排在前面，数字键才落在真正常按的名字上。
+    """
+    found: Counter[str] = Counter()
+    for path in archives:
+        for clip in read_json(path)["clips"]:
+            name = clip.get("name")
+            if name and not name.startswith("__"):
+                found[name] += 1
+    return [name for name, _ in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def _plan_rows(
     plan: Path, episode: dict[str, Any], rows: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -148,12 +162,20 @@ def apply_names(data: dict[str, Any], names: Any) -> dict[str, Any]:
     return {**data, "clips": [dict(c, name=names.get(c["clip_id"])) for c in data["clips"]]}
 
 
-def run(directory: Path, archive: Path, count: int, port: int, plan: Path | None = None) -> None:
+def run(
+    directory: Path,
+    archive: Path,
+    count: int,
+    port: int,
+    plan: Path | None = None,
+    known: list[Path] | None = None,
+) -> None:
     import soundfile as sf
 
     from avs.label_page import PAGE_NAMES
 
     data = build_sample(directory, archive, count, plan)
+    roster = known_names(_roster_archives(known, plan))
     episode, _ = load_episode(directory)
     vocals = episode["vocals"]
     clip_dir = directory / "label_audio" / archive.stem
@@ -179,7 +201,12 @@ def run(directory: Path, archive: Path, count: int, port: int, plan: Path | None
             }
         )
     page = PAGE_NAMES
-    for key, value in (("__CLIPS__", clips), ("__NAMES__", names), ("__SPECIAL__", SPECIAL)):
+    for key, value in (
+        ("__CLIPS__", clips),
+        ("__NAMES__", names),
+        ("__SPECIAL__", SPECIAL),
+        ("__KNOWN__", roster),
+    ):
         page = page.replace(key, json.dumps(value, ensure_ascii=False).replace("<", "\\u003c"))
     (clip_dir / "index.html").write_text(page, encoding="utf-8")
 
@@ -207,6 +234,23 @@ def run(directory: Path, archive: Path, count: int, port: int, plan: Path | None
         def log_message(self, *args: Any) -> None:
             pass
 
-    print(f"打开 http://127.0.0.1:{port}/ ，每条直接保存到 {archive}", flush=True)
+    print(
+        f"打开 http://127.0.0.1:{port}/ ，每条直接保存到 {archive}；"
+        f"页面词表里有 {len(roster)} 个已有角色名",
+        flush=True,
+    )
     with HTTPServer(("127.0.0.1", port), Handler) as server, suppress(KeyboardInterrupt):
         server.serve_forever()
+
+
+def _roster_archives(known: list[Path] | None, plan: Path | None) -> list[Path]:
+    """没指定词表来源时，用计划里记下的那几份人工归档，名字才跟旧标签对得上。"""
+    if known:
+        return known
+    if plan is None:
+        return []
+    paths = [Path(item["path"]) for item in read_json(plan).get("annotations", [])]
+    missing = [p for p in paths if not p.exists()]
+    if missing:
+        raise ValueError(f"计划里记的归档已不在原处，请用 --known 指定：{missing[0]}")
+    return paths
