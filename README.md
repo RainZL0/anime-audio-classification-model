@@ -69,6 +69,8 @@ uv run avs embed runs/episodes/ep02 --model redimnet2-b6
 
 补完片段表变了，声纹缓存失效，要重跑 `embed`。补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音，这里不猜，统一收进来交给人耳判断。`avs label --all` 再跑一次会把新片段以空标签追加到已有归档，已标的一条不动。
 
+`--model` 可选 `redimnet2-b6`（默认）、`wespeaker-resnet293`、`anime-char`、`anime-va`。后两个是动画域模型，相似度尺度与前两个不同，换模型后要用 `avs compare --low --high` 重新扫阈值，别套用旧阈值。
+
 `avs embed --window` 指定最小听音窗口：片段短于它时向两侧借相邻音频补足，片段本身的时间范围不变，只是模型多听了一点上下文。不同窗口的声纹存在不同目录（`embeddings/<模型>@w<秒数>`），互不覆盖。
 
 对白覆盖核对（字幕里哪些台词根本没有片段）：

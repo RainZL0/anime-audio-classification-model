@@ -12,7 +12,17 @@ from typing import Any, Protocol
 
 FRONTIER = "redimnet2-b6"
 BASELINE = "wespeaker-resnet293"
-MODELS = (FRONTIER, BASELINE)
+ANIME_CHAR = "anime-char"
+ANIME_VA = "anime-va"
+MODELS = (FRONTIER, BASELINE, ANIME_CHAR, ANIME_VA)
+
+ANIME_VARIANTS = {ANIME_CHAR: "char", ANIME_VA: "va"}
+"""litagin02/anime_speaker_embedding 的两个变体。char 按角色训练，同一声优配的不同角色也要
+分开；va 按声优归并。我们的标签是角色，所以 char 是对口的那个，但两个都留着比：如果 va
+反而更好，说明本作里同一声优配多角的情况不多，而声优级别的目标更容易学。
+
+作者提醒这个模型「倾向于积极区分说话人」，同人相似度普遍低于其他模型，所以距离阈值不能
+从 ReDimNet 那边照搬，必须重新扫。"""
 
 SAMPLE_RATE = 16_000
 """指纹模型都要 16 kHz，也就是分析副本的采样率。别拿原采样率的人声轨喂它们。"""
@@ -99,12 +109,32 @@ def _load_wespeaker(device: str) -> Extractor:
 
 
 def load_extractor(model: str, device: str = "cuda") -> Extractor:
-    """按代号载入一个指纹模型。device 只对 redimnet2 生效，理由见模块开头。"""
+    """按代号载入一个指纹模型。device 对 wespeaker 不生效，理由见模块开头。"""
     if model == FRONTIER:
         return _load_redimnet2(device)
     if model == BASELINE:
         return _load_wespeaker(device)
+    if model in ANIME_VARIANTS:
+        return _load_anime(ANIME_VARIANTS[model], device)
     raise ValueError(f"不认识的模型 {model!r}，只能是 {' 或 '.join(MODELS)}")
+
+
+def _load_anime(variant: str, device: str) -> Extractor:
+    """动画域的 ECAPA-TDNN。包里的 get_embedding 只收文件路径，这里照它的做法直接喂数组，
+    省掉每条片段写一个临时文件。输入同样是 16 kHz 单声道，正好是分析副本。"""
+    import numpy as np
+    import torch
+    from anime_speaker_embedding import AnimeSpeakerEmbedding
+
+    model = AnimeSpeakerEmbedding(variant=variant, device=device)
+
+    def extract(mono: Any) -> Any:
+        wave = torch.from_numpy(np.ascontiguousarray(mono)).float().unsqueeze(0).to(device)
+        with torch.inference_mode():
+            vector = model(wave).squeeze(0).squeeze(0)
+            return torch.nn.functional.normalize(vector, dim=0).cpu().numpy()
+
+    return extract
 
 
 def embed_segments(
