@@ -135,6 +135,58 @@ def known_names(archives: list[Path]) -> list[str]:
     return [name for name, _ in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
+def stamp(start: float) -> str:
+    """分:秒，和视频进度条对得上。"""
+    return f"{int(start // 60):02d}:{start % 60:05.2f}"
+
+
+def reference_clips(archives: list[Path], directory: Path) -> dict[str, list[dict[str, Any]]]:
+    """每个已有角色名下的旧标签片段，供标注时回放对照。
+
+    旧归档记的音轨路径可能已经搬过位置，所以按文件名去 `runs/episodes` 下的各集里找同名
+    人声轨；找不到的那份归档就整份跳过，宁可没有参考音，也不拿别的音轨凑。
+    """
+    root = directory.resolve().parent
+    sources: dict[str, tuple[str, str]] = {}
+    for candidate in sorted(root.iterdir()) if root.is_dir() else []:
+        if not (candidate / "episode.json").exists():
+            continue
+        own, _ = load_episode(candidate)
+        sources[Path(own["vocals"]).name] = (own["name"], own["vocals"])
+
+    history: dict[str, list[dict[str, Any]]] = {}
+    seen = 0
+    for path in archives:
+        data = read_json(path)
+        found = sources.get(str(data["source"]).replace("\\", "/").rsplit("/", 1)[-1])
+        if found is None:
+            continue
+        name_of_episode, vocals = found
+        for clip in data["clips"]:
+            name = clip.get("name")
+            if not name or name.startswith("__"):
+                continue
+            seen += 1
+            history.setdefault(name, []).append(
+                {
+                    "file": f"ref_{seen:04d}.wav",
+                    "episode": name_of_episode,
+                    "stamp": stamp(float(clip["start"])),
+                    "seconds": round(float(clip["end"]) - float(clip["start"]), 2),
+                    "vocals": vocals,
+                    "start": float(clip["start"]),
+                    "end": float(clip["end"]),
+                }
+            )
+    return history
+
+
+def _cut(sf: Any, vocals: str, start: float, end: float, out: Path) -> None:
+    rate = sf.info(vocals).samplerate
+    wave, wrote = sf.read(vocals, start=int(start * rate), stop=int(end * rate), always_2d=True)
+    sf.write(out, wave, wrote, subtype="PCM_24")
+
+
 def _plan_rows(
     plan: Path, episode: dict[str, Any], rows: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -174,8 +226,10 @@ def run(
 
     from avs.label_page import PAGE_NAMES
 
+    archives = _roster_archives(known, plan)
     data = build_sample(directory, archive, count, plan)
-    roster = known_names(_roster_archives(known, plan))
+    roster = known_names(archives)
+    history = reference_clips(archives, directory)
     episode, _ = load_episode(directory)
     vocals = episode["vocals"]
     clip_dir = directory / "label_audio" / archive.stem
@@ -185,27 +239,26 @@ def run(
     for c in data["clips"]:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", c["clip_id"]):
             raise ValueError("片段 ID 不能用作文件名")
-        info = sf.info(vocals)
-        wave, rate = sf.read(
-            vocals,
-            start=int(c["start"] * info.samplerate),
-            stop=int(c["end"] * info.samplerate),
-            always_2d=True,
-        )
-        sf.write(clip_dir / f"{c['clip_id']}.wav", wave, rate, subtype="PCM_24")
+        _cut(sf, vocals, c["start"], c["end"], clip_dir / f"{c['clip_id']}.wav")
         clips.append(
             {
                 "id": c["clip_id"],
-                "stamp": f"{int(c['start'] // 60):02d}:{c['start'] % 60:05.2f}",
+                "stamp": stamp(c["start"]),
                 "seconds": round(c["end"] - c["start"], 2),
             }
         )
+    # 旧标签的参考音也切出来；vocals/start/end 只用于切，不必送进页面。
+    for entries in history.values():
+        for entry in entries:
+            source, start, end = entry.pop("vocals"), entry.pop("start"), entry.pop("end")
+            _cut(sf, source, start, end, clip_dir / entry["file"])
     page = PAGE_NAMES
     for key, value in (
         ("__CLIPS__", clips),
         ("__NAMES__", names),
         ("__SPECIAL__", SPECIAL),
         ("__KNOWN__", roster),
+        ("__HISTORY__", history),
     ):
         page = page.replace(key, json.dumps(value, ensure_ascii=False).replace("<", "\\u003c"))
     (clip_dir / "index.html").write_text(page, encoding="utf-8")
@@ -236,7 +289,8 @@ def run(
 
     print(
         f"打开 http://127.0.0.1:{port}/ ，每条直接保存到 {archive}；"
-        f"页面词表里有 {len(roster)} 个已有角色名",
+        f"页面词表里有 {len(roster)} 个已有角色名，"
+        f"{sum(len(v) for v in history.values())} 条旧标签可以回放对照",
         flush=True,
     )
     with HTTPServer(("127.0.0.1", port), Handler) as server, suppress(KeyboardInterrupt):

@@ -7,7 +7,13 @@ from typing import Any
 
 import pytest
 
-from avs.labeling import _roster_archives, build_plan, build_sample, known_names
+from avs.labeling import (
+    _roster_archives,
+    build_plan,
+    build_sample,
+    known_names,
+    reference_clips,
+)
 from avs.project import read_json, segment_rows, write_json
 
 # 0.5 秒的算短片段，2 秒的算长片段；分界取自 avs.stages.cluster.SHORT_SECONDS。
@@ -178,3 +184,46 @@ def test_roster_falls_back_to_the_archives_the_plan_recorded(tmp_path: Path) -> 
     annotation.unlink()
     with pytest.raises(ValueError, match="已不在原处"):
         _roster_archives(None, out)
+
+
+def test_reference_clips_group_old_labels_by_name_and_find_moved_audio(tmp_path: Path) -> None:
+    root = tmp_path / "episodes"
+    root.mkdir()
+    first, first_rows = make_episode(root, "ep1")
+    _, second_rows = make_episode(root, "ep2")
+    old = tmp_path / "ep1-old.json"
+    other = tmp_path / "ep2-old.json"
+    # 旧归档记的是搬走以前的路径，只有文件名还对得上。
+    write_json(
+        old,
+        {
+            "source": "runs/probe/ep1/separated/ep1.wav",
+            "clips": [
+                dict(first_rows[0], name="teo"),
+                dict(first_rows[1], name="__multiple__"),
+                dict(first_rows[2], name=None),
+            ],
+        },
+    )
+    write_json(
+        other,
+        {"source": "runs/probe/ep2/separated/ep2.wav", "clips": [dict(second_rows[0], name="teo")]},
+    )
+
+    history = reference_clips([old, other], first)
+    assert list(history) == ["teo"]
+    assert [(e["episode"], e["stamp"]) for e in history["teo"]] == [
+        ("ep1", "00:00.00"),
+        ("ep2", "00:00.00"),
+    ]
+    assert len({e["file"] for e in history["teo"]}) == 2
+    assert all(e["vocals"].endswith(".wav") for e in history["teo"])
+
+
+def test_reference_clips_skip_archives_whose_audio_is_gone(tmp_path: Path) -> None:
+    root = tmp_path / "episodes"
+    root.mkdir()
+    directory, rows = make_episode(root, "ep1")
+    stray = tmp_path / "stray.json"
+    write_json(stray, {"source": "somewhere/else.wav", "clips": [dict(rows[0], name="teo")]})
+    assert reference_clips([stray], directory) == {}
