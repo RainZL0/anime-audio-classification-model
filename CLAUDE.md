@@ -4,7 +4,7 @@
 
 先读 README、docs/STATUS.md、docs/HISTORY.md。流程和指标见 docs/HOW_IT_WORKS.md；已完成实验见 docs/EXPERIMENTS.md。当前计划只维护在 STATUS，实验细节集中在 EXPERIMENTS，长期教训提炼到 HISTORY，不追加失效决策流水账。
 
-嵌入诊断已完成：近邻检索几乎全对，51 对漏合全部含短于 1.5 秒的片段。single/complete/mutual_knn 都不超过 average；整句字幕重切短片段的闸门核对未通过，已停。针对短片段的 two_stage 是唯一有改善的候选（runs/groups/uma-two-stage.json，旧标签上 86/0/32 对 67/0/51），但分界与阈值都用了旧标签，尚未替换默认分组。两集分别标注，跨集同一角色必须同名（红毛 已统一为 Nice Nature；ep02 的 解说/解说2 是两个人，已改名为 解说A/解说B）。当前下一步是两集全量重标（avs label --all，485 条，存 annotations/ep01-full.json 与 ep02-full.json），只用新标签验证错合与漏合；不要把“换嵌入模型”“重切短片段”或“继续试参考阈值”当作当前计划。旧归档 ep01_v4/ep02 退出验收，保留作页面词表与参考音，不要删。抽样补标那条路（avs label-plan）已被全量重标取代。新标签验证尚未实施。
+嵌入诊断已完成：近邻检索几乎全对，51 对漏合全部含短于 1.5 秒的片段。single/complete/mutual_knn 都不超过 average；整句字幕重切短片段的闸门核对未通过，已停。针对短片段的 two_stage 是唯一有改善的候选（runs/groups/uma-two-stage.json，旧标签上 86/0/32 对 67/0/51），但分界与阈值都用了旧标签，尚未替换默认分组。两集分别标注，跨集同一角色必须同名（红毛 已统一为 Nice Nature；ep02 的 解说/解说2 是两个人，已改名为 解说A/解说B）。当前下一步是两集全量重标（avs label --all，485 条，存 annotations/ep01-full.json 与 ep02-full.json），只用新标签验证错合与漏合；不要把“换嵌入模型”“重切短片段”或“继续试参考阈值”当作当前计划。旧的 62 条抽样标签（ep01_v4/ep02）已按标注者要求删除，只留下 annotations/names.json 里的 27 个角色名；EXPERIMENTS 里基于旧标签的数字是历史记录，无法重算。抽样补标那条路（avs label-plan）已被全量重标取代。新标签验证尚未实施。
 
 ## 工作约束
 

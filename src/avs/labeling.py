@@ -131,18 +131,26 @@ def build_sample(
     return data
 
 
-def known_names(archives: list[Path]) -> list[str]:
-    """已有归档里出现过的角色名，去掉特殊标签。只做页面词表，不参与任何评分。
+def known_names(sources: list[Path]) -> list[str]:
+    """页面词表的角色名，去掉特殊标签。只是名字，不参与任何评分。
 
-    按旧标签里出现的条数从多到少排，常用角色排在前面，数字键才落在真正常按的名字上。
+    两种来源都收：人工归档（从 `clips` 的 name 取，按出现条数从多到少排），以及只有名字
+    的词表文件（`names` 列表，保持文件里的顺序）。常用角色排在前面，数字键才落在真正
+    常按的名字上；词表排在归档之后，两边都有的名字以先出现的位置为准。
     """
     found: Counter[str] = Counter()
-    for path in archives:
-        for clip in read_json(path)["clips"]:
+    listed: list[str] = []
+    for path in sources:
+        data = read_json(path)
+        if "names" in data:
+            listed.extend(n for n in data["names"] if n and not n.startswith("__"))
+            continue
+        for clip in data["clips"]:
             name = clip.get("name")
             if name and not name.startswith("__"):
                 found[name] += 1
-    return [name for name, _ in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
+    ordered = [name for name, _ in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return ordered + [n for n in dict.fromkeys(listed) if n not in found]
 
 
 def stamp(start: float) -> str:
@@ -168,6 +176,8 @@ def reference_clips(archives: list[Path], directory: Path) -> dict[str, list[dic
     seen = 0
     for path in archives:
         data = read_json(path)
+        if "clips" not in data:
+            continue
         found = sources.get(str(data["source"]).replace("\\", "/").rsplit("/", 1)[-1])
         if found is None:
             continue

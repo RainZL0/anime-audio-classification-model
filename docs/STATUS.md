@@ -14,7 +14,7 @@
 | 新字幕流程 | 已实现对齐后直接按字幕行切；尚未在这两集重跑，未验证它能改善身份区分 |
 | 嵌入 | ReDimNet2 B6 与 WeSpeaker ResNet293 的全量缓存均已完成 |
 | 分组 | 当前使用 ReDimNet、全局平均连接、距离 0.50；100 组，48 个单条组，0 条未归属，仍有碎组 |
-| 人工对照 | 旧归档 62 条时间精确匹配的标签，覆盖 25 个角色，已退出验收，仅作词表与参考音。两集全量重标尚未开始（485 条待标） |
+| 人工对照 | 旧的 62 条抽样标签已删除，只留下 27 个角色名。两集全量重标尚未开始（485 条待标） |
 | 嵌入诊断 | 已完成，固定片段与两模型缓存；结论见下 |
 | 连接规则 | single/complete/mutual_knn 都不超过 average；针对短片段的 two_stage 零错合下明显更好，候选已生成，未替换默认 |
 | 短片段重切 | 闸门核对未通过：整句字幕只比短片段长约 0.1 秒，此路停止 |
@@ -56,12 +56,12 @@
 1. **两集各标一遍，全量。** 对照画面报名字，顺着时间往下走。
 
    ```powershell
-   uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
-   uv run avs label runs/episodes/ep02 --archive annotations/ep02-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
+   uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json
+   uv run avs label runs/episodes/ep02 --archive annotations/ep02-full.json --all --known annotations/names.json --known annotations/ep01-full.json
    ```
 
-   页面词表来自旧归档的 27 个角色名，每个名字下的旧片段可以回放，用来想起这个名字是谁。跨集同一角色必须同名。标不完可以停，未标的留空。顺便定下两个悬案：ep01 的 `解说员` 属于 `解说A` 还是 `解说B`，以及 `橙毛` 是谁。
-2. **旧标签退出验收。** `ep01_v4.json` 与 `ep02.json` 的逐条标签不再计入评分，文件保留作词表和参考音。评估只用两份 `-full` 归档。
+   页面词表是 `annotations/names.json` 里的 27 个名字。标 ep02 时把 ep01 的归档也传进去，ep01 标过的片段就能在页面上回放，用来想起某个名字是谁。跨集同一角色必须同名。标不完可以停，未标的留空。顺便定下两个悬案：`解说员` 属于 `解说A` 还是 `解说B`，以及 `橙毛` 是谁。
+2. **旧标签已删除。** `ep01_v4.json` 与 `ep02.json`（62 条时间精确匹配的抽样标签）于 2026-09-06 删除，用过的 27 个角色名提取到了 `annotations/names.json`。评估只用两份 `-full` 归档。EXPERIMENTS 里基于旧标签的数字保留为记录，但已无法重算。
 3. **两套分组在新标签上同口径评分。** 跑 `evaluate` 与 `diagnose`，错合与漏合一起报，并按短片段/跨集分层。全量标注之后，未标注片段是否混人这个一直悬着的问题也能一并回答。
 4. **决定是否替换默认。** 新标签上错合不增加、漏合减少才替换默认分组与导出；若短片段挂组带来混人，退回 average 并把两段式记为失败。
 5. **试听错误实例。** `runs/diagnosis/examples/`，确认远距离同人对里是否有喊叫、残留或边界异常。
@@ -80,7 +80,7 @@
 | 连接规则对照、两段式曲线 | `runs/comparison-methods.json`、`runs/comparison-two-stage.json` |
 | 两段式候选、评分与诊断 | `runs/groups/uma-two-stage.json`、`uma-two-stage-evaluation.json`、`runs/diagnosis-two-stage/` |
 | 全量重标归档 | `annotations/ep01-full.json`、`ep02-full.json` |
-| 人工身份与旧现场记录 | `annotations/ep01_v4.json`、`annotations/ep02.json`、`annotations/legacy/` |
+| 角色名词表与旧现场记录 | `annotations/names.json`、`annotations/legacy/` |
 | 已完成实验的报告索引 | [EXPERIMENTS.md](EXPERIMENTS.md) |
 
-最近代码检查：Ruff、格式检查、Mypy 与 44 项测试通过。
+最近代码检查：Ruff、格式检查、Mypy 与 46 项测试通过。

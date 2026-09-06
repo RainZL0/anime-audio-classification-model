@@ -20,7 +20,7 @@ uv run avs embed runs/episodes/ep03
 
 ```powershell
 uv run avs group runs/episodes/ep01 runs/episodes/ep02 --out runs/groups/uma-next.json --threshold 0.5
-uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/groups/uma-next-evaluation.json
+uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/groups/uma-next-evaluation.json
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
@@ -30,7 +30,7 @@ uv run avs export runs/groups/uma-next.json --out out/uma-next
 
 ```powershell
 uv run avs embed runs/episodes/ep01 runs/episodes/ep02 --model wespeaker-resnet293
-uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/comparison-next.json
+uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/comparison-next.json
 ```
 
 比较前会核验两种声纹覆盖同一批片段；使用人工标签挑出的阈值只能算探索结果。`--model` 可只比一个模型，`--method` 可重复给出连接规则，同时比较规则曲线。
@@ -38,7 +38,7 @@ uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotation
 身份参考实验（保留原分组；每个目标角色至少有 4 条精确标签）：
 
 ```powershell
-uv run avs references runs/groups/uma.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --role teo --role trainer --role 皇帝 --out runs/references-next
+uv run avs references runs/groups/uma.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --role teo --role trainer --role 皇帝 --out runs/references-next
 # 增加 --nearest：按最近参考声音归属，扫描四个距离阈值
 ```
 
@@ -47,30 +47,30 @@ uv run avs references runs/groups/uma.json --annotation annotations/ep01_v4.json
 嵌入诊断（固定片段，两模型缓存，不重跑音频模型；`--groups` 可选，用来区分组内与组间错误）：
 
 ```powershell
-uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --groups runs/groups/uma.json --out runs/diagnosis-next
+uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --groups runs/groups/uma.json --out runs/diagnosis-next
 ```
 
 输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
 
 ```powershell
-uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/ep01_v4.json --known annotations/ep02.json
+uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json
 uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
 ```
 
-`label` 对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。`--all` 标这一集的全部片段，按时间顺序连着走；不给 `--all` 就随机抽 `--count` 条。整集连着标其实更省力：顺着画面往下看，不用为每条重新定位，也不必猜这一条属不属于抽样范围。`--known` 指定页面词表和参考音的来源归档。
+`label` 对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。`--all` 标这一集的全部片段，按时间顺序连着走；不给 `--all` 就随机抽 `--count` 条。整集连着标其实更省力：顺着画面往下看，不用为每条重新定位，也不必猜这一条属不属于抽样范围。`--known` 指定页面词表和参考音的来源，可以是 `annotations/names.json` 这种只有名字的词表，也可以是人工归档；给归档时那里面的片段就能在页面上回放。
 
 验收一个候选分组时不必整集重标，先划出它改动过的范围：
 
 ```powershell
-uv run avs label-plan --candidate runs/groups/uma-two-stage.json --baseline runs/groups/uma.json --annotation annotations/ep01_v4.json --annotation annotations/ep02.json --out runs/label-plan.json
+uv run avs label-plan --candidate runs/groups/uma-two-stage.json --baseline runs/groups/uma.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/label-plan.json
 uv run avs label runs/episodes/ep01 --archive annotations/ep01-short.json --plan runs/label-plan.json
 ```
 
 `label-plan` 只挑候选挂进多条组、又还没被任何人工归档覆盖的短片段，并标出哪些在两套分组里归属不同（`reason` 为 `moved`）。`label --plan` 只取该集计划里的片段，仍按时间顺序展示，因为标注者是顺着画面找人，来回跳时间点比多标几条还慢。计划不安排已标过的片段，新旧归档不会给同一条片段两个名字。
 
-标注页把已有归档里的角色名列成词表，按旧标签的条数从多到少排，点一下就打标，数字键 1-9 对应前九个，名字多时可以先筛。词表默认取计划里记的那几份归档，`--known` 可以另指。每个名字显示本轮标了多少条，点条数能展开这些片段、跳过去或整批撤掉，`改名` 会把本轮该名字下的片段一起改。
+标注页把 `--known` 给的角色名列成词表，点一下就打标，数字键 1-9 对应前九个，名字多时可以先筛。不给 `--known` 就只有本轮自己标出来的名字。每个名字显示本轮标了多少条，点条数能展开这些片段、跳过去或整批撤掉，`改名` 会把本轮该名字下的片段一起改。
 
-每个名字后面还有「旧 N 条」，展开是这个角色以前标过的片段，按集和时间列出，点一下就地试听，用单独的播放器，不打断正在标的那一条。旧归档记的音轨路径可能已经搬走，参考音按人声文件名去 `runs/episodes` 下的各集里找同名音轨；找不到就整份跳过，不拿别的音轨凑。试听只用来想起这个名字是谁，判断仍以画面为准。
+名字右边的数字是「本轮 N 条 · 旧标签 N 条」，点开的面板里两边的片段都按集和时间列出：本轮的点了跳过去，旧标签的点了就地试听，用单独的播放器，不打断正在标的那一条。标第二集时把第一集的归档传给 `--known`，第一集标过的片段就成了可回放的参考。旧归档记的音轨路径可能已经搬走，参考音按人声文件名去 `runs/episodes` 下的各集里找同名音轨；找不到就整份跳过，不拿别的音轨凑。试听只用来想起这个名字是谁，判断仍以画面为准。
 
 页面始终不显示机器分组、组号或候选归属：看过机器的答案，标出来的就不再是独立真值。
 
