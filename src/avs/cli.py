@@ -142,6 +142,25 @@ def diagnose(
 
 
 @app.command()
+def scores(
+    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
+    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    out: Annotated[Path, typer.Option(help="新的分离度报告 JSON")],
+    model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
+    norm: Annotated[list[str] | None, typer.Option(help="要比较的归一化，可重复")] = None,
+) -> None:
+    """比较原始余弦与分数归一化下，同人与异人配对的分离度。"""
+    from avs.embeddings.extract import MODELS
+    from avs.evaluation.scores import compare_norms
+
+    report = compare_norms(episodes, annotation, model or list(MODELS), out, norm)
+    for entry in report["results"]:
+        own = entry["overall"]
+        typer.echo(f"{entry['model']:22s} {entry['norm']:7s} AUC {own['auc']}  等错率 {own['eer']}")
+    typer.echo(f"{report['pairs']} 对标签配对 -> {out}")
+
+
+@app.command()
 def coverage(
     episode: Path,
     subtitle: Annotated[Path, typer.Option(help="这一集的 ASS 字幕")],
