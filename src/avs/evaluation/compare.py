@@ -69,7 +69,7 @@ def compare(
                             "roles": scored["roles"],
                         }
                     )
-    # 同时更少错合、更多正确连接的点才算支配；不以组数少就宣称身份更准。
+    # 同时更少错误合并、更多正确连接的点才算支配；不以组数少就宣称身份更准。
     frontier = [
         row
         for row in results

@@ -1,4 +1,4 @@
-"""检验少量人工身份能否连接碎组；参考标签与评分标签严格分开。"""
+"""检验少量人工身份能否连接散成很多小组；参考标签与评分标签严格分开。"""
 
 from __future__ import annotations
 
@@ -209,7 +209,7 @@ def reference_experiment(
         "results": results,
         "candidate": "candidate.json",
         "candidate_selection": "固定每人 2 条、种子 0；最近参考法用 0.5，不按评分选优。",
-        "note": "同批旧标签上的参考合组实验；参考全部排除评分。重复划分相关，非新集盲测。",
+        "note": "同批旧标签上的参考合组实验；参考全部排除评分。重复划分相关，非新集独立检验。",
     }
     write_json(out / "report.json", report)
     write_json(out / "candidate.json", candidate)

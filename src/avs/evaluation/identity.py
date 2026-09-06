@@ -1,4 +1,4 @@
-"""只评价说话人身份：精确时间匹配、错合、漏合和每角色碎组数。"""
+"""只评价说话人身份：精确时间匹配、错误合并、该合没合和每角色散成很多小组数。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from avs.project import read_json, time_key
 
 
 def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
-    """同时报错合与漏合，防止把每条独立成组伪装成完美识别。"""
+    """同时报错误合并与该合没合，防止把每条独立成组伪装成完美识别。"""
     if len(truth) != len(predicted):
         raise ValueError("人工标签和预测长度不同")
     from sklearn.metrics import adjusted_rand_score
