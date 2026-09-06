@@ -61,11 +61,15 @@ uv run avs coverage runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][Umamusu
 现有片段是「字幕范围 ∩ 检测到有人说话」，还带 1 秒下限，所以片段数远少于字幕对白行数。`coverage` 把没有片段的台词切成音频，按原因分到 `below_floor`（行本身短于 1 秒，不可能切出合格片段）和 `no_speech_found`（行够长却没切出来）两个目录，另出 `lines.txt` 和 `report.json`。偏移取片段与字幕行边界差的众数，不需要当初的语音检测结果。
 
 ```powershell
-uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json
+uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json --video "D:/_Search/_Animation/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
 uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
 ```
 
 `label` 对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。`--all` 标这一集的全部片段，按时间顺序连着走；不给 `--all` 就随机抽 `--count` 条。整集连着标其实更省力：顺着画面往下看，不用为每条重新定位，也不必猜这一条属不属于抽样范围。`--known` 指定页面词表和参考音的来源，可以是 `annotations/names.json` 这种只有名字的词表，也可以是人工归档；给归档时那里面的片段就能在页面上回放。
+
+`--video` 给这一集的视频，页面就直接放当前片段对应的画面，前后各多给 0.5 秒。画面按需现切：翻到哪条才用 ffmpeg 切哪条，一段两三秒实测不到半秒，同时预热下一条，翻页时通常已经在了。源片多是 HEVC，浏览器支不支持看机器，所以统一转成 360p 的 H.264，切好的存在 `runs/episodes/<集>/label_audio/<归档名>/video/` 下，一集约 46 MB。需要 `ffmpeg` 在 PATH 里。
+
+视频与音轨必须是同一条时间线。本项目的 `data/raw/*.flac` 就是从这些 mp4 里抽的，时长完全一致、互相关位移 0 毫秒，所以片段时间可以直接当视频时间用。换片源前先核对这一点，否则画面会对错人。
 
 验收一个候选分组时不必整集重标，先划出它改动过的范围：
 

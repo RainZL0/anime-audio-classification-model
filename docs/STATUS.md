@@ -41,10 +41,11 @@
 | 判断 | 处数 | 空洞时长 | 字幕行 |
 | --- | ---: | ---: | ---: |
 | 该收，是真丢的角色台词 | 3 | 89.9 秒 | 28 行 / 58.5 秒 |
-| 不该收 | 3 | 112.5 秒 | 28 行 / 69.4 秒 |
-| 待定 | 1 | 22.3 秒 | 2 行 / 3.6 秒 |
+| 不该收 | 4 | 134.8 秒 | 30 行 / 73.0 秒 |
 
-不该收的三处是：整段赛马解说（与要收的角色无关）、跑步喘气声、众人欢呼。待定的那处前景是主角哼歌、背景是电视机，两条字幕写的是电视里的解说词。
+不该收的四处是：整段赛马解说（与要收的角色无关）、跑步喘气声、众人欢呼，以及主角哼歌压在电视机声音上那处（分离不出主角的声音）。
+
+**逐处人工判断不可持续。** 每集 7 处、每处都要听，换到第 3 集又得重来一遍，这套判断也泛化不到新集。它现在的用处只是把问题说清楚，不是流程的一部分。
 
 这说明「按字幕行全收」不是正确目标：字幕会覆盖电视解说、群体欢呼这些不属于任何角色的声音。同时也确认切段确实丢了真台词，ep01 光空洞里就有 28 行。ep02 的 7 处尚未试听。
 
@@ -83,8 +84,7 @@
 1. **两集各标一遍，全量。** 对照画面报名字，顺着时间往下走。
 
    ```powershell
-   uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json
-   uv run avs label runs/episodes/ep02 --archive annotations/ep02-full.json --all --known annotations/ep01-full.json --known annotations/names.json
+   uv run avs label runs/episodes/ep02 --archive annotations/ep02-full.json --all --known annotations/ep01-full.json --known annotations/names.json --video "D:/_Search/_Animation/uma/[DHR][Uma Musume S2][02][BIG5][1080P][HEVC_AAC].mp4"
    ```
 
    ep01 已于 2026-09-06 标完，242 条全部有名字，31 个名字，其中 `__multiple__` 20 条、`__unclear__` 3 条。标 ep02 时先给 ep01 的归档，名字按 ep01 的实际条数排序，ep01 的片段也能在页面上回放对照；`names.json` 放在后面补上没用到的旧名字。跨集同一角色必须同名。标不完可以停，未标的留空。
