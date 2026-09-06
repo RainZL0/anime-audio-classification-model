@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,8 @@ EDGE = 0.06
 """判断片段是否落在字幕行内时容许的边界误差，覆盖毫秒取整。"""
 FLOOR = 1.0
 """当初切段的时长下限；短于它的字幕行不可能切出片段，单独归一类。"""
+HOLE_SECONDS = 20.0
+"""相邻片段间隔多久算一个空洞。整段没有片段而里面有台词，说明丢的是整场戏，不是零星几句。"""
 
 
 def align_to_segments(lines: list[dict[str, Any]], rows: list[dict[str, Any]]) -> tuple[float, int]:
@@ -77,6 +80,34 @@ def uncovered_lines(
     return out
 
 
+def find_holes(rows: list[dict[str, Any]], missing: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """连续没有片段、里面却有台词的整段。
+
+    零星漏一句是检测边界问题，整场戏没有片段是另一回事，值得先看后者：一百多条逐条听
+    既慢又看不出规律，而空洞一目了然，还能顺带认出片头曲这种本来就没对白的段落。
+    """
+    ordered = sorted(rows, key=lambda row: row["start"])
+    holes = []
+    for before, after in pairwise(ordered):
+        if after["start"] - before["end"] < HOLE_SECONDS:
+            continue
+        inside = [e for e in missing if e["start"] >= before["end"] and e["end"] <= after["start"]]
+        if not inside:
+            continue
+        holes.append(
+            {
+                "start": round(before["end"], 3),
+                "end": round(after["start"], 3),
+                "stamp": stamp(before["end"]),
+                "seconds": round(after["start"] - before["end"], 3),
+                "lines": len(inside),
+                "dialogue_seconds": round(sum(e["seconds"] for e in inside), 3),
+                "texts": [e["text"] for e in inside],
+            }
+        )
+    return holes
+
+
 def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> dict[str, Any]:
     """核对这一集的对白覆盖，把没片段的台词按原因切成音频。"""
     import soundfile as sf
@@ -111,6 +142,12 @@ def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> di
             out / entry["file"],
         )
 
+    holes = find_holes(rows, missing)
+    for index, hole in enumerate(holes):
+        (out / "holes").mkdir(parents=True, exist_ok=True)
+        hole["file"] = f"holes/{index:02d}_{hole['stamp'].replace(':', '-')}.wav"
+        _cut(sf, episode["vocals"], hole["start"], min(duration, hole["end"]), out / hole["file"])
+
     report = {
         "schema": "avs.coverage.v1",
         "episode": episode["name"],
@@ -126,7 +163,11 @@ def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> di
             "below_floor": sum(e["reason"] == "below_floor" for e in missing),
             "no_speech_found": sum(e["reason"] == "no_speech_found" for e in missing),
             "clips": len(rows),
+            "holes": len(holes),
+            "hole_seconds": round(sum(h["seconds"] for h in holes), 3),
+            "hole_dialogue_seconds": round(sum(h["dialogue_seconds"] for h in holes), 3),
         },
+        "holes": holes,
         "uncovered": missing,
         "note": "偏移取片段与字幕行边界差的众数；below_floor 是行本身短于切段下限，"
         "no_speech_found 是行够长却没切出片段，具体原因要听音频才知道。",
@@ -136,4 +177,12 @@ def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> di
         f"{e['stamp']}  {e['seconds']:>5.2f}s  {e['reason']:<16}  {e['text']}" for e in missing
     ]
     (out / "lines.txt").write_text("\n".join(listing) + "\n", encoding="utf-8")
+    spans = []
+    for hole in holes:
+        spans.append(
+            f"{hole['stamp']}  空 {hole['seconds']:.1f}s  "
+            f"台词 {hole['lines']} 行 {hole['dialogue_seconds']:.1f}s  {hole['file']}"
+        )
+        spans.extend(f"      {text}" for text in hole["texts"])
+    (out / "holes.txt").write_text("\n".join(spans) + "\n", encoding="utf-8")
     return report

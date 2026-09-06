@@ -159,6 +159,10 @@ def coverage(
         f"（短于 {report['floor_seconds']} 秒 {own['below_floor']} 行，"
         f"够长却没切出 {own['no_speech_found']} 行）"
     )
+    typer.echo(
+        f"整段没有片段却有台词的空洞 {own['holes']} 处，共 {own['hole_seconds'] / 60:.1f} 分钟，"
+        f"里面有 {own['hole_dialogue_seconds']:.0f} 秒台词"
+    )
     typer.echo(f"偏移 {report['offset_seconds']:+.2f} 秒，音频与清单 -> {out}")
 
 
