@@ -13,7 +13,9 @@ from typing import Any
 
 from avs.project import write_json
 
-DURATION_BINS = ((0.0, 1.5), (1.5, 3.0), (3.0, 6.0))
+DURATION_BINS = ((0.0, 0.5), (0.5, 1.0), (1.0, 1.5), (1.5, 3.0), (3.0, 6.0))
+"""短的一端分得细：所有已知的劣势都集中在那里，1 秒上下差多少直接决定要不要把
+1 秒以下的片段收进来。长的一端反正差别不大，不必细分。"""
 
 
 def duration_bin(seconds: float) -> str:
@@ -54,6 +56,7 @@ def compare_norms(
     models: list[str],
     out: Path,
     methods: list[str] | None = None,
+    window: float = 0.0,
 ) -> dict[str, Any]:
     """在人工标签的配对上，对照原始余弦与各种归一化的分离度。"""
     import numpy as np
@@ -68,7 +71,7 @@ def compare_norms(
     if any(m not in NORMS for m in chosen) or len(set(chosen)) != len(chosen):
         raise ValueError(f"归一化只能是 {', '.join(NORMS)}，且不能重复")
 
-    info, records, vectors = load_pool(episodes, models)
+    info, records, vectors = load_pool(episodes, models, window)
     matched, unmatched, special = match_annotations(
         {"schema": "avs.groups.v1", "episodes": info, "assignments": records}, annotations
     )
@@ -107,6 +110,7 @@ def compare_norms(
 
     report = {
         "schema": "avs.score_norm.v1",
+        "window_seconds": window,
         "labeled_clips": len(labeled),
         "unmatched_labels": unmatched,
         "special_labels": special,

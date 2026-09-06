@@ -72,10 +72,21 @@ def load_episode(directory: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
     return episode, rows
 
 
-def cache_signature(directory: Path, model: str) -> dict[str, str]:
+def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[str, str]:
+    """声纹缓存的指纹。窗口为 0 时不写这一项，好让改动之前算好的缓存继续有效。"""
     episode, _ = load_episode(directory)
-    return {
+    signature = {
         "model": model,
         "segments_sha256": digest(directory / "segments.json"),
         "analysis_sha256": digest(Path(episode["analysis"])),
     }
+    if window:
+        signature["window_seconds"] = f"{window:.3f}"
+    return signature
+
+
+def cache_dir(directory: Path, model: str, window: float = 0.0) -> Path:
+    """不同听音窗口算出来的是不同的声纹，分开放，免得互相顶掉。"""
+    validate_name(model)
+    name = model if not window else f"{model}@w{window:g}"
+    return directory / "embeddings" / name

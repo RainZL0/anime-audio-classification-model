@@ -94,7 +94,9 @@ def test_separation_reads_higher_is_more_alike() -> None:
 
 
 def test_duration_bins_cover_every_length() -> None:
-    assert duration_bin(0.4) == "0-1.5s"
+    assert duration_bin(0.4) == "0-0.5s"
+    assert duration_bin(0.7) == "0.5-1s"
+    assert duration_bin(1.2) == "1-1.5s"
     assert duration_bin(1.5) == "1.5-3s"
     assert duration_bin(5.9) == "3-6s"
     assert duration_bin(20.0) == ">=6s"

@@ -111,6 +111,8 @@ def build_sample(
         times = {time_key(row) for row in rows}
         if any(time_key(c) not in times for c in data["clips"]):
             raise ValueError("已有标注包含旧切段，换一个归档文件名以保留旧标签")
+        if every:
+            data = _fill_in(data, rows, archive)
         return data
     if every:
         chosen = list(rows)
@@ -135,6 +137,22 @@ def build_sample(
     }
     write_json(archive, data)
     return data
+
+
+def _fill_in(data: dict[str, Any], rows: list[dict[str, Any]], archive: Path) -> dict[str, Any]:
+    """整集标时，把片段表里后来补进来的片段以空标签追加到已有归档，已标的一条不动。
+
+    片段 ID 是集名加时间范围的哈希，补片段不会改动已有片段，所以旧标签照旧有效，
+    只需要把新出现的那些排进来接着标。
+    """
+    have = {time_key(clip) for clip in data["clips"]}
+    fresh = [row for row in rows if time_key(row) not in have]
+    if not fresh:
+        return data
+    clips = [*data["clips"], *(dict(row, clip_id=row["id"], name=None) for row in fresh)]
+    updated = {**data, "clips": sorted(clips, key=lambda c: (c["start"], c["end"]))}
+    write_json(archive, updated)
+    return updated
 
 
 def known_names(sources: list[Path]) -> list[str]:

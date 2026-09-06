@@ -47,14 +47,33 @@ def prepare(
 
 
 @app.command()
+def extend(
+    episode: Path,
+    subtitle: Annotated[Path, typer.Option(help="这一集的 ASS 字幕")],
+    floor: Annotated[float, typer.Option(help="短于这个秒数的行不补，算不出可靠声纹")] = 0.2,
+) -> None:
+    """把字幕里没有对应片段的对白行补进片段表；已有片段不动，标签不用重做。"""
+    result = pipeline.extend_segments(episode, subtitle, floor)
+    typer.echo(
+        f"{result['episode']}：{result['before']} 条 -> {result['after']} 条，"
+        f"补了 {result['added']} 条（最短 {result['shortest_added']} 秒），"
+        f"另有 {result['too_short']} 条短于 {result['floor_seconds']} 秒没补"
+    )
+    typer.echo("片段表变了，声纹缓存已失效，重新运行 embed")
+
+
+@app.command()
 def embed(
     episodes: Annotated[list[Path], typer.Argument(help="一集或多集目录")],
     model: str = "redimnet2-b6",
     device: str = "cuda",
+    window: Annotated[
+        float, typer.Option(help="最小听音窗口秒数；短片段向两侧借相邻音频补足，0 表示不补")
+    ] = 0.0,
 ) -> None:
     """计算全量片段声纹，输入未变时复用缓存。"""
     for episode in episodes:
-        typer.echo(pipeline.embed(episode, model, device))
+        typer.echo(pipeline.embed(episode, model, device, window))
 
 
 @app.command()
@@ -148,12 +167,13 @@ def scores(
     out: Annotated[Path, typer.Option(help="新的分离度报告 JSON")],
     model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
     norm: Annotated[list[str] | None, typer.Option(help="要比较的归一化，可重复")] = None,
+    window: Annotated[float, typer.Option(help="读哪一档听音窗口算出的声纹")] = 0.0,
 ) -> None:
     """比较原始余弦与分数归一化下，同人与异人配对的分离度。"""
     from avs.embeddings.extract import MODELS
     from avs.evaluation.scores import compare_norms
 
-    report = compare_norms(episodes, annotation, model or list(MODELS), out, norm)
+    report = compare_norms(episodes, annotation, model or list(MODELS), out, norm, window)
     for entry in report["results"]:
         own = entry["overall"]
         typer.echo(f"{entry['model']:22s} {entry['norm']:7s} AUC {own['auc']}  等错率 {own['eer']}")

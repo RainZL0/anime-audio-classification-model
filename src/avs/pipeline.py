@@ -10,6 +10,7 @@ from typing import Any
 
 from avs.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
 from avs.project import (
+    cache_dir,
     cache_signature,
     digest,
     load_episode,
@@ -83,20 +84,75 @@ def prepare(
     return {"episode": name, "segments": len(rows), "offset": offset, "overlap": overlap}
 
 
-def embed(directory: Path, model: str = FRONTIER, device: str = "cuda") -> dict[str, Any]:
+def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS) -> dict[str, Any]:
+    """把字幕里没有对应片段的对白行补进这一集的片段表，已有片段一个不动。
+
+    片段 ID 是集名加时间范围的哈希，跟邻居无关，所以只增不改的话既有标签和归档仍然对得上，
+    不用重标。代价是声纹缓存会失效，需要重跑 `embed`。
+
+    补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音；不在这里猜，
+    统一收进来交给人耳判断，标注页有 `__not_speech__` 之类的标签可用。
+    """
+    from avs.audio import audio_info
+    from avs.evaluation.coverage import align_to_segments, uncovered_lines
+    from avs.stages.subtitle import load_dialogue
+
+    episode, rows = load_episode(directory)
+    lines = load_dialogue(subtitle)
+    if not lines:
+        raise ValueError(f"{subtitle} 里没有对白行，检查字幕样式名")
+    offset, inside = align_to_segments(lines, rows)
+    if inside < len(rows) * 0.9:
+        raise ValueError(f"只有 {inside}/{len(rows)} 条片段落在字幕行内，这份字幕多半不是这一集")
+
+    duration = audio_info(Path(episode["vocals"])).duration
+    missing = uncovered_lines(lines, rows, offset)
+    added, too_short = [], 0
+    for entry in missing:
+        start, end = max(0.0, entry["start"]), min(duration, entry["end"])
+        if end - start < floor:
+            too_short += 1
+            continue
+        added.append({"start": start, "end": end})
+    if not added:
+        raise ValueError("没有可补的对白行，片段表未改动")
+
+    spans = [{"start": r["start"], "end": r["end"]} for r in rows] + added
+    combined = segment_rows(episode["name"], spans)
+    kept = {r["id"] for r in rows}
+    if not kept <= {r["id"] for r in combined}:
+        raise ValueError("补片段改动了已有片段，已中止")
+    write_json(directory / "segments.json", combined)
+    return {
+        "episode": episode["name"],
+        "before": len(rows),
+        "after": len(combined),
+        "added": len(added),
+        "too_short": too_short,
+        "floor_seconds": floor,
+        "offset_seconds": offset,
+        "shortest_added": round(min(a["end"] - a["start"] for a in added), 3),
+    }
+
+
+def embed(
+    directory: Path, model: str = FRONTIER, device: str = "cuda", window: float = 0.0
+) -> dict[str, Any]:
     """声纹与输入绑定；已有完整缓存直接复用。短片段保留在片段表中。"""
     import numpy as np
 
     validate_name(model)
     episode, rows = load_episode(directory)
-    signature = cache_signature(directory, model)
-    cache = directory / "embeddings" / model
+    signature = cache_signature(directory, model, window)
+    cache = cache_dir(directory, model, window)
     if (cache / "cache.json").exists() and read_json(cache / "cache.json") == signature:
-        cached_records, _ = load_embeddings(directory, model)
+        cached_records, _ = load_embeddings(directory, model, window)
         return {"episode": episode["name"], "embedded": len(cached_records), "cached": True}
     eligible = [dict(r, speaker="") for r in rows if r["end"] - r["start"] >= MIN_SECONDS]
     if eligible:
-        metadata, vectors = embed_segments(Path(episode["analysis"]), eligible, model, device)
+        metadata, vectors = embed_segments(
+            Path(episode["analysis"]), eligible, model, device, window
+        )
         by_time = {time_key(r): r for r in rows}
         records = [by_time[(round(m.start, 3), round(m.end, 3))] for m in metadata]
     else:
@@ -108,12 +164,14 @@ def embed(directory: Path, model: str = FRONTIER, device: str = "cuda") -> dict[
     return {"episode": episode["name"], "embedded": len(records), "cached": False}
 
 
-def load_embeddings(directory: Path, model: str) -> tuple[list[dict[str, Any]], Any]:
+def load_embeddings(
+    directory: Path, model: str, window: float = 0.0
+) -> tuple[list[dict[str, Any]], Any]:
     import numpy as np
 
     validate_name(model)
-    cache = directory / "embeddings" / model
-    if read_json(cache / "cache.json") != cache_signature(directory, model):
+    cache = cache_dir(directory, model, window)
+    if read_json(cache / "cache.json") != cache_signature(directory, model, window):
         raise ValueError(f"{directory} 声纹缓存已过期，重新运行 embed")
     records = read_json(cache / "metadata.json")
     vectors = np.load(cache / "vectors.npy", allow_pickle=False)
