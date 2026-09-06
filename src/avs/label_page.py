@@ -19,6 +19,10 @@ background:white;cursor:pointer}
 button:hover{border-color:#888}
 input{cursor:text}
 audio{width:100%;margin:6px 0}
+/* 画面按原始高度显示，不放大也不占满：名字块得和画面同屏，否则又要来回滚动。 */
+#clip{width:auto;max-width:min(100%,520px);max-height:30vh;background:#000;
+border-radius:8px;margin:6px 0;display:block}
+#clip[hidden]{display:none}
 h1{margin:0 0 4px;font-size:26px}h2{margin:20px 0 4px;font-size:18px}
 .hint{color:#666;font-size:13px;line-height:1.6;margin:4px 0 10px}
 #stamp{font-size:28px;font-variant-numeric:tabular-nums}
@@ -61,10 +65,13 @@ border-radius:8px;background:white}
 <h1>对照画面确认角色</h1>
 <p class="hint">时间相对音轨开头。按顺序到视频里看是谁在说，名字前后一致即可。
 这页不显示机器分组，也不该显示：看过机器的答案，标出来的就不再是独立真值。<br>
-快捷键：回车保存，← → 上一条／跳过，空格重播，数字 1-9 选下面前九个名字。</p>
+快捷键：回车保存，← → 上一条／跳过，空格重播，数字 1-9 选下面前九个名字。<br>
+给了 <code>--video</code> 就在上面直接放这一条对应的画面，前后各多给半秒，看得出是谁在说。
+下面那个播放器是分离出来的人声，只作参考。</p>
 <div id="bar"><div id="fill"></div></div>
 <p id="status"></p>
 <div id="stamp"></div>
+<video id="clip" controls hidden></video>
 <audio id="audio" controls></audio>
 <p><input id="name" list="roster" placeholder="角色名，回车保存" autocomplete="off">
 <button id="submit">保存并继续</button><button id="drop">清除本条</button></p>
@@ -83,6 +90,7 @@ border-radius:8px;background:white}
 <audio id="ref" controls hidden></audio>
 <script>
 const clips=__CLIPS__, special=__SPECIAL__, roster=__KNOWN__, history=__HISTORY__;
+const hasVideo=__VIDEO__;
 let names=__NAMES__, at=0, opened=null;
 /* extra 是本次页面里新建、还没用到的名字；hidden 是从列表里藏掉的名字。两者都只活在
    这个页面：真正被用到的名字已经在归档里，下次开页面自然回来，没用到的不值得落盘。 */
@@ -222,6 +230,18 @@ function renderDetail(){
  }
 }
 
+/* 画面按需现切，切一段要几百毫秒，所以顺手把后一条也预热掉，翻过去时就已经在了。 */
+function showClip(c){
+ const box=el('clip');
+ box.hidden=false;
+ if(!box.src.endsWith('/'+c.id+'.mp4')){
+  box.src='video/'+c.id+'.mp4';
+  box.play().catch(()=>{});
+ }
+ const next=clips[at+1];
+ if(next)fetch('video/'+next.id+'.mp4',{method:'HEAD'}).catch(()=>{});
+}
+
 /* 旧标签用单独的播放器，免得盖掉正在标的那一条。 */
 function audition(entry){
  const ref=el('ref');
@@ -257,13 +277,16 @@ function render(){
  if(at>=total){
   el('stamp').textContent='本轮到底了，可以回去改任何一条';
   el('audio').removeAttribute('src');el('name').value='';
+  el('clip').hidden=true;el('clip').removeAttribute('src');
  }else{
   const c=clips[at];
   el('stamp').textContent=`${c.stamp} · ${c.seconds} 秒`;
   if(!el('audio').src.endsWith('/'+c.id+'.wav')){
    el('audio').src=c.id+'.wav';
-   el('audio').play().catch(()=>{});
+   // 有画面时画面是主角，人声只作参考，别两个一起响。
+   if(!hasVideo)el('audio').play().catch(()=>{});
   }
+  if(hasVideo)showClip(c);
   el('name').value=names[c.id]||'';
   Object.entries(special).forEach(([v,label])=>button(el('special'),label,()=>assign(v)));
  }
@@ -321,7 +344,9 @@ document.addEventListener('keydown',e=>{
  if(e.key==='ArrowLeft'){e.preventDefault();el('prev').click();}
  else if(e.key==='ArrowRight'){e.preventDefault();el('next').click();}
  else if(e.key===' '){
-  e.preventDefault();el('audio').currentTime=0;el('audio').play().catch(()=>{});
+  e.preventDefault();
+  const player=hasVideo&&!el('clip').hidden?el('clip'):el('audio');
+  player.currentTime=0;player.play().catch(()=>{});
  }
  else if(e.key>='1'&&e.key<='9'){
   const row=rows()[Number(e.key)-1];

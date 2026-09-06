@@ -29,8 +29,8 @@
    "seconds": 22.3,
    "lines": 2,
    "dialogue_seconds": 3.6,
-   "verdict": "undecided",
-   "reason": "前景是主角在哼歌，背景是电视机声音；这两条字幕写的是电视里的解说词，不是主角在说话"
+   "verdict": "drop",
+   "reason": "前景是主角在哼歌，背景是电视机声音；两条字幕写的是电视里的解说词。标注者判定不留：分离不出主角的声音"
   },
   {
    "file": "holes/03_07-14.84.wav",

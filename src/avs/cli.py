@@ -189,11 +189,14 @@ def label(
     every: Annotated[
         bool, typer.Option("--all", help="标这一集的全部片段，按时间顺序；忽略 --count")
     ] = False,
+    video: Annotated[
+        Path | None, typer.Option(help="这一集的视频；给了就在页面上放对应画面，按需现切")
+    ] = None,
 ) -> None:
     """抽样、按计划或整集取片段，对照画面标角色名，逐条存入归档。"""
     from avs.labeling import run
 
-    run(episode, archive, count, port, plan, known, every)
+    run(episode, archive, count, port, plan, known, every, video)
 
 
 @app.command()

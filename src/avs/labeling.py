@@ -9,9 +9,11 @@ from __future__ import annotations
 import json
 import random
 import re
+import subprocess
+import threading
 from collections import Counter
 from contextlib import suppress
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,10 @@ from avs.project import digest, load_episode, read_json, time_key, write_json
 
 SPECIAL = {"__unclear__": "无法确认", "__multiple__": "不止一个人", "__not_speech__": "不是说话"}
 PLAN_SCHEMA = "avs.label_plan.v1"
+VIDEO_PAD = 0.5
+"""切视频片段时前后各留几秒。只看台词那一瞬间常常看不出是谁在说，得有点前后文。"""
+VIDEO_HEIGHT = 360
+"""转出来的画面高度。够看清是谁在说就行，越小切得越快、载入越快。"""
 
 
 def build_plan(
@@ -201,6 +207,32 @@ def reference_clips(archives: list[Path], directory: Path) -> dict[str, list[dic
     return history
 
 
+def cut_video(video: Path, start: float, end: float, out: Path) -> None:
+    """用 ffmpeg 切一小段视频，转成浏览器一定放得动的 H.264 mp4。
+
+    源片是 HEVC，浏览器对它的支持看机器看版本，不能赌；这里统一转码，顺带压到
+    `VIDEO_HEIGHT` 高。一段两三秒的画面实测不到半秒就切好，所以按需现切，不预先批量转。
+    `-ss` 放在 `-i` 前面是快速定位，不这样做每次都要从头解码。
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    temporary = out.with_suffix(".part.mp4")
+    command = [
+        "ffmpeg", "-v", "error", "-nostdin",
+        "-ss", f"{max(0.0, start):.3f}", "-t", f"{max(0.05, end - start):.3f}",
+        "-i", str(video),
+        "-vf", f"scale=-2:{VIDEO_HEIGHT}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-c:a", "aac", "-b:a", "96k",
+        "-movflags", "+faststart", "-y", str(temporary),
+    ]  # fmt: skip
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        temporary.unlink(missing_ok=True)
+        raise ValueError(f"切视频失败，确认 ffmpeg 可用且视频能读：{exc}") from exc
+    temporary.replace(out)
+
+
 def _cut(sf: Any, vocals: str, start: float, end: float, out: Path) -> None:
     rate = sf.info(vocals).samplerate
     wave, wrote = sf.read(vocals, start=int(start * rate), stop=int(end * rate), always_2d=True)
@@ -242,6 +274,7 @@ def run(
     plan: Path | None = None,
     known: list[Path] | None = None,
     every: bool = False,
+    video: Path | None = None,
 ) -> None:
     import soundfile as sf
 
@@ -280,13 +313,36 @@ def run(
         ("__SPECIAL__", SPECIAL),
         ("__KNOWN__", roster),
         ("__HISTORY__", history),
+        ("__VIDEO__", video is not None),
     ):
         page = page.replace(key, json.dumps(value, ensure_ascii=False).replace("<", "\\u003c"))
     (clip_dir / "index.html").write_text(page, encoding="utf-8")
 
+    spans = {c["clip_id"]: (float(c["start"]), float(c["end"])) for c in data["clips"]}
+    saving = threading.Lock()
+    cutting = threading.Lock()
+
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, directory=str(clip_dir), **kwargs)
+
+        def send_head(self) -> Any:
+            # 视频按需现切：只有真正翻到那一条才切，翻不到的那些一辈子不用切。
+            wanted = re.fullmatch(r"/video/([A-Za-z0-9_-]+)\.mp4", self.path)
+            if wanted and video is not None:
+                target = clip_dir / "video" / f"{wanted[1]}.mp4"
+                span = spans.get(wanted[1])
+                if span is None:
+                    self.send_error(404)
+                    return None
+                with cutting:
+                    if not target.exists():
+                        try:
+                            cut_video(video, span[0] - VIDEO_PAD, span[1] + VIDEO_PAD, target)
+                        except ValueError as exc:
+                            self.send_error(500, str(exc).encode("ascii", "replace").decode())
+                            return None
+            return super().send_head()
 
         def do_POST(self) -> None:
             if self.path.rstrip("/") != "/save":
@@ -297,8 +353,8 @@ def run(
                 if not 0 < length <= 1_000_000:
                     raise ValueError("提交过大或为空")
                 names = json.loads(self.rfile.read(length))
-                updated = apply_names(data, names)
-                write_json(archive, updated)
+                with saving:
+                    write_json(archive, apply_names(data, names))
             except (ValueError, OSError) as exc:
                 self.send_error(400, str(exc).encode("ascii", "replace").decode())
                 return
@@ -311,10 +367,12 @@ def run(
     print(
         f"打开 http://127.0.0.1:{port}/ ，每条直接保存到 {archive}；"
         f"页面词表里有 {len(roster)} 个已有角色名，"
-        f"{sum(len(v) for v in history.values())} 条旧标签可以回放对照",
+        f"{sum(len(v) for v in history.values())} 条旧标签可以回放对照"
+        + ("；画面按需从视频现切" if video else "；没给 --video，只有分离后的人声"),
         flush=True,
     )
-    with HTTPServer(("127.0.0.1", port), Handler) as server, suppress(KeyboardInterrupt):
+    # 多线程：按需切视频要几百毫秒，单线程会把这段时间里的保存请求一起堵住。
+    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server, suppress(KeyboardInterrupt):
         server.serve_forever()
 
 
