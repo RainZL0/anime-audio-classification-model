@@ -1,8 +1,15 @@
 """分数归一化值不值得接进分组：先只看同人与异人的分离度。
 
-分组规则只决定「哪些分数算连上」，改不了分数本身。所以先在人工标签的配对上量分离度
-（AUC 与等错率），分不开就没必要往聚类里接。按片段时长和是否跨集分层，因为归一化要治的
-正是这两处的系统偏移，总体数字持平也可能在短片段上有改善。
+分组规则只决定「哪些分数算连上」，改不了分数本身。所以先在人工标签的配对上量两件事，
+分不开就没必要往聚类里接：
+
+- **排序正确率**（`auc`）：随机拿一对同角色片段和一对不同角色片段，同角色那对分数更高的比例。
+  完全随机是 0.50。
+- **相等错误率**（`eer`）：把分界线挪到「同角色被错误分开」和「不同角色被错误合并」这两种
+  错误一样多的位置，那时候的错误率。
+
+按片段时长和是否跨集分层，因为有些手段只在某一档上起作用，总体数字持平也可能在短片段上
+有改善。
 """
 
 from __future__ import annotations
@@ -26,7 +33,7 @@ def duration_bin(seconds: float) -> str:
 
 
 def separation(same: Any, other: Any) -> dict[str, Any]:
-    """同人与异人分数的分离程度。分数越大表示越像。"""
+    """同角色与不同角色的分数分得开不开。分数越大表示越像。"""
     import numpy as np
     from sklearn.metrics import roc_auc_score
 
@@ -35,7 +42,7 @@ def separation(same: Any, other: Any) -> dict[str, Any]:
     labels = np.concatenate([np.ones(len(same)), np.zeros(len(other))])
     scores = np.concatenate([same, other])
     auc = float(roc_auc_score(labels, scores))
-    # 等错率：扫过所有候选分界，取「同人被判开」与「异人被判合」两个错误率最接近的那点。
+    # 相等错误率：扫过所有候选分界，取两种错误率最接近的那一点。
     grid = np.quantile(scores, np.linspace(0, 1, 401))
     miss = np.array([float((same < cut).mean()) for cut in grid])
     false = np.array([float((other >= cut).mean()) for cut in grid])
@@ -116,8 +123,9 @@ def compare_norms(
         "special_labels": special,
         "pairs": len(pairs),
         "results": results,
-        "note": "只比较分离度，不做聚类。干扰集就是本批全部片段，没有独立干扰集，"
-        "asnorm 取到的最像 k 条里会混进同角色片段，这会削弱它的效果。",
+        "note": "只比较分得开不开，不做分组。作基准的无关片段就是本批全部片段，"
+        "没有另一批与本作无关的片段可用，所以 asnorm 挑出的最像 k 条里会混进同一角色的"
+        "片段，等于拿同角色的分数当基准，这会削弱它的效果。",
     }
     write_json(out, report)
     return report

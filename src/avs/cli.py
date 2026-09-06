@@ -190,7 +190,10 @@ def scores(
     report = compare_norms(episodes, annotation, model or list(MODELS), out, norm, window)
     for entry in report["results"]:
         own = entry["overall"]
-        typer.echo(f"{entry['model']:22s} {entry['norm']:7s} AUC {own['auc']}  等错率 {own['eer']}")
+        typer.echo(
+            f"{entry['model']:22s} {entry['norm']:7s} "
+            f"排序正确率 {own['auc']}  相等错误率 {own['eer']}"
+        )
     typer.echo(f"{report['pairs']} 对标签配对 -> {out}")
 
 

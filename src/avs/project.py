@@ -73,12 +73,19 @@ def load_episode(directory: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
 
 
 def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[str, str]:
-    """声纹缓存的指纹。窗口为 0 时不写这一项，好让改动之前算好的缓存继续有效。"""
+    """声纹缓存的指纹。改了其中任何一项，旧缓存就该作废重算。
+
+    时长下限也要记进来：它决定哪些片段有声纹。少了这一项，调高下限之后旧缓存照样通过校验，
+    分组会继续用上本该被丢掉的短片段，而且没有任何报错。
+    """
+    from avs.embeddings.extract import MIN_SECONDS
+
     episode, _ = load_episode(directory)
     signature = {
         "model": model,
         "segments_sha256": digest(directory / "segments.json"),
         "analysis_sha256": digest(Path(episode["analysis"])),
+        "min_seconds": f"{MIN_SECONDS:.3f}",
     }
     if window:
         signature["window_seconds"] = f"{window:.3f}"

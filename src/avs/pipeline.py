@@ -31,7 +31,13 @@ def prepare(
     offset: float | None = None,
     device: str = "cuda",
 ) -> dict[str, Any]:
-    """以每行字幕为候选。偏移可显式提供，否则用说话时间线自动量。"""
+    """片段就是字幕行本身。偏移可以直接给，不给就自动量。
+
+    **语音检测只用来量偏移，不参与判断片段里有没有人在说话。** 早期的做法是拿检测结果去和
+    字幕求重叠再切，那样丢掉了四成对白行，已经废弃。给了 `--offset` 就完全不跑检测；
+    同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），直接给上一集
+    量到的值即可，跑完用 `avs coverage` 核对覆盖是否完整。
+    """
     from avs.audio import audio_info, diarize, make_analysis_copy, separate_vocals
     from avs.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
 
