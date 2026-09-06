@@ -52,12 +52,15 @@ border-top:1px solid #ececec}
 <nav><button id="prev">上一条</button><button id="next">跳过</button>
 <button id="tonew">下一条未标</button></nav>
 <h2>角色名</h2>
-<p class="hint">点名字给当前片段打标。点条数展开这个角色的全部片段，可跳过去或撤掉。
-改名会改掉本轮这个名字下的所有片段。名字多时先在下面筛一下，数字键跟着筛完的顺序走。</p>
+<p class="hint">点名字给当前片段打标。点「本轮 N 条」展开这个角色本轮的片段，可跳过去或撤掉；
+点「旧 N 条」展开以前标过的片段，点时间点就地试听。改名会改掉本轮这个名字下的所有片段。
+名字多时先在下面筛一下，数字键跟着筛完的顺序走。<br>
+试听旧标签只用来帮你想起这个名字是谁，判断仍以画面为准，别改成靠耳朵比对。</p>
 <p><input id="filter" placeholder="筛名字" autocomplete="off"></p>
+<audio id="ref" controls hidden></audio>
 <div id="known"></div>
 <script>
-const clips=__CLIPS__, special=__SPECIAL__, roster=__KNOWN__;
+const clips=__CLIPS__, special=__SPECIAL__, roster=__KNOWN__, history=__HISTORY__;
 let names=__NAMES__, at=0, expanded=null;
 const el=id=>document.getElementById(id);
 const total=clips.length;
@@ -84,6 +87,16 @@ function rows(){
   .filter(([n])=>!keep||n.toLowerCase().includes(keep));
 }
 
+/* 一次只展开一处：expanded 记住是哪个名字的哪一栏（本轮 mine，旧标签 past）。 */
+function shown(name,kind){return expanded&&expanded.name===name&&expanded.kind===kind;}
+function toggle(name,kind){expanded=shown(name,kind)?null:{name,kind};renderRoster();}
+
+/* 旧标签用单独的播放器，免得盖掉正在标的那一条。 */
+function audition(entry){
+ const ref=el('ref');
+ ref.hidden=false;ref.src=entry.file;ref.play().catch(()=>{});
+}
+
 function button(parent,label,fn,cls){
  const b=document.createElement('button');
  b.textContent=label;b.onclick=fn;if(cls)b.className=cls;
@@ -105,15 +118,15 @@ function renderRoster(){
   row.appendChild(key);
   const pick=button(row,'',()=>assign(name),'pick');
   pick.replaceChildren(Object.assign(document.createElement('b'),{textContent:name}));
-  if(where.length)button(row,`${where.length} 条`,()=>{
-   expanded=expanded===name?null:name;renderRoster();
-  },'count');
+  const past=history[name]||[];
+  if(where.length)button(row,`本轮 ${where.length} 条`,()=>toggle(name,'mine'),'count');
   else{
    const tag=document.createElement('span');
-   tag.className='count';tag.textContent='未用';row.appendChild(tag);
+   tag.className='count';tag.textContent='本轮未用';row.appendChild(tag);
   }
+  if(past.length)button(row,`旧 ${past.length} 条`,()=>toggle(name,'past'),'count');
   if(where.length)button(row,'改名',()=>rename(name,row),'edit');
-  if(expanded===name){
+  if(shown(name,'mine')){
    const strip=document.createElement('div');strip.className='clips';
    where.forEach(i=>{
     const b=button(strip,clips[i].stamp,()=>{at=i;render();},i===at?'here':'');
@@ -124,6 +137,14 @@ function renderRoster(){
      const proposed={...n};where.forEach(i=>delete proposed[clips[i].id]);return proposed;
     }).then(()=>{expanded=null;render();});
    },'drop');
+   row.appendChild(strip);
+  }
+  if(shown(name,'past')){
+   const strip=document.createElement('div');strip.className='clips';
+   past.forEach(entry=>{
+    const b=button(strip,`${entry.episode} ${entry.stamp}`,()=>audition(entry));
+    b.title=`${entry.seconds} 秒`;
+   });
    row.appendChild(strip);
   }
   box.appendChild(row);
