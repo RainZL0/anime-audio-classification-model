@@ -1,0 +1,72 @@
+{
+ "schema": "avs.coverage_verdict.v1",
+ "episode": "ep01",
+ "judged_on": "2026-09-06",
+ "method": "人工试听 runs/coverage/ep01/holes/ 下的整段音频后逐个判断",
+ "note": "这些是标注者听过之后给出的判断，重跑恢复不了，和角色名标签一样必须保留。keep 表示这段里确实有该收的角色台词，是切段真丢了；drop 表示这段本来就不该进片段集；undecided 需要标注者再定。字幕行数与时长取自 runs/coverage/ep01/report.json。",
+ "holes": [
+  {
+   "file": "holes/00_00-39.67.wav",
+   "stamp": "00:39.67",
+   "seconds": 58.6,
+   "lines": 22,
+   "dialogue_seconds": 48.9,
+   "verdict": "drop",
+   "reason": "一整段连续赛马解说，与要收集的角色无关"
+  },
+  {
+   "file": "holes/01_02-00.86.wav",
+   "stamp": "02:00.86",
+   "seconds": 20.1,
+   "lines": 8,
+   "dialogue_seconds": 13.0,
+   "verdict": "keep",
+   "reason": "是漏掉的角色台词"
+  },
+  {
+   "file": "holes/02_02-30.43.wav",
+   "stamp": "02:30.43",
+   "seconds": 22.3,
+   "lines": 2,
+   "dialogue_seconds": 3.6,
+   "verdict": "undecided",
+   "reason": "前景是主角在哼歌，背景是电视机声音；这两条字幕写的是电视里的解说词，不是主角在说话"
+  },
+  {
+   "file": "holes/03_07-14.84.wav",
+   "stamp": "07:14.84",
+   "seconds": 47.8,
+   "lines": 17,
+   "dialogue_seconds": 42.0,
+   "verdict": "keep",
+   "reason": "是漏掉的角色台词"
+  },
+  {
+   "file": "holes/04_10-53.71.wav",
+   "stamp": "10:53.71",
+   "seconds": 24.6,
+   "lines": 2,
+   "dialogue_seconds": 2.0,
+   "verdict": "drop",
+   "reason": "跑步的喘气声，不是台词"
+  },
+  {
+   "file": "holes/05_17-14.38.wav",
+   "stamp": "17:14.38",
+   "seconds": 22.0,
+   "lines": 3,
+   "dialogue_seconds": 3.5,
+   "verdict": "keep",
+   "reason": "有说话声，应该跟着字幕切下来"
+  },
+  {
+   "file": "holes/06_20-27.62.wav",
+   "stamp": "20:27.62",
+   "seconds": 29.3,
+   "lines": 4,
+   "dialogue_seconds": 18.5,
+   "verdict": "drop",
+   "reason": "众人欢呼声，不是某个角色的台词"
+  }
+ ]
+}
