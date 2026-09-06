@@ -9,20 +9,33 @@ from typing import Any
 from avs.project import read_json, time_key
 
 
-def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
-    """同时报错误合并与该合没合，防止把每条独立成组伪装成完美识别。"""
+def pair_counts(truth: list[str], predicted: list[Any]) -> tuple[int, int, int]:
+    """数出连上、错误合并、该合没合三个配对数。
+
+    按人工名字乘机器组号的计数表算，不逐对循环：扫分界线时同一批标签要数上千遍，
+    逐对循环慢到不能用，而两种算法的结果完全一样。
+    """
+    import numpy as np
+
     if len(truth) != len(predicted):
         raise ValueError("人工标签和预测长度不同")
+    _, names = np.unique(np.asarray(truth, dtype=str), return_inverse=True)
+    _, groups = np.unique(np.asarray(predicted, dtype=str), return_inverse=True)
+    table = np.zeros((names.max(initial=-1) + 1, groups.max(initial=-1) + 1), dtype=np.int64)
+    np.add.at(table, (names, groups), 1)
+
+    def pairs(counts: Any) -> int:
+        return int((counts * (counts - 1) // 2).sum())
+
+    hits = pairs(table)
+    return hits, pairs(table.sum(axis=0)) - hits, pairs(table.sum(axis=1)) - hits
+
+
+def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
+    """同时报错误合并与该合没合，防止把每条独立成组伪装成完美识别。"""
     from sklearn.metrics import adjusted_rand_score
 
-    hits = false_merges = missed_links = 0
-    for i in range(len(truth)):
-        for j in range(i):
-            same_person = truth[i] == truth[j]
-            same_group = predicted[i] == predicted[j]
-            hits += int(same_person and same_group)
-            false_merges += int(not same_person and same_group)
-            missed_links += int(same_person and not same_group)
+    hits, false_merges, missed_links = pair_counts(truth, predicted)
     groups: dict[int, list[str]] = defaultdict(list)
     for name, label in zip(truth, predicted, strict=True):
         groups[label].append(name)
