@@ -29,7 +29,7 @@ def duration_bin(seconds: float) -> str:
 
 
 def load_pool(
-    episodes: list[Path], models: list[str]
+    episodes: list[Path], models: list[str], window: float = 0.0
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """所有模型必须覆盖同一批片段；各模型的矩阵按片段 ID 对齐到同一行序。"""
     import numpy as np
@@ -52,7 +52,7 @@ def load_pool(
         }
         base: list[dict[str, Any]] = []
         for model in models:
-            own, vectors = load_embeddings(directory, model)
+            own, vectors = load_embeddings(directory, model, window)
             order = {r["id"]: i for i, r in enumerate(own)}
             if model == models[0]:
                 base = own

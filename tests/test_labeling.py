@@ -255,3 +255,22 @@ def test_reference_clips_ignore_a_name_list_with_no_segments(tmp_path: Path) -> 
     roster = tmp_path / "names.json"
     write_json(roster, {"names": ["teo"]})
     assert reference_clips([roster], directory) == {}
+
+
+def test_all_clips_archive_picks_up_segments_added_later(tmp_path: Path) -> None:
+    directory, _ = make_episode(tmp_path, "ep1")
+    archive = tmp_path / "ep1-full.json"
+    data = build_sample(directory, archive, count=1, every=True)
+    write_json(archive, {**data, "clips": [dict(c, name="A") for c in data["clips"]]})
+
+    # 片段表后来补进两条，已有片段一条没动。
+    extra = [*SPANS, {"start": 7.0, "end": 7.4}, {"start": 8.0, "end": 8.6}]
+    write_json(directory / "segments.json", segment_rows("ep1", extra))
+    grown = build_sample(directory, archive, count=1, every=True)
+
+    assert len(grown["clips"]) == len(SPANS) + 2
+    assert [c["name"] for c in grown["clips"]] == ["A"] * len(SPANS) + [None, None]
+    assert [c["start"] for c in grown["clips"]] == sorted(c["start"] for c in grown["clips"])
+    assert read_json(archive) == grown
+    # 不是整集标的时候不动已有归档。
+    assert build_sample(directory, archive, count=1) == grown

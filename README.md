@@ -60,6 +60,17 @@ uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotatio
 
 输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
 
+把没有片段的对白行补进片段表（片段 ID 是集名加时间范围的哈希，只增不改，已有标签照旧有效）：
+
+```powershell
+uv run avs extend runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass"
+uv run avs embed runs/episodes/ep02 --model redimnet2-b6
+```
+
+补完片段表变了，声纹缓存失效，要重跑 `embed`。补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音，这里不猜，统一收进来交给人耳判断。`avs label --all` 再跑一次会把新片段以空标签追加到已有归档，已标的一条不动。
+
+`avs embed --window` 指定最小听音窗口：片段短于它时向两侧借相邻音频补足，片段本身的时间范围不变，只是模型多听了一点上下文。不同窗口的声纹存在不同目录（`embeddings/<模型>@w<秒数>`），互不覆盖。
+
 对白覆盖核对（字幕里哪些台词根本没有片段）：
 
 ```powershell

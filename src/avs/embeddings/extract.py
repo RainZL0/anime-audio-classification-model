@@ -17,8 +17,18 @@ MODELS = (FRONTIER, BASELINE)
 SAMPLE_RATE = 16_000
 """指纹模型都要 16 kHz，也就是分析副本的采样率。别拿原采样率的人声轨喂它们。"""
 
-MIN_SECONDS = 1.0
-"""短于这个长度的片段指纹不可靠，跳过。见 HOW_IT_WORKS.md 4.5。"""
+MIN_SECONDS = 0.2
+"""短于这个长度就不算指纹了。原来是 1.0 秒，等于把一秒以下的台词整批扔掉；全量标签显示
+短片段虽然更差但差得有限（0-1.5 秒配对 AUC 0.9239 对 3-6 秒的 0.9402），扔掉不如收进来
+再评。低于 0.2 秒连一个音节都不完整，留着这个底线。"""
+
+MIN_WINDOW = 0.0
+"""喂给模型的最小音频窗口。片段短于它时，向前后两侧对称取原轨上的相邻音频补足，
+片段本身的时间范围不变，只是模型多听了一点上下文。0 表示只听片段本身。
+
+**为什么可能有用又可能有害。** 短片段的指纹差，一个解释是模型听到的音太少；补上相邻音频
+等于给它更多材料。但相邻音频未必还是同一个人在说，补过头就会把邻座的声音混进来。
+是利大于弊还是相反，只能在人工标签上量，别凭直觉定。"""
 
 REDIMNET2_REPO = "PalabraAI/redimnet2"
 REDIMNET2_SIZE = "b6"
@@ -102,8 +112,12 @@ def embed_segments(
     segments: list[Any],
     model: str = FRONTIER,
     device: str = "cuda",
+    window: float = MIN_WINDOW,
 ) -> tuple[list[Embedded], Any]:
     """给每条片段算指纹。wav 要 16 kHz 单声道，也就是分析副本。
+
+    `window` 是最小听音窗口，短片段会对称地向两边借相邻音频补到这个长度；元信息里记的
+    仍是片段自己的时间范围，借来的部分只影响模型听到什么，不影响这条片段是什么。
 
     返回（元信息列表, 指纹矩阵）。矩阵每行一条，行号跟列表对齐，已经做过长度归一，
     所以两行点乘就是余弦相似度。
@@ -123,7 +137,8 @@ def embed_segments(
         start, end = float(seg["start"]), float(seg["end"])
         if end - start < MIN_SECONDS:
             continue
-        chunk = mono[int(start * sample_rate) : int(end * sample_rate)]
+        heard = _window(start, end, window, len(mono) / sample_rate)
+        chunk = mono[int(heard[0] * sample_rate) : int(heard[1] * sample_rate)]
         vector = np.asarray(extract(chunk), dtype=np.float32).reshape(-1)
         norm = float(np.linalg.norm(vector))
         if norm == 0.0:
@@ -134,3 +149,16 @@ def embed_segments(
     if not vectors:
         raise RuntimeError("一条指纹都没算出来，检查片段时长和分析副本")
     return meta, np.stack(vectors)
+
+
+def _window(start: float, end: float, window: float, duration: float) -> tuple[float, float]:
+    """把不足 `window` 的片段对称扩到 `window`；碰到轨道两端就往另一侧补回来。"""
+    if window <= 0 or end - start >= window:
+        return start, end
+    room = (window - (end - start)) / 2
+    low, high = start - room, end + room
+    if low < 0:
+        low, high = 0.0, min(duration, high - low)
+    if high > duration:
+        low, high = max(0.0, low - (high - duration)), duration
+    return low, high
