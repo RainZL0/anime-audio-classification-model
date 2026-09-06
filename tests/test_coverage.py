@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from avs.evaluation.coverage import align_to_segments, coverage, uncovered_lines
+from avs.evaluation.coverage import (
+    align_to_segments,
+    coverage,
+    find_holes,
+    uncovered_lines,
+)
 from avs.project import segment_rows, write_json
 
 # 字幕整体比音轨晚 0.5 秒，正确偏移是 -0.5。
@@ -93,6 +98,9 @@ def test_coverage_cuts_the_missing_lines_and_refuses_a_foreign_subtitle(tmp_path
         "below_floor": 1,
         "no_speech_found": 1,
         "clips": 3,
+        "holes": 0,
+        "hole_seconds": 0,
+        "hole_dialogue_seconds": 0,
     }
     cut = sorted(p.relative_to(out).as_posix() for p in out.rglob("*.wav"))
     assert [e["file"] for e in report["uncovered"]] == cut
@@ -113,3 +121,30 @@ def test_coverage_cuts_the_missing_lines_and_refuses_a_foreign_subtitle(tmp_path
     subs.save(str(other))
     with pytest.raises(ValueError, match="多半不是这一集"):
         coverage(directory, other, tmp_path / "coverage-other")
+
+
+def test_holes_are_stretches_with_no_clip_but_real_dialogue(tmp_path: Path) -> None:
+    # 片段之间留一个 30 秒的空档，里面放两条台词，另一个空档里什么都没有。
+    rows = [{"start": 0.0, "end": 2.0}, {"start": 32.0, "end": 34.0}, {"start": 70.0, "end": 72.0}]
+    missing = [
+        {"start": 5.0, "end": 6.5, "seconds": 1.5, "text": "第一句"},
+        {"start": 20.0, "end": 21.0, "seconds": 1.0, "text": "第二句"},
+    ]
+    holes = find_holes(rows, missing)
+    assert [h["stamp"] for h in holes] == ["00:02.00"]
+    assert holes[0]["lines"] == 2
+    assert holes[0]["dialogue_seconds"] == 2.5
+    assert holes[0]["texts"] == ["第一句", "第二句"]
+    # 34 到 70 秒同样是空档，但里面没有台词，不算问题。
+    assert len(holes) == 1
+    assert tmp_path.exists()
+
+
+def test_coverage_writes_hole_audio_and_listing(tmp_path: Path) -> None:
+    directory = make_episode(tmp_path)
+    subtitle = make_subtitle(tmp_path / "ep1.ass")
+    out = tmp_path / "coverage"
+    report = coverage(directory, subtitle, out)
+    # 片段 4 秒到 8 秒之间只空了 4 秒，够不上空洞门槛。
+    assert report["summary"]["holes"] == 0
+    assert (out / "holes.txt").read_text(encoding="utf-8").strip() == ""
