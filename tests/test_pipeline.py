@@ -50,7 +50,7 @@ def episode(root: Path, name: str) -> Path:
 def test_group_export_includes_every_clip_and_small_groups(tmp_path: Path) -> None:
     episodes = [episode(tmp_path, name) for name in ("ep1", "ep2")]
     out = tmp_path / "groups.json"
-    result = pipeline.group(episodes, out)
+    result = pipeline.group(episodes, out, model="redimnet2-b6")
     assert result["summary"] == {"clips": 6, "groups": 2, "singleton_groups": 0, "unassigned": 2}
     exported = pipeline.export_groups(out, tmp_path / "export")
     assert exported["files"] == 6
@@ -68,8 +68,8 @@ def test_grouping_and_cached_embed_do_not_load_models(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(pipeline, "embed_segments", fail)
     assert pipeline.embed(directory)["cached"]
-    a = pipeline.group([directory], tmp_path / "a.json", threshold=0.1)
-    b = pipeline.group([directory], tmp_path / "b.json", threshold=1.5)
+    a = pipeline.group([directory], tmp_path / "a.json", threshold=0.1, model="redimnet2-b6")
+    b = pipeline.group([directory], tmp_path / "b.json", threshold=1.5, model="redimnet2-b6")
     assert a["summary"]["groups"] == 2
     assert b["summary"]["groups"] == 1
 
@@ -87,13 +87,13 @@ def test_cache_drift_is_detected(tmp_path: Path, changed: str) -> None:
         rows[0]["end"] = 1.9
         write_json(p, rows)
     with pytest.raises(ValueError):
-        pipeline.group([directory], tmp_path / "groups.json")
+        pipeline.group([directory], tmp_path / "groups.json", model="redimnet2-b6")
 
 
 def test_exact_annotations_and_unassigned_are_not_hidden(tmp_path: Path) -> None:
     directory = episode(tmp_path, "ep1")
     groups = tmp_path / "groups.json"
-    pipeline.group([directory], groups)
+    pipeline.group([directory], groups, model="redimnet2-b6")
     archive = tmp_path / "truth.json"
     write_json(
         archive,

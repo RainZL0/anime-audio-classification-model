@@ -16,6 +16,13 @@ ANIME_CHAR = "anime-char"
 ANIME_VA = "anime-va"
 MODELS = (FRONTIER, BASELINE, ANIME_CHAR, ANIME_VA)
 
+DEFAULT_THRESHOLDS = {FRONTIER: 0.50, BASELINE: 0.60, ANIME_CHAR: 0.53, ANIME_VA: 0.70}
+"""每个模型自己的起始距离阈值。相似度尺度因模型而异，套用别人的阈值会扫在毫无意义的一段上。
+
+这些值都是在前两集标签上选的，**而且随片段池增大会漂移**：同一阈值下池子越大，平均连接
+要求整簇平均距离达标，合并越保守。anime-va 0.70 在 375 条池里 ep03 连回 2613 对，
+放进 1184 条池只连回 2091 对。语料继续增长时要重新核，别当常数用。"""
+
 ANIME_VARIANTS = {ANIME_CHAR: "char", ANIME_VA: "va"}
 """litagin02/anime_speaker_embedding 的两个变体。char 按角色训练，同一声优配的不同角色也要
 分开；va 按声优归并。我们的标签是角色，所以 char 是对口的那个，但两个都留着比：如果 va
