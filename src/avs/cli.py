@@ -114,14 +114,21 @@ def compare(
     out: Annotated[Path, typer.Option(help="新的比较报告 JSON")],
     model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
     method: Annotated[list[str] | None, typer.Option(help="连接规则，可重复；默认 average")] = None,
+    low: Annotated[float, typer.Option(help="阈值扫描下界")] = 0.20,
+    high: Annotated[float, typer.Option(help="阈值扫描上界")] = 0.90,
 ) -> None:
-    """比较缓存模型与连接规则在 0.20—0.90 阈值下的错合与漏合；仅用于探索。"""
+    """比较缓存模型与连接规则在给定阈值区间上的错合与漏合；仅用于探索。
+
+    默认区间是给 ReDimNet 定的。不同模型的相似度尺度不一样，换模型要先看同人距离落在哪，
+    再定区间；照搬别人的区间会扫在完全没有意义的一段上。
+    """
     from avs.embeddings.extract import MODELS
     from avs.evaluation.compare import compare as compare_models
 
-    result = compare_models(
-        episodes, annotation, model or list(MODELS), [i / 100 for i in range(20, 91)], out, method
-    )
+    if not 0 < low < high <= 2:
+        raise typer.BadParameter("阈值区间必须满足 0 < low < high <= 2")
+    grid = [i / 100 for i in range(round(low * 100), round(high * 100) + 1)]
+    result = compare_models(episodes, annotation, model or list(MODELS), grid, out, method)
     typer.echo(f"比较 {len(result['results'])} 个设置 -> {out}")
 
 

@@ -5,6 +5,7 @@ description = "Group subtitle-aligned anime voice clips by speaker"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anime-speaker-embedding>=0.2",
     "audio-separator[gpu]>=0.45.0",
     "audioread>=3.1.0",
     "numpy>=2.5.2",
@@ -86,6 +87,7 @@ warn_unreachable = true
 # 音频/ML 生态大量缺 stub，逐库放行而不是全局关掉 strict
 [[tool.mypy.overrides]]
 module = [
+    "anime_speaker_embedding.*",
     "audio_separator.*",
     "pandas.*",
     "pyloudnorm.*",

@@ -6,6 +6,7 @@
 - audio-separator / Mel-Band RoFormer：抽取人声，模型为 `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`。默认 fp16 推理：在 RTX 4060 Laptop 上用同一段 3 分钟音频实测，fp16 比 fp32 快约 1.6 倍，与 fp32 输出的信噪比 73.5 dB，远在听感之下；bf16 更慢且差 15.6 dB，不选。换显卡架构需重测；怀疑分离伪影时用 `--precision fp32` 对照。
 - pyannote community-1：只在字幕偏移未知时提取说话时间线；WeSpeaker 适配也依赖它。
 - [ReDimNet2](https://github.com/PalabraAI/redimnet2)：当前声纹。通过 torch.hub 加载官方代码和模型。
+- [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding)：动画域声纹，ECAPA-TDNN 把 BatchNorm 换成 GroupNorm，约 700 万条视觉小说音频上训练，MIT 许可，192 维，输入 16 kHz 单声道。两个变体：`anime-char` 按角色（7357 个），`anime-va` 按声优（989 位）。实测 `va` 更好，见 EXPERIMENTS。**它的相似度尺度和 VoxCeleb 系模型不同**，同人相似度中位 0.337 对 ReDimNet 的 0.541，阈值必须单独扫，别照搬。包里的 `get_embedding` 只收文件路径，我们绕开它直接喂数组，避免每条片段写临时文件。
 - [WeSpeaker ResNet293](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM)：身份对照模型，两集全量缓存已完成，当前 Windows 用 CPU 后端。
 - scikit-learn：全局分组与身份指标，已明确列为直接依赖。
 - soundfile、pyloudnorm、pandas/pyarrow：读取原采样率音轨、响度处理、保存来源表。
