@@ -1,114 +1,109 @@
 # anime-voice-sorter
 
-按字幕切出动画对白，再把同一角色的声音归到一起。**先完成说话人分类，偶发语气词和噪声后置。** 不按音质排名丢掉一半，也不把短小组混到一个人物桶里。
+按字幕切出动画对白，再把同一角色的声音归到一起。**先完成说话人分类，偶发语气词和噪声后置。** 不按音质排名丢掉一半，也不把小组混进一个杂物桶。
 
-流程已跑通，身份分组仍需改善。当前进度、假设和下一步统一见 [项目现状](docs/STATUS.md)；本页只维护使用方法。
+流程已跑通，分组仍需改善。进度、结论和下一步统一见 [项目现状](docs/STATUS.md)，名词解释见 [流程与名词](docs/HOW_IT_WORKS.md#名词表)；本页只写怎么用。
 
-## 使用
+## 装好
 
-安装后用 `uv run avs --help` 查看命令。需要 FFmpeg；GPU 环境、字幕对齐与模型说明见 [工具](docs/TOOLS.md)。
+需要 FFmpeg 在 PATH 里。GPU 环境和各模型说明见 [工具](docs/TOOLS.md)。
 
 ```powershell
 uv sync --locked
 uv run avs doctor
-# 新的一集；省略 --offset 时自动估计字幕偏移
-uv run avs prepare data/raw/uma_s2_03.flac --subs "对应字幕.ass" --name ep03 --out runs/episodes/ep03
-uv run avs embed runs/episodes/ep03
 ```
 
-本机第 1、2 集已迁移好，可直接分组，不必重算模型：
+`uv run avs --help` 列出全部命令。
+
+## 处理新的一集
 
 ```powershell
-uv run avs group runs/episodes/ep01 runs/episodes/ep02 --out runs/groups/uma-next.json --threshold 0.5
-uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/groups/uma-next-evaluation.json
+uv run avs prepare data/raw/uma_s2_04.flac --subs "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --name ep04 --out runs/episodes/ep04 --offset -0.96
+uv run avs embed runs/episodes/ep04
+uv run avs coverage runs/episodes/ep04 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep04
+```
+
+`prepare` 分离整集人声并按每条字幕行切片段。**建议直接给 `--offset`**：同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测；省略时才用说话时间线自动量，吻合度太低会报错。
+
+`coverage` 用来验收切得对不对：按字幕行切的话，「有片段的对白行」应该等于对白行总数（第 3 集是 375/375）。它顺便把没有片段的台词切成音频放在 `below_floor`（行本身太短）和 `no_speech_found`（行够长却没切出）两个目录，另出 `lines.txt` 和 `report.json`。
+
+## 分组、打分、导出
+
+```powershell
+uv run avs group runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --out runs/groups/uma-next.json
+uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --out runs/groups/uma-next-evaluation.json
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
-重新调分组只需再跑 `group`；`--method` 可选 average（默认）、single、complete、mutual_knn、two_stage。前三种已实测都不超过 average；two_stage 先分长片段再挂短片段，是旧标签上唯一有改善的候选，等待新标签验证后才会成为默认。分组文件与导出目录用新名字，避免旧音频残留混进新结果。
+`group` 不指定 `--threshold` 时用该模型自己的默认分界线并把它打印出来。`--model` 可选 `anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`；**换模型必须重新扫分界线**，不同模型的相似度刻度不通用。
 
-固定片段比较两个模型（阈值 0.20—0.90，步长 0.01，保留错合与漏合完整曲线）：
+`--method` 除默认的 `average`（按整组平均距离合并）外还有 `single`、`complete`、`mutual_knn`、`two_stage`，都已实测不如 `average`，留着只为可复算。
 
-```powershell
-uv run avs embed runs/episodes/ep01 runs/episodes/ep02 --model wespeaker-resnet293
-uv run avs compare runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/comparison-next.json
-```
+分组文件和导出目录每次用新名字，免得旧音频混进新结果。导出回到原采样率人声轨，16 kHz 副本只用于分析；没有声纹的片段留在 `_unassigned`，不会被悄悄丢掉。
 
-比较前会核验两种声纹覆盖同一批片段；使用人工标签挑出的阈值只能算探索结果。`--model` 可只比一个模型，`--method` 可重复给出连接规则，同时比较规则曲线。
-
-身份参考实验（保留原分组；每个目标角色至少有 4 条精确标签）：
+## 标注
 
 ```powershell
-uv run avs references runs/groups/uma.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --role teo --role trainer --role 皇帝 --out runs/references-next
-# 增加 --nearest：按最近参考声音归属，扫描四个距离阈值
+uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_Search/_Animation/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
 ```
 
-每角色分别取 1/2 条参考，各重复 20 次划分。报告中的基线和参考方法始终用同一批剩余片段评分；参考候选带有已用标签 ID，`evaluate` 会自动排除它们。输出仅为实验候选，当前实测不足以替换默认分组。
+对照画面报名字，每条按下就存进人工归档。不是凭记忆听音分组。
 
-分数归一化的分离度对照（只比同人与异人分不分得开，不做聚类）：
+- `--all`：标这一集全部片段，按时间顺序连着走。整集连着标比抽样省力，因为顺着画面往下看，不用为每条重新定位。不给 `--all` 就随机抽 `--count` 条。片段表后来补进新片段时，再跑一次 `--all` 会把它们以空标签追加到已有归档，已标的一条不动。
+- `--known`：页面上可点的角色名从哪来，可以重复给。给人工归档时，那里面的片段还能在页面上回放，用来想起某个名字是谁；给 `annotations/names.json` 这种只有名字的词表就只有名字。名字按出现条数排序，数字键 1 至 9 对应前九个。
+- `--video`：放当前片段对应的画面，前后各多给 0.5 秒。按需现切，翻到哪条才用 ffmpeg 切哪条（一段两三秒实测不到半秒），同时预热下一条。源片多是 HEVC，浏览器支不支持看机器，所以统一转成 360p 的 H.264，存在 `runs/episodes/<集>/label_audio/<归档名>/video/`，一集约 46 MB。
 
-```powershell
-uv run avs scores runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/score-norm-next.json
-```
+  **视频和音轨必须是同一条时间线。** 本项目 `data/raw/*.flac` 就是从这些 mp4 里抽的，时长精确一致、波形对齐位移 0 毫秒，所以片段时间可以直接当视频时间用。换片源前先核对，否则画面会对错人。
 
-`--norm` 可重复指定要比的归一化（`none` / `snorm` / `asnorm`），默认三种都比。报告按片段时长和是否跨集分层。
+页面上角色名排成小块，点一下就给当前片段打标。`__multiple__` 这类特殊标签也成块显示，否则标成「不止一个人」的片段就再也翻不出来复核。
 
-嵌入诊断（固定片段，两模型缓存，不重跑音频模型；`--groups` 可选，用来区分组内与组间错误）：
+名字右边的数字打开面板，里面按集和时间列出这个名字下的全部片段：本轮的点一下跳过去，旧归档里的点一下就地试听（用单独的播放器，不打断正在标的那条）。面板里可以改名、整批撤掉标签，**也可以把某一条片段直接拖到另一个名字上改归属**，包括拖到特殊标签上。整集标完回头核对时，改错一条不必重新定位重听。
 
-```powershell
-uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --groups runs/groups/uma.json --out runs/diagnosis-next
-```
+在筛名字框里敲一个新名字，点「＋ 建这个名字」就能先把名字建出来再往上拖。建了没用到的名字和从列表里删掉的名字都只影响当前页面，不落盘——真正用到的名字已经在归档里。
 
-输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻排除查询自身；只有一条标签的角色不作查询，但留作干扰项；未标注近邻只算线索。
+**页面始终不显示机器分组、组号或候选归属。** 看过机器的答案，标出来的就不再是独立的真值。
 
-把没有片段的对白行补进片段表（片段 ID 是集名加时间范围的哈希，只增不改，已有标签照旧有效）：
+试听旧标签只用来想起某个名字是谁，判断仍以画面为准。
+
+## 补片段
 
 ```powershell
 uv run avs extend runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass"
-uv run avs embed runs/episodes/ep02 --model redimnet2-b6
+uv run avs embed runs/episodes/ep02
 ```
 
-补完片段表变了，声纹缓存失效，要重跑 `embed`。补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音，这里不猜，统一收进来交给人耳判断。`avs label --all` 再跑一次会把新片段以空标签追加到已有归档，已标的一条不动。
+把字幕里没有对应片段的对白行补进片段表。片段 ID 是集名加起止时间的哈希，**只增不改，已有标签照旧有效**。补完片段表变了，声纹缓存失效，要重跑 `embed`。
 
-`--model` 可选 `redimnet2-b6`（默认）、`wespeaker-resnet293`、`anime-char`、`anime-va`。后两个是动画域模型，相似度尺度与前两个不同，换模型后要用 `avs compare --low --high` 重新扫阈值，别套用旧阈值。
+补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音。这里不猜，统一收进来，由人在标注时打上「不是说话」之类的标签。
 
-`avs embed --window` 指定最小喂给模型的最小音频长度：片段短于它时向两侧借相邻音频补足，片段本身的时间范围不变，只是模型多听了一点上下文。不同窗口的声纹存在不同目录（`embeddings/<模型>@w<秒数>`），互不覆盖。
+## 对照实验
 
-对白覆盖核对（字幕里哪些台词根本没有片段）：
+扫分界线，比模型和合并规则：
 
 ```powershell
-uv run avs coverage runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep02 --pad 0.3
+uv run avs compare runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --model redimnet2-b6 --method average --low 0.25 --high 1.15 --out runs/comparison-next.json
 ```
 
-现有片段是「字幕范围 ∩ 检测到有人说话」，还带 1 秒下限，所以片段数远少于字幕对白行数。`coverage` 把没有片段的台词切成音频，按原因分到 `below_floor`（行本身短于 1 秒，不可能切出合格片段）和 `no_speech_found`（行够长却没切出来）两个目录，另出 `lines.txt` 和 `report.json`。偏移取片段与字幕行边界差的众数，不需要当初的语音检测结果。
+会先核验各模型覆盖同一批片段。`--low` / `--high` 必须按模型的相似度刻度给，默认的 0.20 至 0.90 是给 `redimnet2-b6` 定的，对 `anime-va` 几乎全无意义。用人工标签挑出来的分界线只能算探索，要另找一份没参与过的数据检验。
+
+只比同一角色和不同角色的配对分不分得开，不做分组：
 
 ```powershell
-uv run avs label runs/episodes/ep01 --archive annotations/ep01-full.json --all --known annotations/names.json --video "D:/_Search/_Animation/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
-uv run avs label runs/episodes/ep03 --archive annotations/ep03.json --count 50
+uv run avs scores runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --norm none --out runs/score-next.json
 ```
 
-`label` 对照画面报名字，每条直接存进人工归档。不是让你凭记忆听音分组。`--all` 标这一集的全部片段，按时间顺序连着走；不给 `--all` 就随机抽 `--count` 条。整集连着标其实更省力：顺着画面往下看，不用为每条重新定位，也不必猜这一条属不属于抽样范围。`--known` 指定页面词表和参考音的来源，可以是 `annotations/names.json` 这种只有名字的词表，也可以是人工归档；给归档时那里面的片段就能在页面上回放。
+报告给排序正确率和相等错误率，按片段时长和是否跨集分层。`--norm` 可重复（`none` / `snorm` / `asnorm`），后两个是分数归一化，已实测无效。`--window` 读用别的最小音频长度算出的声纹。
 
-`--video` 给这一集的视频，页面就直接放当前片段对应的画面，前后各多给 0.5 秒。画面按需现切：翻到哪条才用 ffmpeg 切哪条，一段两三秒实测不到半秒，同时预热下一条，翻页时通常已经在了。源片多是 HEVC，浏览器支不支持看机器，所以统一转成 360p 的 H.264，切好的存在 `runs/episodes/<集>/label_audio/<归档名>/video/` 下，一集约 46 MB。需要 `ffmpeg` 在 PATH 里。
-
-视频与音轨必须是同一条时间线。本项目的 `data/raw/*.flac` 就是从这些 mp4 里抽的，时长完全一致、互相关位移 0 毫秒，所以片段时间可以直接当视频时间用。换片源前先核对这一点，否则画面会对错人。
-
-验收一个候选分组时不必整集重标，先划出它改动过的范围：
+近邻检索与距离分布：
 
 ```powershell
-uv run avs label-plan --candidate runs/groups/uma-two-stage.json --baseline runs/groups/uma.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --out runs/label-plan.json
-uv run avs label runs/episodes/ep01 --archive annotations/ep01-short.json --plan runs/label-plan.json
+uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --groups runs/groups/uma3.json --out runs/diagnosis-next
 ```
 
-`label-plan` 只挑候选挂进多条组、又还没被任何人工归档覆盖的短片段，并标出哪些在两套分组里归属不同（`reason` 为 `moved`）。`label --plan` 只取该集计划里的片段，仍按时间顺序展示，因为标注者是顺着画面找人，来回跳时间点比多标几条还慢。计划不安排已标过的片段，新旧归档不会给同一条片段两个名字。
+输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。近邻检索排除查询自身；只有一条标签的角色不作为提问对象，但留在候选池里当陪衬；没有名字的近邻只算线索。
 
-标注页把 `--known` 给的角色名列成小块，点一下就打标，数字键 1-9 对应前九个，名字多时可以先筛。不给 `--known` 就只有本轮自己标出来的名字。`__multiple__` 这类特殊标签也会成块出现，否则标成「不止一个人」的片段就再也翻不出来复核。
+`avs embed --window` 给短片段向两侧借相邻音频补到指定长度，片段本身的时间范围不变。不同长度的声纹存在不同目录（`embeddings/<模型>@w<秒数>`），互不覆盖。已实测无效，留着可复算。
 
-名字右边的数字打开面板：里面列出这个名字下的全部片段，可以跳过去、改名、整批撤掉标签，**也可以把某一条直接拖到另一个名字上改归属**，包括拖到特殊标签上。整集标完回头核对时，改错一条不必重新定位重听。在筛名字框里敲一个新名字再点「＋ 建这个名字」，可以先把名字建出来再往上拖；建了没用到的名字，以及从列表里删掉的名字，都只影响当前页面，不落盘，因为真正用到的名字已经在归档里了。
-
-名字右边的数字是「本轮 N 条 · 旧标签 N 条」，点开的面板里两边的片段都按集和时间列出：本轮的点了跳过去，旧标签的点了就地试听，用单独的播放器，不打断正在标的那一条。标第二集时把第一集的归档传给 `--known`，第一集标过的片段就成了可回放的参考。旧归档记的音轨路径可能已经搬走，参考音按人声文件名去 `runs/episodes` 下的各集里找同名音轨；找不到就整份跳过，不拿别的音轨凑。试听只用来想起这个名字是谁，判断仍以画面为准。
-
-页面始终不显示机器分组、组号或候选归属：看过机器的答案，标出来的就不再是独立真值。
-
-导出回到原始采样率的人声轨；16 kHz 副本只用于分析。短于 1 秒、没有可靠声纹的片段保留在 `_unassigned`，不会被安静丢弃。
+`avs references` 和 `avs label-plan` 属于已关闭的路线（少量身份参考、只标候选改动过的片段），留着可复算，不要作为当前做法。
 
 [文档导航](docs/README.md) · [人工标注](annotations/README.md)

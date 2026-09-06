@@ -105,7 +105,7 @@ def evaluate(
     annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
     out: Path = Path("runs/evaluation.json"),
 ) -> None:
-    """精确对照人工身份，统计错合与漏合。"""
+    """精确对照人工身份，统计错误合并与该合没合。"""
     from avs.evaluation.identity import evaluate as score
 
     result = score(groups, annotation)
@@ -124,9 +124,9 @@ def compare(
     low: Annotated[float, typer.Option(help="阈值扫描下界")] = 0.20,
     high: Annotated[float, typer.Option(help="阈值扫描上界")] = 0.90,
 ) -> None:
-    """比较缓存模型与连接规则在给定阈值区间上的错合与漏合；仅用于探索。
+    """比较缓存模型与连接规则在给定阈值区间上的错误合并与该合没合；仅用于探索。
 
-    默认区间是给 ReDimNet 定的。不同模型的相似度尺度不一样，换模型要先看同人距离落在哪，
+    默认区间是给 ReDimNet 定的。不同模型的相似度尺度不一样，换模型要先看同一角色的距离落在哪，
     再定区间；照搬别人的区间会扫在完全没有意义的一段上。
     """
     from avs.embeddings.extract import MODELS
@@ -183,7 +183,7 @@ def scores(
     norm: Annotated[list[str] | None, typer.Option(help="要比较的归一化，可重复")] = None,
     window: Annotated[float, typer.Option(help="读哪一档听音窗口算出的声纹")] = 0.0,
 ) -> None:
-    """比较原始余弦与分数归一化下，同人与异人配对的分离度。"""
+    """比较原始余弦与分数归一化下，同一角色和不同角色的配对分不分得开。"""
     from avs.embeddings.extract import MODELS
     from avs.evaluation.scores import compare_norms
 
@@ -257,7 +257,7 @@ def label(
 
 @app.command()
 def label_plan(
-    candidate: Annotated[Path, typer.Option(help="候选分组，例如两段式")],
+    candidate: Annotated[Path, typer.Option(help="候选分组，例如分两步")],
     baseline: Annotated[Path, typer.Option(help="现行默认分组，用于标出归属不同的片段")],
     annotation: Annotated[list[Path], typer.Option(help="已有人工归档，可重复提供")],
     out: Annotated[Path, typer.Option(help="新的标注计划 JSON")],

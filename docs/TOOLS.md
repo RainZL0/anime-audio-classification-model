@@ -4,13 +4,14 @@
 
 - FFmpeg：制作 16 kHz 分析副本；原采样率人声保留用于导出。
 - audio-separator / Mel-Band RoFormer：抽取人声，模型为 `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`。默认 fp16 推理：在 RTX 4060 Laptop 上用同一段 3 分钟音频实测，fp16 比 fp32 快约 1.6 倍，与 fp32 输出的信噪比 73.5 dB，远在听感之下；bf16 更慢且差 15.6 dB，不选。换显卡架构需重测；怀疑分离伪影时用 `--precision fp32` 对照。
-- pyannote community-1：只在字幕偏移未知时提取说话时间线；WeSpeaker 适配也依赖它。
-- [ReDimNet2](https://github.com/PalabraAI/redimnet2)：当前声纹。通过 torch.hub 加载官方代码和模型。
-- [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding)：动画域声纹，ECAPA-TDNN 把 BatchNorm 换成 GroupNorm，约 700 万条视觉小说音频上训练，MIT 许可，192 维，输入 16 kHz 单声道。两个变体：`anime-char` 按角色（7357 个），`anime-va` 按声优（989 位）。实测 `va` 更好，见 EXPERIMENTS。**它的相似度尺度和 VoxCeleb 系模型不同**，同人相似度中位 0.337 对 ReDimNet 的 0.541，阈值必须单独扫，别照搬。包里的 `get_embedding` 只收文件路径，我们绕开它直接喂数组，避免每条片段写临时文件。
-- [WeSpeaker ResNet293](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM)：身份对照模型，两集全量缓存已完成，当前 Windows 用 CPU 后端。
+- pyannote community-1：**只在没给 `--offset` 时用来量字幕偏移**，不参与判断片段里有没有人说话；WeSpeaker 适配也依赖它。
+- [ReDimNet2](https://github.com/PalabraAI/redimnet2)：对照用的声纹模型，2026-09-07 前是默认。通过 torch.hub 加载官方代码和模型，用的是只在 VoxCeleb2 上训练的默认变体（官方还有 `vb2+vox2`、`vb2+vox2+cnc2` 两个跨库更好的变体，没试过）。
+- [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding)：动画域声纹，ECAPA-TDNN 把 BatchNorm 换成 GroupNorm，约 700 万条视觉小说音频上训练，MIT 许可，192 维，输入 16 kHz 单声道。两个变体：`anime-char` 按角色（7357 个），`anime-va` 按声优（989 位）。**`anime-va` 是当前默认声纹模型**，第 3 集独立检验通过，见 EXPERIMENTS。**它的相似度尺度和 VoxCeleb 系模型不同**，同一角色之间的相似度中位数是 0.337，ReDimNet 是 0.541，距离分界线必须单独扫，别照搬。包里的 `get_embedding` 只收文件路径，我们绕开它直接喂数组，避免每条片段写临时文件。
+- [WeSpeaker ResNet293](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM)：对照模型，已实测没有一个设置能压过 ReDimNet2，当前 Windows 用 CPU 后端。
 - scikit-learn：全局分组与身份指标，已明确列为直接依赖。
 - soundfile、pyloudnorm、pandas/pyarrow：读取原采样率音轨、响度处理、保存来源表。
 - pysubs2、Typer：字幕与命令行。
+- FFmpeg（命令行调用）：标注页按需切当前片段对应的视频画面，转成 360p H.264。
 
 Windows torch/torchaudio 使用 CUDA 12.8，Linux CI 使用 CPU 轮子；由锁文件选择。pyannote 从波形张量读取，避开 Windows torchcodec 的 FFmpeg DLL 问题。`audioread` 是 audio-separator 未声明但实际需要的依赖，保留。
 
