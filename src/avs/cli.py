@@ -80,13 +80,20 @@ def embed(
 def group(
     episodes: Annotated[list[Path], typer.Argument(help="要一起分组的集目录")],
     out: Annotated[Path, typer.Option(help="新的分组 JSON 文件")],
-    threshold: float = 0.5,
-    model: str = "redimnet2-b6",
+    threshold: Annotated[
+        float | None, typer.Option(help="距离阈值；省略则用该模型自己的默认值")
+    ] = None,
+    model: str = "anime-va",
     method: Annotated[
         str, typer.Option(help="连接规则：average/single/complete/mutual_knn/two_stage")
     ] = "average",
 ) -> None:
     """只读取缓存进行全局分组，小组保留；可以反复调整阈值和连接规则。"""
+    from avs.embeddings.extract import DEFAULT_THRESHOLDS
+
+    if threshold is None:
+        threshold = DEFAULT_THRESHOLDS.get(model, 0.5)
+        typer.echo(f"未指定阈值，用 {model} 的默认值 {threshold}")
     result = pipeline.group(episodes, out, threshold, model, method)
     typer.echo(result["summary"])
     typer.echo(f"分组 -> {out}")

@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from avs.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
+from avs.embeddings.extract import ANIME_VA, FRONTIER, MIN_SECONDS, embed_segments
 from avs.project import (
     cache_dir,
     cache_signature,
@@ -194,7 +194,7 @@ def group(
     directories: list[Path],
     out: Path,
     threshold: float = 0.5,
-    model: str = FRONTIER,
+    model: str = ANIME_VA,
     method: str = "average",
 ) -> dict[str, Any]:
     import numpy as np
