@@ -1,12 +1,13 @@
 """姓名标注页面；只展示人工任务，不展示机器分组。
 
 页面把已有角色名当词表给出来，省得每条重敲，但不显示任何分组、组号或候选归属：
-标注者一旦看见机器的答案就不再是独立真值。改名与删标签都整份提交，服务端仍按
+标注者一旦看见机器的答案就不再是独立真值。改名、改归属、删标签都整份提交，服务端仍按
 `apply_names` 校验，页面不做本地增量状态。
 
 角色名排成一行行的小块，不占整行：整集连着标的时候名字有几十个，每个占一行会把
 片段推到屏幕外，得来回滚动才能既听见又点得着。展开的详情统一放在一块面板里，
-不塞回名字那一行，免得点开一个就把后面的名字全挤走。
+不塞回名字那一行，免得点开一个就把后面的名字全挤走。面板里的片段可以直接拖到别的
+名字上改归属，因为改错主要发生在整集标完之后回头核对，那时候一条条重新定位太慢。
 """
 
 PAGE_NAMES = r"""<!doctype html><meta charset="utf-8"><title>角色身份标注</title>
@@ -25,7 +26,8 @@ h1{margin:0 0 4px;font-size:26px}h2{margin:20px 0 4px;font-size:18px}
 #bar{height:5px;background:#e4e4e4;border-radius:3px;overflow:hidden;margin:8px 0}
 #fill{height:100%;width:0;background:#4a7;transition:width .2s}
 #name{width:min(420px,60%)}
-#filter{width:min(260px,50%);padding:5px 9px;font-size:14px}
+#filter{width:min(220px,40%);padding:5px 9px;font-size:14px}
+#add{padding:5px 9px;font-size:13px}
 #special button{color:#666;font-size:13px;padding:5px 9px}
 nav{margin:12px 0}
 
@@ -41,6 +43,9 @@ padding:5px 7px;font-size:12px;font-variant-numeric:tabular-nums}
 .chip .more:hover{background:#eef5f1;color:#222}
 .chip.used{border-color:#bcd9c8;background:#f4faf6}
 .chip.here .more{color:#2b6b47;font-weight:600}
+.chip.mark{border-style:dashed;background:#fbfbfb}
+.chip.mark .pick{color:#666}
+.chip.over{border-color:#2b6b47;background:#dff0e6;box-shadow:0 0 0 2px #cfe6da}
 
 #detail{display:none;margin-top:10px;padding:10px 12px;border:1px solid #e2e2e2;
 border-radius:8px;background:white}
@@ -49,6 +54,8 @@ border-radius:8px;background:white}
 #detail .line{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0}
 #detail .line b{font-size:13px;color:#666;font-weight:600;min-width:56px}
 #detail button{font-size:13px;padding:4px 8px;font-variant-numeric:tabular-nums}
+#detail .own{cursor:grab}
+#detail .own:active{cursor:grabbing}
 #detail .here{outline:2px solid #4a7}
 </style>
 <h1>对照画面确认角色</h1>
@@ -65,8 +72,11 @@ border-radius:8px;background:white}
 <div id="special"></div>
 <nav><button id="prev">上一条</button><button id="next">跳过</button>
 <button id="tonew">下一条未标</button></nav>
-<h2>角色名 <input id="filter" placeholder="筛名字" autocomplete="off"></h2>
-<p class="hint">点名字给当前片段打标；点右边的数字看这个名字下都有哪些片段、改名或撤标签。
+<h2>角色名 <input id="filter" placeholder="筛名字" autocomplete="off">
+<button id="add">＋ 建这个名字</button></h2>
+<p class="hint">点名字给当前片段打标；点右边的数字打开面板，看这个名字下都有哪些片段。
+面板里的片段可以直接拖到另一个名字上改归属，改错了不必回去一条条重听。
+在筛名字框里敲一个新名字再点「＋ 建这个名字」，就能先把名字建出来再往上拖。<br>
 试听旧标签只为帮你想起这个名字是谁，判断仍以画面为准，别改成靠耳朵比对。</p>
 <div id="known"></div>
 <div id="detail"></div>
@@ -74,6 +84,9 @@ border-radius:8px;background:white}
 <script>
 const clips=__CLIPS__, special=__SPECIAL__, roster=__KNOWN__, history=__HISTORY__;
 let names=__NAMES__, at=0, opened=null;
+/* extra 是本次页面里新建、还没用到的名字；hidden 是从列表里藏掉的名字。两者都只活在
+   这个页面：真正被用到的名字已经在归档里，下次开页面自然回来，没用到的不值得落盘。 */
+let extra=[], hidden=[];
 const el=id=>document.getElementById(id);
 const total=clips.length;
 
@@ -82,21 +95,30 @@ function firstBlank(from){
  for(let i=from;i<total;i++)if(!names[clips[i].id])return i;
  return total;
 }
-/* 顺序固定：先是旧标签里的名字（常用的在前），再是本轮新敲出来的，按第一次用到排。
+function clipsOf(value){
+ const out=[];
+ clips.forEach((c,i)=>{if(names[c.id]===value)out.push(i);});
+ return out;
+}
+/* 顺序固定：词表里的名字（常用的在前），然后是本页新建的，最后是本轮敲出来的新名字。
    本轮标了多少条只显示，不参与排序，否则数字键会在手底下跳来跳去。 */
-function rows(){
- const used=new Map();
- clips.forEach((c,i)=>{
+function allNames(){
+ const used=[];
+ clips.forEach(c=>{
   const n=names[c.id];
-  if(!n||n in special)return;
-  if(!used.has(n))used.set(n,[]);
-  used.get(n).push(i);
+  if(n&&!(n in special)&&!used.includes(n))used.push(n);
  });
- const order=[...roster,...[...used.keys()].filter(n=>!roster.includes(n))];
+ return [...new Set([...roster,...extra,...used])].filter(n=>!hidden.includes(n));
+}
+function rows(){
  const keep=el('filter').value.trim().toLowerCase();
- return order
-  .map(n=>[n,used.get(n)||[]])
-  .filter(([n])=>!keep||n.toLowerCase().includes(keep));
+ return allNames()
+  .filter(n=>!keep||n.toLowerCase().includes(keep))
+  .map(n=>[n,clipsOf(n)]);
+}
+/* 特殊标签也排成小块，否则标成「不止一个人」的片段就再也翻不出来复核了。 */
+function markRows(){
+ return Object.keys(special).map(v=>[v,clipsOf(v)]).filter(([,where])=>where.length);
 }
 
 function button(parent,label,fn,cls){
@@ -105,49 +127,72 @@ function button(parent,label,fn,cls){
  parent.appendChild(b);return b;
 }
 
+function makeChip(box,value,label,where,index,mark){
+ const past=history[value]||[];
+ const chip=document.createElement('span');
+ chip.className='chip'+(where.length?' used':'')+(opened===value?' here':'')+(mark?' mark':'');
+ if(index!==null){
+  const key=document.createElement('span');
+  key.className='key';key.textContent=index+1;chip.appendChild(key);
+ }
+ button(chip,label,()=>assign(value),'pick');
+ const badge=button(chip,`${where.length}·${past.length}`,()=>openName(value),'more');
+ badge.title=`本轮 ${where.length} 条，旧标签 ${past.length} 条`;
+ chip.ondragover=e=>{e.preventDefault();chip.classList.add('over');};
+ chip.ondragleave=()=>chip.classList.remove('over');
+ chip.ondrop=e=>{
+  e.preventDefault();chip.classList.remove('over');
+  const i=Number(e.dataTransfer.getData('text/plain'));
+  if(Number.isInteger(i)&&i>=0&&i<total)reassign(i,value);
+ };
+ box.appendChild(chip);
+}
+
 function renderRoster(){
  const box=el('known');box.replaceChildren();
  const list=rows();
  el('roster').replaceChildren(...list.map(([n])=>{
   const o=document.createElement('option');o.value=n;return o;
  }));
- if(!list.length){box.textContent='没有匹配的名字，直接在上面敲一个新的。';return;}
- list.forEach(([name,where],index)=>{
-  const past=history[name]||[];
-  const chip=document.createElement('span');
-  chip.className='chip'+(where.length?' used':'')+(opened===name?' here':'');
-  if(index<9){
-   const key=document.createElement('span');
-   key.className='key';key.textContent=index+1;chip.appendChild(key);
-  }
-  button(chip,name,()=>assign(name),'pick');
-  const badge=button(chip,`${where.length}·${past.length}`,()=>openName(name),'more');
-  badge.title=`本轮 ${where.length} 条，旧标签 ${past.length} 条`;
-  box.appendChild(chip);
- });
+ if(!list.length&&!markRows().length){
+  box.textContent='还没有名字，在上面敲一个，或者用「＋ 建这个名字」。';return;
+ }
+ list.forEach(([name,where],index)=>makeChip(box,name,name,where,index<9?index:null,false));
+ markRows().forEach(([value,where])=>makeChip(box,value,special[value],where,null,true));
 }
 
-function openName(name){
- opened=opened===name?null:name;
+function openName(value){
+ opened=opened===value?null:value;
  renderRoster();renderDetail();
+}
+
+function reassign(i,value){
+ if(names[clips[i].id]===value)return;
+ submit(n=>({...n,[clips[i].id]:value})).then(()=>render());
 }
 
 function renderDetail(){
  const box=el('detail');box.replaceChildren();
  box.className=opened?'on':'';
  if(!opened)return;
- const where=rows().find(([n])=>n===opened)?.[1]||[];
+ const where=clipsOf(opened);
  const past=history[opened]||[];
  const head=document.createElement('h3');
- head.textContent=`${opened} · 本轮 ${where.length} 条 · 旧标签 ${past.length} 条`;
+ const shown=opened in special?special[opened]:opened;
+ head.textContent=`${shown} · 本轮 ${where.length} 条 · 旧标签 ${past.length} 条`;
  box.appendChild(head);
 
  const tools=document.createElement('div');tools.className='line';
- if(where.length)button(tools,'改名',()=>rename(opened,tools));
- if(where.length)button(tools,'撤掉本轮这些标签',()=>{
+ if(where.length&&!(opened in special))button(tools,'改名',()=>rename(opened,tools));
+ if(where.length)button(tools,`撤掉这 ${where.length} 条标签`,()=>{
   submit(n=>{
    const proposed={...n};where.forEach(i=>delete proposed[clips[i].id]);return proposed;
   }).then(()=>{opened=null;render();});
+ });
+ if(!where.length&&!(opened in special))button(tools,'从列表里删掉这个名字',()=>{
+  extra=extra.filter(n=>n!==opened);
+  if(roster.includes(opened))hidden.push(opened);
+  opened=null;renderRoster();renderDetail();
  });
  button(tools,'关闭',()=>{opened=null;renderRoster();renderDetail();});
  box.appendChild(tools);
@@ -156,8 +201,13 @@ function renderDetail(){
   const line=document.createElement('div');line.className='line';
   line.appendChild(Object.assign(document.createElement('b'),{textContent:'本轮'}));
   where.forEach(i=>{
-   const b=button(line,clips[i].stamp,()=>{at=i;render();},i===at?'here':'');
-   b.title=`${clips[i].seconds} 秒，点了跳过去`;
+   const b=button(line,clips[i].stamp,()=>{at=i;render();},'own'+(i===at?' here':''));
+   b.draggable=true;
+   b.ondragstart=e=>{
+    e.dataTransfer.setData('text/plain',String(i));
+    e.dataTransfer.effectAllowed='move';
+   };
+   b.title=`${clips[i].seconds} 秒。点了跳过去，拖到别的名字上就改到那个名字。`;
   });
   box.appendChild(line);
  }
@@ -166,7 +216,7 @@ function renderDetail(){
   line.appendChild(Object.assign(document.createElement('b'),{textContent:'旧标签'}));
   past.forEach(entry=>{
    const b=button(line,`${entry.episode} ${entry.stamp}`,()=>audition(entry));
-   b.title=`${entry.seconds} 秒，点了试听`;
+   b.title=`${entry.seconds} 秒，点了试听。旧归档里的片段，改不了归属。`;
   });
   box.appendChild(line);
  }
@@ -259,6 +309,13 @@ el('prev').onclick=()=>{if(at>0){at--;render();}};
 el('next').onclick=()=>{if(at<total){at++;render();}};
 el('tonew').onclick=()=>{at=firstBlank(0);render();};
 el('filter').oninput=()=>{opened=null;renderRoster();renderDetail();};
+el('add').onclick=()=>{
+ const value=el('filter').value.trim();
+ if(!value){el('filter').focus();return;}
+ hidden=hidden.filter(n=>n!==value);
+ if(!allNames().includes(value))extra.push(value);
+ el('filter').value='';opened=value;renderRoster();renderDetail();
+};
 document.addEventListener('keydown',e=>{
  if(e.target.tagName==='INPUT'||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='ArrowLeft'){e.preventDefault();el('prev').click();}
