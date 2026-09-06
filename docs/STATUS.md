@@ -52,8 +52,15 @@
 **尚未实施。** 候选在旧标签上零错合且多找回 19 对，但分界、幅度和阈值都用了这批标签；在换掉默认分组之前必须用没参与过探索的标签检验，重点是错合。
 
 1. **跨集角色名，两条待听。** 两集是分别标注的。已确认：ep01 的 `红毛` 就是 ep02 的 `Nice Nature`（已统一）；ep02 的解说是两个人，`解说` 与 `解说2` 已改名为 `解说A` 与 `解说B`。仍未定：ep01 的 `解说员` 属于 A 还是 B，以及 ep01 的 `橙毛` 是谁，标注者要重听才能确认。两者各只有 1 条标签，按现有约定不作同人检索查询，当前错合又是 0，所以它们现在不影响任何数字；即便日后确认是跨集同一角色，代价也只是漏合多算，不会把成绩报高。因此不单独安排重听，并入第 2 步一起做。
-2. **给候选改动的片段补标签。** 两段式把 123 条短片段挂进了多条组，绝大多数没有标签。从这些片段和它们被挂进的组里抽样，对照画面报名字，存成新的归档文件；不看机器分组结果标注，跨集同一角色用同一个名字。
-3. **两套分组在新标签上同口径评分。** 只用新标签跑 `evaluate` 与 `diagnose`，错合与漏合一起报，并按短片段/跨集分层；旧标签的成绩不再计入验收。
+2. **给候选改动的片段补标签。标注计划已生成，等人工标注。** 两段式把 123 条短片段挂进了多条组，其中 103 条还没有任何标签（ep01 48 条、ep02 55 条，共约 129 秒），71 条在两套分组里归属不同。范围由 `avs label-plan` 划定并存在 `runs/label-plan.json`，只收还没被人工归档覆盖的片段，所以新旧归档不会给同一条片段两个名字。标注命令：
+
+   ```powershell
+   uv run avs label runs/episodes/ep01 --archive annotations/ep01-short.json --plan runs/label-plan.json
+   uv run avs label runs/episodes/ep02 --archive annotations/ep02-short.json --plan runs/label-plan.json
+   ```
+
+   对照画面报名字，不看机器分组结果标注，跨集同一角色用同一个名字。标不完可以停，未标的留空不影响评分。顺便确认第 1 步那两条：`橙毛` 在 14:19.6，`解说员` 在 14:50.7，都在 ep01；确认后改 `annotations/ep01_v4.json` 并补 `renamed` 记录，不要在新归档里重标它们。
+3. **两套分组在新标签上同口径评分。** 只用 `annotations/ep01-short.json` 与 `ep02-short.json` 跑 `evaluate` 与 `diagnose`，错合与漏合一起报，并按短片段/跨集分层；旧标签的成绩不再计入验收。
 4. **决定是否替换默认。** 新标签上错合不增加、漏合减少才替换默认分组与导出；若短片段挂组带来混人，退回 average 并把两段式记为失败。
 5. **试听错误实例。** `runs/diagnosis/examples/`，确认远距离同人对里是否有喊叫、残留或边界异常。
 6. **新集。** 第 3 集起用新流程（整句字幕切段）准备，先按同样方法标注，再作为独立验证。
@@ -68,7 +75,8 @@
 | 嵌入诊断报告、逐配对距离、错误实例 | `runs/diagnosis/report.json`、`pairs-<model>.json`、`examples/` |
 | 连接规则对照、两段式曲线 | `runs/comparison-methods.json`、`runs/comparison-two-stage.json` |
 | 两段式候选、评分与诊断 | `runs/groups/uma-two-stage.json`、`uma-two-stage-evaluation.json`、`runs/diagnosis-two-stage/` |
+| 下一轮标注范围 | `runs/label-plan.json` |
 | 人工身份与旧现场记录 | `annotations/ep01_v4.json`、`annotations/ep02.json`、`annotations/legacy/` |
 | 已完成实验的报告索引 | [EXPERIMENTS.md](EXPERIMENTS.md) |
 
-最近代码检查：Ruff、格式检查、Mypy 与 34 项测试通过。
+最近代码检查：Ruff、格式检查、Mypy 与 39 项测试通过。

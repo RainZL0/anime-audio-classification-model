@@ -154,8 +154,27 @@ def label(
     archive: Annotated[Path, typer.Option(help="人工归档，例如 annotations/ep03.json")],
     count: int = 50,
     port: int = 8765,
+    plan: Annotated[
+        Path | None, typer.Option(help="标注计划；给了就只标计划里的片段，忽略 --count")
+    ] = None,
 ) -> None:
-    """从全量片段随机抽样，对照画面标角色名，逐条存入归档。"""
+    """抽样或按计划取片段，对照画面标角色名，逐条存入归档。"""
     from avs.labeling import run
 
-    run(episode, archive, count, port)
+    run(episode, archive, count, port, plan)
+
+
+@app.command()
+def label_plan(
+    candidate: Annotated[Path, typer.Option(help="候选分组，例如两段式")],
+    baseline: Annotated[Path, typer.Option(help="现行默认分组，用于标出归属不同的片段")],
+    annotation: Annotated[list[Path], typer.Option(help="已有人工归档，可重复提供")],
+    out: Annotated[Path, typer.Option(help="新的标注计划 JSON")],
+) -> None:
+    """列出候选把哪些还没标过的短片段挂进了多条组，作为下一轮标注的范围。"""
+    from avs.labeling import build_plan
+
+    plan = build_plan(candidate, baseline, annotation, out)
+    for episode, own in plan["summary"].items():
+        typer.echo(f"{episode}: {own['clips']} 条待标，其中 {own['moved']} 条两套分组归属不同")
+    typer.echo(f"计划 -> {out}")

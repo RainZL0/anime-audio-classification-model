@@ -42,10 +42,8 @@ def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
     }
 
 
-def match_annotations(
-    data: dict[str, Any], annotations: list[Path]
-) -> tuple[dict[str, str], int, int]:
-    """只返回精确匹配的人工身份；供评估和参考样本划分共用。"""
+def episode_by_source(data: dict[str, Any]) -> dict[str, str]:
+    """人声文件名到集名的映射；人工归档只记了音轨文件，靠它找回是哪一集。"""
     if data.get("schema") != "avs.groups.v1":
         raise ValueError("不是当前分组文件")
     sources: dict[str, str] = {}
@@ -54,6 +52,31 @@ def match_annotations(
         if key in sources:
             raise ValueError("不同集使用同名人声文件，无法安全匹配旧标注")
         sources[key] = episode
+    return sources
+
+
+def annotated_clip_ids(data: dict[str, Any], annotations: list[Path]) -> set[str]:
+    """人工归档里已经出现过的片段，含特殊标签和留空的。用于不重复安排标注。"""
+    sources = episode_by_source(data)
+    by_time = {(r["episode"], time_key(r)): r["id"] for r in data["assignments"]}
+    covered: set[str] = set()
+    for path in annotations:
+        annotation = read_json(path)
+        source = str(annotation["source"]).replace("\\", "/").rsplit("/", 1)[-1]
+        if source not in sources:
+            raise ValueError(f"{path} 的音轨不在此次分组中")
+        for clip in annotation["clips"]:
+            clip_id = by_time.get((sources[source], time_key(clip)))
+            if clip_id is not None:
+                covered.add(clip_id)
+    return covered
+
+
+def match_annotations(
+    data: dict[str, Any], annotations: list[Path]
+) -> tuple[dict[str, str], int, int]:
+    """只返回精确匹配的人工身份；供评估和参考样本划分共用。"""
+    sources = episode_by_source(data)
     by_time = {(r["episode"], time_key(r)): r for r in data["assignments"]}
     matched: dict[str, str] = {}
     unmatched = special = 0
