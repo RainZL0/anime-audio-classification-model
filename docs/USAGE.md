@@ -1,0 +1,129 @@
+# 命令
+
+全部命令只写在这里。每一步内部怎么运转见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md)。`uv run avs --help` 列出全部命令，`uv run avs <命令> --help` 列出参数。
+
+| 小节 | 做什么 |
+| --- | --- |
+| [装好](#装好) | 第一次运行前 |
+| [处理新的一集](#处理新的一集) | 分离人声、切片段、算声纹、核对覆盖 |
+| [补片段](#补片段) | 把漏掉的对白行补进旧的片段表 |
+| [标注](#标注) | 对照画面给片段报角色名 |
+| [分组、打分、导出](#分组打分导出) | 日常主流程 |
+| [对照实验](#对照实验) | 扫分界线、量漂移、比分不分得开、近邻诊断 |
+| [检查](#检查) | 提交前跑的检查 |
+
+## 装好
+
+需要 FFmpeg 在 PATH 里。GPU 环境和各模型说明见 [TOOLS.md](TOOLS.md)。
+
+```powershell
+uv sync --locked
+uv run avs doctor
+```
+
+## 处理新的一集
+
+```powershell
+uv run avs prepare data/raw/uma_s2_04.flac --subs "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --name ep04 --out runs/episodes/ep04 --offset -0.96
+uv run avs embed runs/episodes/ep04
+uv run avs coverage runs/episodes/ep04 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep04
+```
+
+**建议直接给 `--offset`。** 同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测。
+
+`coverage` 验收切得对不对：「有片段的对白行」应该等于对白行总数（第 3 集是 375/375）。它顺便把没有片段的台词切成音频，放在 `below_floor`（行本身太短）和 `no_speech_found`（行够长却没切出）两个目录，另出 `lines.txt` 和 `report.json`。
+
+## 补片段
+
+```powershell
+uv run avs extend runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass"
+uv run avs embed runs/episodes/ep02
+```
+
+把字幕里没有对应片段的对白行补进片段表。只增不改，已有标签照旧有效。片段表变了声纹缓存就失效，所以要重跑 `embed`。补进来的解说、欢呼不在这里挑，标注时由人打标签。
+
+## 标注
+
+标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
+
+```powershell
+uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/_Animation/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
+```
+
+对照画面报名字，每条按下就存进人工归档。
+
+- `--all`：标这一集全部片段，按时间顺序连着走。不给就随机抽 `--count` 条。片段表后来补进新片段时，再跑一次 `--all` 会把它们以空标签追加到已有归档，已标的不动。
+- `--known`：页面上可点的角色名从哪来，可以重复给。给人工归档时，里面的片段还能在页面上回放；给 `annotations/names.json` 这种只有名字的词表就只有名字。名字按出现条数排序，数字键 1 至 9 对应前九个。
+- `--video`：放当前片段对应的画面，前后各多给 0.5 秒。翻到哪条才用 ffmpeg 切哪条（一段两三秒实测不到半秒），同时预热下一条。统一转成 360p 的 H.264，一集约 46 MB。
+
+  **视频和音轨必须是同一条时间线。** `data/raw/*.flac` 就是从这些 mp4 里抽的，时长精确一致、波形对齐位移 0 毫秒。换片源前先核对，否则画面会对错人。
+
+页面操作：
+
+- 角色名排成小块，点一下给当前片段打标。特殊标签也成块显示，否则标成「不止一个人」的片段就再也翻不出来复核。
+- 名字右边的数字打开面板，按集和时间列出这个名字下的全部片段：本轮的点一下跳过去，旧归档里的点一下就地试听（用单独的播放器，不打断正在标的那条）。面板里可以改名、整批撤掉标签，也可以把某一条直接拖到另一个名字上改归属。
+- 在筛名字框里敲一个新名字，点「＋ 建这个名字」先建出来再往上拖。没用到的名字和从列表里删掉的名字只影响当前页面，不落盘。
+
+## 分组、打分、导出
+
+```powershell
+uv run avs group runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --out runs/groups/uma-next.json
+uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --out runs/groups/uma-next-evaluation.json
+uv run avs export runs/groups/uma-next.json --out out/uma-next
+```
+
+`group` 的参数：
+
+- `--threshold`：不给就用这个模型自己的默认分界线，并把它打印出来。
+- `--relative`：按池子自己的距离定分界线（见[名词表](HOW_IT_WORKS.md#名词表)）。还没有独立检验，默认不开，现状见 [STATUS.md](STATUS.md)。
+- `--model`：`anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`。换模型要重新扫分界线。
+- `--method`：默认 `average`。另有 `single`、`complete`、`mutual_knn`、`two_stage`，都已排除，留着只为复算。
+
+分组文件和导出目录每次用新名字，免得旧音频混进新结果。
+
+## 对照实验
+
+用人工标签挑出来的数字只能算探索，要另找一份没参与过的数据检验。
+
+**扫分界线，比模型和合并规则：**
+
+```powershell
+uv run avs compare runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --model redimnet2-b6 --method average --low 0.25 --high 1.15 --out runs/comparison-next.json
+```
+
+会先核验各模型覆盖同一批片段。`--low` / `--high` 要按模型的相似度刻度给，默认的 0.20 至 0.90 是给 `redimnet2-b6` 定的，对 `anime-va` 几乎全无意义。
+
+**量成绩随片段池变大怎么变：**
+
+```powershell
+uv run avs drift runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --scored ep03 --annotation annotations/ep03-full.json --out runs/drift-next.json --steps 9 --seeds 8
+```
+
+被打分的那一集始终整集在池子里，只往池子里加别的集的片段。`--steps` 分几档，`--seeds` 每档随机抽几遍。报告并排给固定分界线和按池子定分界线两条线，`--multiplier` 可以试别的松紧。
+
+**只比同一角色和不同角色分不分得开，不做分组：**
+
+```powershell
+uv run avs scores runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --norm none --out runs/score-next.json
+```
+
+报告给排序正确率和相等错误率，按片段时长和是否跨集分层。`--norm` 可重复（`none` / `snorm` / `asnorm`），后两个是分数归一化，已排除。`--window` 读用别的最小音频长度算出的声纹。
+
+**近邻检索与距离分布：**
+
+```powershell
+uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --groups runs/groups/uma3.json --out runs/diagnosis-next
+```
+
+输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。
+
+**已排除路线留下的命令**，只为复算：`avs embed --window`（给短片段补相邻音频，存在 `embeddings/<模型>@w<秒数>`）、`avs references`（少量身份参考）、`avs label-plan`（只标候选改动过的片段）。
+
+## 检查
+
+```powershell
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src
+uv run pytest -q
+```
