@@ -65,7 +65,7 @@ def test_reference_labels_are_excluded_and_hidden_contamination_is_counted(tmp_p
     assert before["metrics"]["missed_same_person_pairs"] == 2
     assert after["metrics"]["missed_same_person_pairs"] == 1
     assert after["metrics"]["correct_same_person_pairs"] == 1
-    # 一个未用作参考的 B 混进 g2，整组传播会把错合扩大，评分必须揭示它。
+    # 一个未用作参考的 B 混进 g2，整组传播会让错误合并变多，评分必须揭示它。
     data["assignments"][4]["speaker"] = "g2"
     write_json(base, data)
     write_json(candidate, link_reference_groups(data, {"0": "A", "2": "A"}))
