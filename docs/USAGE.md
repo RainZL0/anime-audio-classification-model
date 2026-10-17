@@ -101,6 +101,14 @@ uv run avs drift runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --scor
 
 被打分的那一集始终整集在池子里，只往池子里加别的集的片段。`--steps` 分几档，`--seeds` 每档随机抽几遍。报告并排给固定分界线和按池子定分界线两条线，`--multiplier` 可以试别的松紧。
 
+**按集留出，把片段直接分到角色名下：**
+
+```powershell
+uv run avs classify-check runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --test ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --model anime-va --model anime-char --model redimnet2-b6 --out runs/classify/next.json
+```
+
+`--test` 那一集的标签不进训练，只用来打分，其余各集的标签都拿来训练。`--model` 可重复，多个时把声纹拼在一起，各模型的缓存要先用 `avs embed` 算好。报告并排给「最像的一条」「角色平均」「小分类器」三种做法，每份带逐条预测。
+
 **只比同一角色和不同角色分不分得开，不做分组：**
 
 ```powershell
