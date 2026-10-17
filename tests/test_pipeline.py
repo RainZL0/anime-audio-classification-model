@@ -155,11 +155,28 @@ def test_prepare_uses_subtitle_boundaries_keeps_short_lines(
         pytest.fail("显式偏移不应加载对齐模型")
 
     monkeypatch.setattr(audio, "diarize", fail)
+    video = tmp_path / "ep1.mp4"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(pipeline, "video_seconds", lambda path: audio.audio_info(source).duration)
     out = tmp_path / "prepared"
-    pipeline.prepare(source, subtitles, out, "new", source, -0.5)
+    pipeline.prepare(video, subtitles, out, "new", source, -0.5, audio=source)
     rows = read_json(out / "segments.json")
     assert [(r["start"], r["end"]) for r in rows] == [(0.5, 2.5), (3.5, 4.0)]
     assert not (out / "quality.json").exists()
+    assert read_json(out / "episode.json")["video"] == str(video.resolve())
+
+
+def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: Any) -> None:
+    directory = episode(tmp_path, "ep1")
+    subtitles = tmp_path / "test.srt"
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
+    video = tmp_path / "ep1.mp4"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(pipeline, "video_seconds", lambda path: 999.0)
+    with pytest.raises(ValueError, match="时长对不上"):
+        pipeline.prepare(video, subtitles, tmp_path / "x", "new", audio=directory / "ep1.wav")
+    with pytest.raises(ValueError, match="视频不存在"):
+        pipeline.prepare(tmp_path / "none.mp4", subtitles, tmp_path / "y", "new")
 
 
 def test_cli_has_one_route() -> None:

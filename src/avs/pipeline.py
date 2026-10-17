@@ -23,22 +23,26 @@ from avs.project import (
 
 
 def prepare(
-    audio: Path,
+    video: Path,
     subtitles: Path,
     out: Path,
     name: str,
     vocals: Path | None = None,
     offset: float | None = None,
     device: str = "cuda",
+    audio: Path | None = None,
 ) -> dict[str, Any]:
     """片段就是字幕行本身。偏移可以直接给，不给就自动量。
+
+    **视频和字幕都是必需的。** 字幕决定怎么切片段；视频是标注时认人的主要依据。音轨默认从
+    视频里抽；另给 `audio` 时，它的时长必须和视频对得上，否则多半不是同一个片源。
 
     **语音检测只用来量偏移，不参与判断片段里有没有人在说话。** 早期的做法是拿检测结果去和
     字幕求重叠再切，那样丢掉了四成对白行，已经废弃。给了 `--offset` 就完全不跑检测；
     同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），直接给上一集
     量到的值即可，跑完用 `avs coverage` 核对覆盖是否完整。
     """
-    from avs.audio import audio_info, diarize, make_analysis_copy, separate_vocals
+    from avs.audio import audio_info, diarize, extract_audio, make_analysis_copy, separate_vocals
     from avs.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
 
     validate_name(name)
@@ -46,9 +50,20 @@ def prepare(
         raise ValueError(f"输出目录已存在：{out}")
     if offset is not None and not math.isfinite(offset):
         raise ValueError("字幕偏移必须是有限数值")
+    if not video.is_file():
+        raise ValueError(f"视频不存在：{video}")
+    if not subtitles.is_file():
+        raise ValueError(f"字幕不存在：{subtitles}")
     lines = load_lines(subtitles)
     if not lines:
         raise ValueError("字幕中没有对白行")
+    picture = video_seconds(video)
+    if audio is not None and abs(audio_info(audio).duration - picture) > VIDEO_TOLERANCE:
+        raise ValueError("音轨和视频的时长对不上，多半不是同一个片源")
+    out.mkdir(parents=True)
+    if audio is None:
+        audio = out / "source.flac"
+        extract_audio(video, audio)
     source = audio_info(audio)
     if source.sample_rate < 32000:
         raise ValueError("原始音轨采样率低于 32000 Hz")
@@ -56,7 +71,6 @@ def prepare(
         info = audio_info(vocals)
         if info.sample_rate != source.sample_rate or abs(info.duration - source.duration) > 0.1:
             raise ValueError("复用人声轨的采样率或时长与原始音轨不一致")
-    out.mkdir(parents=True)
     if vocals is None:
         vocals = separate_vocals(audio, out / "separated", Path("models"), source.sample_rate)
     analysis = out / "analysis_16k.wav"
@@ -77,6 +91,7 @@ def prepare(
         "schema": "avs.episode.v1",
         "name": name,
         "source": str(audio.resolve()),
+        "video": str(video.resolve()),
         "vocals": str(vocals.resolve()),
         "analysis": str(analysis.resolve()),
         "subtitles": str(subtitles.resolve()),
@@ -88,6 +103,86 @@ def prepare(
     write_json(out / "segments.json", rows)
     write_json(out / "episode.json", episode)
     return {"episode": name, "segments": len(rows), "offset": offset, "overlap": overlap}
+
+
+VIDEO_TOLERANCE = 0.5
+"""视频和原始音轨的时长最多差这么多秒。差得更多，几乎肯定不是同一个片源。"""
+
+
+def video_seconds(video: Path) -> float:
+    import shutil
+    import subprocess
+
+    probe = shutil.which("ffprobe")
+    if probe is None:
+        raise RuntimeError("找不到 ffprobe，它和 ffmpeg 一起装")
+    result = subprocess.run(
+        [probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        return float(result.stdout.strip())
+    except ValueError as exc:
+        raise ValueError(f"读不出视频时长：{video}") from exc
+
+
+def attach_video(directory: Path, video: Path) -> dict[str, Any]:
+    """给一集记上视频。标注时画面是认人的主要依据，所以时长必须和音轨对得上。"""
+    from avs.audio import audio_info
+
+    episode, _ = load_episode(directory)
+    if not video.is_file():
+        raise ValueError(f"视频不存在：{video}")
+    seconds = video_seconds(video)
+    audio = audio_info(Path(episode["source"])).duration
+    if abs(seconds - audio) > VIDEO_TOLERANCE:
+        raise ValueError(f"视频 {seconds:.2f} 秒、音轨 {audio:.2f} 秒，差太多，多半不是同一个片源")
+    write_json(directory / "episode.json", {**episode, "video": str(video.resolve())})
+    return {
+        "episode": episode["name"],
+        "video_seconds": round(seconds, 2),
+        "audio_seconds": round(audio, 2),
+    }
+
+
+MIN_SUBTITLE_MATCH = 0.8
+"""补记字幕时，至少这么多片段要能找到台词，否则多半是拿错了字幕文件。"""
+
+
+def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
+    """给早期没记字幕的集补上字幕路径和偏移。
+
+    按字幕行切的片段就是字幕行加上一个固定偏移，所以偏移不用重新量：把每个片段开头减去
+    每行字幕开头，出现最多的那个差就是偏移。再数一遍有多少片段能找到台词，太少就拒绝。
+    早期按语音检测切的片段边界不是字幕行，所以找台词按时间重叠算，见 app/workspace.py。
+    """
+    from avs.app.workspace import text_for
+    from avs.stages.subtitle import load_dialogue
+
+    episode, rows = load_episode(directory)
+    dialogue = load_dialogue(subtitles)
+    if not dialogue:
+        raise ValueError("字幕中没有对白行")
+    starts = {round(r["start"], 2) for r in rows}
+    votes: Counter[float] = Counter()
+    for line in dialogue:
+        for row_start in starts:
+            gap = round(row_start - line["start"], 2)
+            if abs(gap) <= 30:
+                votes[gap] += 1
+    offset = votes.most_common(1)[0][0]
+    lines = [(d["start"] + offset, d["end"] + offset, d["text"]) for d in dialogue]
+    begins = [line[0] for line in lines]
+    matched = sum(bool(text_for(lines, begins, r["start"], r["end"])) for r in rows) / len(rows)
+    if matched < MIN_SUBTITLE_MATCH:
+        raise ValueError(f"只有 {matched:.0%} 的片段找得到台词，多半不是这一集的字幕")
+    write_json(
+        directory / "episode.json",
+        {**episode, "subtitles": str(subtitles.resolve()), "subtitle_offset": offset},
+    )
+    return {"episode": episode["name"], "offset": offset, "matched": round(matched, 4)}
 
 
 def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS) -> dict[str, Any]:

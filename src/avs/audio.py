@@ -47,6 +47,12 @@ def _ffmpeg(args: list[str]) -> None:
         raise RuntimeError(f"ffmpeg 失败：{proc.stderr.strip()[:500]}")
 
 
+def extract_audio(video: Path, dst: Path) -> None:
+    """从视频里抽出第一条音轨，无损存成 FLAC，采样率和声道都不动。"""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    _ffmpeg(["-i", str(video), "-vn", "-map", "0:a:0", "-c:a", "flac", str(dst)])
+
+
 def separate_vocals(
     src: Path,
     out_dir: Path,

@@ -34,16 +34,17 @@ def doctor() -> None:
 
 @app.command()
 def prepare(
-    audio: Annotated[Path, typer.Argument(help="原始音轨")],
-    subs: Annotated[Path, typer.Option(help="对应的对白字幕")],
+    video: Annotated[Path, typer.Argument(help="这一集的视频，必需")],
+    subs: Annotated[Path, typer.Option(help="对应的对白字幕，必需")],
     out: Annotated[Path, typer.Option(help="新的一集目录")],
     name: Annotated[str, typer.Option(help="唯一集名，例如 ep03")],
+    audio: Annotated[Path | None, typer.Option(help="另给的原始音轨；省略就从视频里抽")] = None,
     vocals: Annotated[Path | None, typer.Option(help="复用已有的原采样率人声轨")] = None,
     offset: Annotated[float | None, typer.Option(help="字幕加上的秒数，省略则自动对齐")] = None,
     device: str = "cuda",
 ) -> None:
-    """准备一集：抠人声、对齐字幕，每行对白一个片段。"""
-    typer.echo(pipeline.prepare(audio, subs, out, name, vocals, offset, device))
+    """准备一集：抽音轨、抠人声、对齐字幕，每行对白一个片段。"""
+    typer.echo(pipeline.prepare(video, subs, out, name, vocals, offset, device, audio))
 
 
 @app.command()
@@ -74,6 +75,87 @@ def embed(
     """计算全量片段声纹，输入未变时复用缓存。"""
     for episode in episodes:
         typer.echo(pipeline.embed(episode, model, device, window))
+
+
+@app.command("set-video")
+def set_video(
+    episode: Path,
+    video: Annotated[Path, typer.Argument(help="这一集的视频文件，和音轨同一条时间线")],
+) -> None:
+    """给一集记上视频文件。时长和原始音轨对不上就拒绝，免得画面对错人。"""
+    result = pipeline.attach_video(episode, video)
+    typer.echo(
+        f"{result['episode']}：视频 {result['video_seconds']} 秒，音轨 {result['audio_seconds']} 秒"
+    )
+
+
+@app.command("set-subtitles")
+def set_subtitles(
+    episode: Path,
+    subtitles: Annotated[Path, typer.Argument(help="这一集切片段时用的那份字幕")],
+) -> None:
+    """给早期没记字幕的集补上字幕，界面要靠它显示台词。偏移从已有片段推出来。"""
+    result = pipeline.attach_subtitles(episode, subtitles)
+    typer.echo(
+        f"{result['episode']}：偏移 {result['offset']} 秒，{result['matched']:.1%} 的片段对上"
+    )
+
+
+@app.command("import-labels")
+def import_labels(
+    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],
+    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    untrained: Annotated[
+        list[str] | None, typer.Option(help="导进来但不参与训练的名字，比如「路人」")
+    ] = None,
+) -> None:
+    """把人工归档里的名字导进界面的标签记录。只在标签记录还是空的时候用。"""
+    from avs.app.labels import LabelStore, import_archives
+    from avs.app.workspace import episode_dirs
+    from avs.project import load_episode, time_key
+
+    store = LabelStore(workspace / "labels")
+    if store.batches:
+        raise typer.BadParameter("标签记录里已经有东西了，不重复导入")
+    by_time, sources = {}, {}
+    for directory in episode_dirs(workspace):
+        episode, rows = load_episode(directory)
+        sources[Path(episode["vocals"]).name] = episode["name"]
+        by_time.update({(episode["name"], time_key(r)): r["id"] for r in rows})
+    count = import_archives(store, annotation, by_time, sources, untrained or [])
+    typer.echo(f"导入 {count} 条标签、{len(store.roles)} 个角色 -> {store.folder}")
+
+
+@app.command("app")
+def run_app(
+    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],
+    port: int = 8765,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="启动后打开浏览器")] = True,
+    model: Annotated[
+        list[str] | None, typer.Option(help="声纹模型，可重复提供；省略用三个拼在一起")
+    ] = None,
+) -> None:
+    """打开标注与修正界面。"""
+    import webbrowser
+
+    import uvicorn
+
+    from avs.app.server import AppState, create_app
+    from avs.app.workspace import DEFAULT_MODELS
+
+    state = AppState(workspace, tuple(model) if model else DEFAULT_MODELS)
+    typer.echo(
+        f"{len(state.workspace.episodes)} 集、{len(state.workspace.clips)} 条片段、"
+        f"{state.trained['labels']} 条标签参与训练"
+    )
+    url = f"http://127.0.0.1:{port}/"
+    typer.echo(f"打开 {url}")
+    if open_browser:
+        import threading
+
+        # 等服务起来再开浏览器，否则第一眼是一个连不上的页面。
+        threading.Timer(1.0, webbrowser.open, args=[url]).start()
+    uvicorn.run(create_app(state), host="127.0.0.1", port=port, log_level="warning")
 
 
 @app.command()

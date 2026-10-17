@@ -12,8 +12,8 @@
 
 | 想知道什么 | 读哪份 | 主要小节 |
 | --- | --- | --- |
-| 命令怎么敲 | [USAGE.md](USAGE.md) | [处理新的一集](USAGE.md#处理新的一集)、[标注](USAGE.md#标注)、[分组、打分、导出](USAGE.md#分组打分导出)、[对照实验](USAGE.md#对照实验) |
-| 东西怎么运转、名词什么意思 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [名词表](HOW_IT_WORKS.md#名词表)、[五步流程](HOW_IT_WORKS.md#五步流程)、[打分怎么算](HOW_IT_WORKS.md#打分怎么算)、[数据文件](HOW_IT_WORKS.md#数据文件) |
+| 命令怎么敲 | [USAGE.md](USAGE.md) | [处理新的一集](USAGE.md#处理新的一集)、[标注与修正界面](USAGE.md#标注与修正界面)、[分组、打分、导出](USAGE.md#分组打分导出)、[对照实验](USAGE.md#对照实验) |
+| 东西怎么运转、名词什么意思 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [名词表](HOW_IT_WORKS.md#名词表)、[五步流程](HOW_IT_WORKS.md#五步流程)、[标注与修正界面](HOW_IT_WORKS.md#标注与修正界面)、[打分怎么算](HOW_IT_WORKS.md#打分怎么算)、[数据文件](HOW_IT_WORKS.md#数据文件) |
 | 依赖、模型、运行环境 | [TOOLS.md](TOOLS.md) | |
 | 人工标签文件 | [annotations/README.md](../annotations/README.md) | |
 
