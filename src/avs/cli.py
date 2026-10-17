@@ -188,6 +188,34 @@ def drift(
     typer.echo(f"报告 -> {out}")
 
 
+@app.command("classify-check")
+def classify_check(
+    episodes: Annotated[list[Path], typer.Argument(help="训练集和被测集的集目录")],
+    test: Annotated[str, typer.Option(help="被测的那一集集名，它的标签不进训练")],
+    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    out: Annotated[Path, typer.Option(help="新的检验报告 JSON")],
+    model: Annotated[
+        list[str] | None, typer.Option(help="声纹模型，可重复提供；多个时拼在一起")
+    ] = None,
+) -> None:
+    """按集留出检验：在别的集的标签上训练，把被测集的片段直接分到角色名下。"""
+    from avs.evaluation.classify import classify_check as run_check
+
+    report = run_check(episodes, test, annotation, out, model or ["anime-va"])
+    typer.echo(
+        f"{'+'.join(report['models'])}：训练 {sum(report['train_episodes'].values())} 条，"
+        f"测 {report['test_clips']} 条，其中 {report['unseen_role_clips']} 条的角色训练集里没有"
+    )
+    for method, own in report["results"].items():
+        tiers = "，".join(
+            f"{k} {v['accuracy']}（{v['clips']} 条）" for k, v in own["by_duration"].items()
+        )
+        confident = "，".join(f"{k} {v}" for k, v in own["by_confidence"].items())
+        typer.echo(f"{method}：全部 {own['accuracy']}；按把握 {confident}")
+        typer.echo(f"  按时长 {tiers}")
+    typer.echo(f"报告 -> {out}")
+
+
 @app.command()
 def references(
     groups: Path,
