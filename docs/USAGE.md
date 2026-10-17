@@ -7,7 +7,8 @@
 | [装好](#装好) | 第一次运行前 |
 | [处理新的一集](#处理新的一集) | 分离人声、切片段、算声纹、核对覆盖 |
 | [补片段](#补片段) | 把漏掉的对白行补进旧的片段表 |
-| [标注](#标注) | 对照画面给片段报角色名 |
+| [标注与修正界面](#标注与修正界面) | 日常主流程：标几句、让机器猜、改它猜错的、导出 |
+| [标注](#标注) | 盲标检验集用的旧页面 |
 | [分组、打分、导出](#分组打分导出) | 日常主流程 |
 | [对照实验](#对照实验) | 扫分界线、量漂移、比分不分得开、近邻诊断 |
 | [检查](#检查) | 提交前跑的检查 |
@@ -24,10 +25,14 @@ uv run avs doctor
 ## 处理新的一集
 
 ```powershell
-uv run avs prepare data/raw/uma_s2_04.flac --subs "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --name ep04 --out runs/episodes/ep04 --offset -0.96
-uv run avs embed runs/episodes/ep04
+uv run avs prepare "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --name ep04 --out runs/episodes/ep04 --offset -0.96
+uv run avs embed runs/episodes/ep04 --model anime-va
+uv run avs embed runs/episodes/ep04 --model anime-char
+uv run avs embed runs/episodes/ep04 --model redimnet2-b6
 uv run avs coverage runs/episodes/ep04 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep04
 ```
+
+视频和字幕都必需。音轨默认从视频里抽；另有同一时间线的无损音轨就用 `--audio` 给，时长和视频差超过 0.5 秒会拒绝。界面默认把三个声纹模型拼在一起用，所以三个都要算。
 
 **建议直接给 `--offset`。** 同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测。
 
@@ -42,12 +47,41 @@ uv run avs embed runs/episodes/ep02
 
 把字幕里没有对应片段的对白行补进片段表。只增不改，已有标签照旧有效。片段表变了声纹缓存就失效，所以要重跑 `embed`。补进来的解说、欢呼不在这里挑，标注时由人打标签。
 
-## 标注
+## 标注与修正界面
 
-标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
+工作区是一个目录，下面的 `episodes/` 放各集（`prepare` 的输出），标签自动存在 `labels/`。本仓库用 `runs/` 当工作区。
 
 ```powershell
-uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/_Animation/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
+uv run avs app runs
+```
+
+在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。
+
+- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，给组起名字，一次标一整组。
+- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的前三名，Enter 接受第一名，数字键选底部的角色，`/` 搜索或新建角色。F 只看要人处理的。
+- **角色**（O）：按角色列出片段，从机器最没把握的开始。X 标出「不是这个角色」，Shift+Enter 确认其余。这里也能改名、合并角色、设头像、关掉某个角色的训练。
+- **导出**（E）：选角色和格式（GPT-SoVITS、Style-Bert-VITS2 或按角色分文件夹），可以只导人确认过的，也可以带上机器有把握的。
+
+每次标注立刻落盘、立刻重训；Z 一直往回撤销。全部快捷键按 `?` 查看。
+
+旧的集补信息用的命令：
+
+```powershell
+uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
+uv run avs set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
+uv run avs import-labels runs --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --untrained 路人
+```
+
+- `set-video`：给 `prepare` 改成必需视频之前处理的集记上视频。时长和音轨对不上就拒绝。
+- `set-subtitles`：给没记字幕的集补上字幕，偏移从已有片段推出来，按时间重叠找台词文字。
+- `import-labels`：把旧的人工归档一次导进标签记录，只在记录还空着时可用，导入不能撤销。`--untrained` 的名字照样导入，但不拿来训练。
+
+## 标注
+
+盲标检验集用这个旧页面，它不显示机器的猜测。标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
+
+```powershell
+uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
 ```
 
 对照画面报名字，每条按下就存进人工归档。
