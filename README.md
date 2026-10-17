@@ -13,4 +13,4 @@ uv run avs doctor
 
 - 现在到哪了、下一步做什么：[docs/STATUS.md](docs/STATUS.md)
 - 命令怎么敲：[docs/USAGE.md](docs/USAGE.md)
-- 其他全部文档：[docs/README.md](docs/README.md)
+- 其他全部文档：[docs/index.md](docs/index.md)

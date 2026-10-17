@@ -8,7 +8,7 @@
 2. `docs/DECISIONS.md`：已经定下和已经排除的做法。**不要重开已排除的路**，要推翻先拿出新数据。
 3. `docs/HISTORY.md`：做事的规矩，尤其是打分和标注那两节。
 
-其余文档从 `docs/README.md` 找，那里也写了每份文档管什么、不管什么。**一件事只写在一处，别处只放链接。**
+其余文档从 `docs/index.md` 找，那里也写了每份文档管什么、不管什么，以及怎么维护。**一件事只写在一处，别处只放链接。**
 
 ## 语言
 
@@ -21,4 +21,5 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
 uv run pytest -q
+lychee --offline --no-progress CLAUDE.md docs   # 改过文档时
 ```
