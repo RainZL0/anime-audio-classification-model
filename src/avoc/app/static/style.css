@@ -284,11 +284,15 @@ kbd {
 .group.done { opacity: .6; }
 .member .t { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .pick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.pick-row .av { cursor: pointer; }
-.pick-row .av:hover { box-shadow: 0 0 0 2px var(--accent); }
 .pill.hint { display: inline-flex; align-items: center; gap: 5px; padding-left: 2px; }
-/* The name box takes the whole first row. If the buttons do not fit, they wrap to the next row, so they do not squeeze the input box. */
-.name-form { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Who the ticked lines are: every choice looks the same, like the character bar at the bottom.
+   Only the machine's guess is marked, as on the left. */
+.who-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.who-row .chip { padding: 3px 10px 3px 3px; gap: 6px; font-size: 13px; }
+.who-row .chip.top { border-color: var(--accent-ring); background: var(--accent-soft); }
+.who-row .chip:disabled:hover { border-color: var(--line-strong); background: var(--panel); }
+.who-row .chip.top:disabled:hover { border-color: var(--accent-ring); background: var(--accent-soft); }
+.name-form { display: flex; gap: 8px; }
 .name-form input { flex: 1 1 140px; min-width: 120px; }
 .name-form button { white-space: nowrap; }
 

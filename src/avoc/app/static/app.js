@@ -495,8 +495,8 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
   return html`<div>
     ${firstRun && html`<div class="welcome"><div>
       <h3>${tr("第一步：给声音相近的一组起个名字", "Step one: name a group of similar voices")}</h3>
-      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。是你要收集的人，就按「是新角色」把勾上的台词定成一个目标角色，再从画面里截一张头像，名字可以现在填，也可以以后再起；不是你要的人，就按「是其他」。",
-        "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". If it is someone you want to collect, press \"New character\" to make the ticked lines a target character, then crop an avatar from the picture; you can type a name now or later. If it is not someone you want, press \"Other\".")}</p>
+      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。再在下面选是谁：是你要收集的新面孔，就按「新角色」把勾上的台词定成一个目标角色，再从画面里截一张头像，名字可以以后再起；不是你要的人，就按「其他」。",
+        "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". Then pick who it is below: if it is a new face you want to collect, press \"New character\" to make the ticked lines a target character, then crop an avatar from the picture; you can name it later. If it is not someone you want, press \"Other\".")}</p>
       <ol><li>${tr("一组里混着几个人时，分几次勾、几次标。按住 Shift 点，能一下勾上中间的几句。",
         "When a group mixes several people, tick and label them in turns. Shift+click ticks all the lines in between.")}</li>
       <li>${tr("有勾选时，数字键、Q、N 标勾上的台词；没勾选时，标正在播放的那一句。",
@@ -531,19 +531,18 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
           setAnchor((a) => ({ ...a, [g.key]: c.id }));
         };
         const tickAll = () => setPicked((p) => ({ ...p, [g.key]: new Set(all ? [] : open.map((c) => c.id)) }));
-        /* The machine's guess only goes in the placeholder, not in the box: listen first, Enter to accept it. */
         const value = names[g.key] ?? "";
-        const chosen = value.trim() || g.hint?.name || "";
         const ids = keep.map((c) => c.id);
-        /* With no name typed and no hint from the machine, Enter makes a new character without a name. */
         const submit = (e) => {
           e.preventDefault();
-          if (!keep.length) return;
-          if (chosen) onName(ids, chosen); else onNew(ids);
+          if (!keep.length || !value.trim()) return;
+          onName(ids, value.trim());
           /* The name was for these lines; the lines left in the group may be someone else. */
           setNames({ ...names, [g.key]: "" });
         };
+        /* The machine's guess comes first and is marked the same way as its top guess on the left. */
         const known = Object.values(roles).filter((r) => r.target && r.name !== g.hint?.name).slice(0, 8);
+        const who = g.hint && roles[g.hint.name] ? [roles[g.hint.name], ...known] : known;
         return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""} ${done ? "done" : ""}">
           <h3>${tr(`第 ${gi + 1} 组`, `Group ${gi + 1}`)} <span class="meta">${lines(g.size)} · ${tr(`${g.seconds} 秒`, `${g.seconds} s`)}${
             done ? tr(" · 都标好了", " · all labeled") : ""}</span>
@@ -566,23 +565,23 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
             <span class="note">${keep.length ? tr(`勾了 ${keep.length} 句；数字键、Q、N 也标勾上的`, `${lines(keep.length)} ticked; number keys, Q and N label them too`)
               : tr("先勾上同一个人的台词，再选是谁", "Tick the lines of one person first, then pick who it is")}</span>
           </div>`}
-          ${known.length > 0 && keep.length > 0 && html`<div class="pick-row">
-            <span class="note">${tr("是已有的人：", "An existing character:")}</span>
-            ${known.map((r) => html`<${Avatar} key=${r.name} role=${r} name=${r.name} size="md"
-              title=${tr(`勾上的 ${keep.length} 句是 ${r.name}`, `The ${lines(keep.length)} ticked are ${r.name}`)} onClick=${() => onName(ids, r.name)} />`)}
-          </div>`}
+          ${!done && html`<div class="who-row">
+            ${who.map((r) => html`<button type="button" key=${r.name} class="chip ${r.name === g.hint?.name ? "top" : ""}" disabled=${!keep.length}
+                title=${r.name === g.hint?.name ? tr("机器在这组里最常猜的角色", "The character the machine guesses most often in this group") : ""}
+                onClick=${() => onName(ids, r.name)}>
+              <${Avatar} role=${r} name=${r.name} size="sm" /><${RoleName} role=${r} name=${r.name} /></button>`)}
+            <button type="button" class="chip" disabled=${!keep.length} onClick=${() => onName(ids, OTHER)}
+                title=${tr("不是你要收集的人", "Not someone you want to collect")}>
+              <${Avatar} blank=${true} size="sm" /><span class="rn">${labelText[OTHER]}</span><span class="k">Q</span></button>
+            <button type="button" class="chip" disabled=${!keep.length} onClick=${() => onNew(ids)}
+                title=${tr("新建一个目标角色，名字可以以后再起；有画面时接着截头像", "Make a new target character; you can name it later. With video, crop an avatar next")}>
+              <div class="av sm unknown">+</div><span class="rn">${tr("新角色", "New character")}</span><span class="k">N</span></button>
+          </div>
           <form class="name-form" onSubmit=${submit}>
-            <input list="role-names" value=${value}
-              placeholder=${g.hint ? tr(`可能是 ${g.hint.name}，听过确认就回车`, `Maybe ${g.hint.name}. Listen, and press Enter if it is`)
-                : tr("名字（可以不填）", "Name (optional)")}
+            <input list="role-names" value=${value} placeholder=${tr("或者输入名字：已有的或新的", "Or type a name: existing or new")}
               onInput=${(e) => setNames({ ...names, [g.key]: e.target.value })} />
-            ${chosen
-              ? html`<button class="primary" type="submit" disabled=${!keep.length}>${tr(`${keep.length} 句是 ${chosen}`, `${lines(keep.length)}: ${chosen}`)}</button>
-                ${!value.trim() && html`<button type="button" disabled=${!keep.length} onClick=${() => onNew(ids)}>${tr("是新角色", "New character")}</button>`}`
-              : html`<button class="primary" type="submit" disabled=${!keep.length}>${tr(`${keep.length} 句是一个新角色`, `${lines(keep.length)}: one new character`)}</button>`}
-            <button type="button" disabled=${!keep.length} onClick=${() => onName(ids, OTHER)}
-              title=${tr("不是你要收集的人", "Not someone you want to collect")}>${tr(`${keep.length} 句是其他`, `${lines(keep.length)}: other`)}</button>
-          </form>
+            <button type="submit" disabled=${!keep.length || !value.trim()}>${tr("用这个名字", "Use this name")}</button>
+          </form>`}
         </div>`;
       })}
     </div>
