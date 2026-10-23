@@ -351,6 +351,29 @@ def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
     assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
 
 
+def test_prefetch_cuts_nearby_clips_in_the_background(tmp_path: Path) -> None:
+    import time
+
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    first = state.workspace.clips[0]
+    near = [
+        c for c in state.workspace.clips
+        if c.episode == first.episode and c.start <= first.end + 60
+    ]  # fmt: skip
+    episode = state.workspace.episodes[first.episode]
+    assert not episode.get("video")
+    queued = client.post("/api/prefetch", json={"clip": first.id}).json()["queued"]
+    assert queued == len(near)
+    folder = Path(episode["directory"]) / "app_media" / "audio"
+    deadline = time.time() + 30
+    while time.time() < deadline and not all((folder / f"{c.id}.wav").exists() for c in near):
+        time.sleep(0.1)
+    assert state.prefetch(first.id) == 0
+    assert client.post("/api/prefetch", json={"clip": "nope"}).status_code == 404
+
+
 def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
     """以前单独的「多人」开关已并进「质量低」，旧记录回放、撤销都按「质量低」算。"""
     folder = tmp_path / "labels"

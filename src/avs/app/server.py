@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import re
 import threading
@@ -31,6 +32,10 @@ UNUSABLE = "人标了质量低"
 """导出时跳过人标了「质量低」的片段，在 rejected.tsv 里写的原因。"""
 MAYBE_LIMIT = 100
 """「可能漏掉的」最多列这么多条，从最像的往下排。"""
+PREFETCH_SECONDS = 60.0
+"""看到一句时，在后台把前后这么多秒内的台词片段先切好，往附近跳就不用等。"""
+PREFETCH_WORKERS = 2
+"""后台同时切几段。一段画面要切半秒多，两个并行，前后一分钟三十来句十秒左右切完。"""
 
 
 class AppState:
@@ -43,6 +48,10 @@ class AppState:
         self.guesses: dict[int, Guess] = {}
         self.trained: dict[str, Any] = {}
         self._cutting: dict[str, threading.Lock] = {}
+        self._prefetch: list[tuple[str, str]] = []
+        """等着在后台切的 (种类, 片段)，最近的在前。人换一句就整个换掉。"""
+        self._prefetch_ready = threading.Condition()
+        self._prefetchers: list[threading.Thread] = []
         self.retrain()
 
     # 模型
@@ -308,6 +317,48 @@ class AppState:
                 cut_video(Path(video), clip.start - VIDEO_PAD, clip.end + VIDEO_PAD, target)
         return target
 
+    def prefetch(self, clip_id: str, seconds: float = PREFETCH_SECONDS) -> int:
+        """把这句前后 `seconds` 秒内同一集的台词排进后台去切，离这句近的先切；视频和人声都切。
+        已经切好的不排。换一句就换掉整个队列，所以快速翻过去的那些句不会白占时间。返回排了几段。"""
+        clip = self.workspace.by_id.get(clip_id)
+        if clip is None:
+            raise KeyError(clip_id)
+        episode = self.workspace.episodes[clip.episode]
+        kinds = ("video", "audio") if episode.get("video") else ("audio",)
+        folder = Path(episode["directory"]) / "app_media"
+        near = [
+            c
+            for c in self.workspace.clips
+            if c.episode == clip.episode
+            and c.end >= clip.start - seconds
+            and c.start <= clip.end + seconds
+        ]
+        near.sort(key=lambda c: abs(c.start - clip.start))
+        jobs = [
+            (kind, c.id)
+            for c in near
+            for kind in kinds
+            if not (folder / kind / f"{c.id}.{'wav' if kind == 'audio' else 'mp4'}").exists()
+        ]
+        with self._prefetch_ready:
+            self._prefetch = jobs
+            while len(self._prefetchers) < PREFETCH_WORKERS:
+                worker = threading.Thread(target=self._prefetch_loop, daemon=True)
+                worker.start()
+                self._prefetchers.append(worker)
+            self._prefetch_ready.notify_all()
+        return len(jobs)
+
+    def _prefetch_loop(self) -> None:
+        while True:
+            with self._prefetch_ready:
+                while not self._prefetch:
+                    self._prefetch_ready.wait()
+                kind, clip_id = self._prefetch.pop(0)
+            # 切不了的等人真点到那句时再报错。
+            with contextlib.suppress(KeyError, FileNotFoundError, ValueError):
+                self.media(kind, clip_id)
+
     def save_avatar(self, name: str, data_url: str) -> dict[str, Any]:
         head, _, body = data_url.partition(",")
         if head not in ("data:image/jpeg;base64", "data:image/png;base64"):
@@ -436,6 +487,10 @@ class LabelBody(BaseModel):
     """标成一个新建的、还没起名字的角色，这时 `label` 不用给。"""
     unusable: bool = False
     """同时标「质量低」。只对目标角色有效；标成别的、或清掉标签时一律关掉。"""
+
+
+class PrefetchBody(BaseModel):
+    clip: str
 
 
 class ChangesBody(BaseModel):
@@ -647,6 +702,14 @@ def create_app(state: AppState) -> Any:
             raise HTTPException(404) from exc
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(404, str(exc)) from exc
+
+    @app.post("/api/prefetch")
+    def post_prefetch(body: PrefetchBody) -> dict[str, Any]:
+        """人看到一句时网页调这个，后台先切好前后一分钟的片段。"""
+        try:
+            return {"queued": state.prefetch(body.clip)}
+        except KeyError as exc:
+            raise HTTPException(404) from exc
 
     @app.get("/favicon.ico")
     def favicon() -> Any:
