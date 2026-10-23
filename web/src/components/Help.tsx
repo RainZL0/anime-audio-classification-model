@@ -44,8 +44,8 @@ export function Help({ onClose }: { onClose: () => void }) {
     [
       "L",
       tr(
-        "看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常",
-        "When you can't tell who it is, play 5 more seconds on each side; press again for 15, again for normal",
+        "多放前后文：在不多放、前后各 5 秒、15 秒之间切换，换一句也保持",
+        "More context: step through none, 5 seconds on each side, and 15. It stays when you move to another line",
       ),
     ],
     ["Z", tr("撤销上一步（可以一直往回撤）", "Undo the last step (you can keep going back)")],

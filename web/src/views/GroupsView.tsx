@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from "react";
 import type { Clip, Group, Roles } from "../api";
-import { OTHER, type LabelText } from "../clips";
+import { lowTip, OTHER, type LabelText } from "../clips";
 import { Avatar } from "../components/Avatar";
 import { Closest } from "../components/Pills";
 import { RoleName } from "../components/RoleName";
@@ -21,7 +21,7 @@ interface GroupsViewProps {
   roles: Roles;
   dock: string[];
   labelText: LabelText;
-  onName: (ids: string[], name: string) => void;
+  onName: (ids: string[], name: string, low?: boolean) => void;
   onNew: (ids: string[]) => void;
   focus: string | null;
   setFocus: (id: string) => void;
@@ -225,11 +225,9 @@ export function GroupsView({
               {!done && (
                 <div className="who-row">
                   {dock.map((name, i) => (
-                    <button
-                      type="button"
+                    <div
                       key={name}
-                      className={`chip ${name === g.hint?.name ? "top" : ""}`}
-                      disabled={!keep.length}
+                      className={`chip ${name === g.hint?.name ? "top" : ""} ${keep.length ? "" : "off"}`}
                       title={
                         name === g.hint?.name
                           ? tr(
@@ -238,12 +236,27 @@ export function GroupsView({
                             )
                           : ""
                       }
-                      onClick={() => onName(ids, name)}
+                      onClick={() => keep.length && onName(ids, name)}
                     >
                       <Avatar role={roles[name]} name={name} size="sm" />
                       <RoleName role={roles[name]} name={name} />
                       {i < 9 ? <span className="k">{i + 1}</span> : ""}
-                    </button>
+                      <button
+                        type="button"
+                        className="low"
+                        disabled={!keep.length}
+                        title={
+                          tr(`标成 ${name}·质量低：`, `Label as ${name}, low quality: `) + lowTip()
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onName(ids, name, true);
+                        }}
+                      >
+                        {tr("质量低", "Low quality")}
+                        {i < 9 ? <span className="k"> ⇧{i + 1}</span> : ""}
+                      </button>
+                    </div>
                   ))}
                   <button
                     type="button"

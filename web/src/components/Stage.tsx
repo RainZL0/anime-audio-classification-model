@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type RefObject, type SyntheticEvent } from "react";
-import { media, type Clip, type Roles } from "../api";
+import { media, mediaProblem, type Clip, type Roles } from "../api";
 import { lowTip, OTHER, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
 import { tr } from "../language";
-import { SPEEDS, VIDEO_PAD, type Sound } from "../playback";
+import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
 import { RoleName } from "./RoleName";
 
@@ -25,7 +25,7 @@ interface StageProps {
   onNewRole: () => void;
   onClear: () => void;
   context: number;
-  onContext: () => void;
+  setContext: (context: number) => void;
   dock: string[];
 }
 
@@ -48,15 +48,47 @@ export function Stage({
   onNewRole,
   onClear,
   context,
-  onContext,
+  setContext,
   dock,
 }: StageProps) {
   /* Which player can play, named by what it plays. "Loading" is worked out from it while drawing. It used to be
      switched on when the line changed, but a clip already cut could be ready before that ran, and then the
      spinner covered the picture for good. */
-  const [ready, setReady] = useState<string | null>(null);
-  const shown = `${clip?.id}-${sound}-${context}`;
-  const loading = ready !== shown;
+  const line = `${clip?.id}-${sound}-${context}`;
+  /* How many times "Cut again" was pressed on this line. Only this line asks for a fresh cut. */
+  const [retry, setRetry] = useState<{ for: string; times: number } | null>(null);
+  const fresh = retry?.for === line ? retry.times : 0;
+  const shown = `${line}-${fresh}`;
+  /* `problem` is set when a player failed: "" until the reason comes back from the server. */
+  const [status, setStatus] = useState<{ for: string; problem?: string } | null>(null);
+  const problem = status?.for === shown ? status.problem : undefined;
+  const loading = status?.for !== shown;
+  const ready = () =>
+    setStatus((s) => (s?.for === shown && s.problem !== undefined ? s : { for: shown }));
+  const fail = (kind: "video" | "audio") => {
+    const at = shown;
+    setStatus({ for: at, problem: "" });
+    mediaProblem(media(kind, clip!.id, context))
+      .catch(() => null)
+      .then((reason) =>
+        setStatus((s) =>
+          s?.for === at
+            ? {
+                for: at,
+                problem:
+                  reason ??
+                  tr(
+                    "切好的文件坏了，浏览器放不了",
+                    "The cut file is broken, so the browser cannot play it",
+                  ),
+              }
+            : s,
+        ),
+      );
+  };
+  /* Which line's player is playing, so a new line starts out shown as paused. */
+  const [playingFor, setPlayingFor] = useState<string | null>(null);
+  const playing = playingFor === shown;
   /* The number key of each of the first 9 characters in the bottom bar; Shift + it is that character, low quality. */
   const slot = (name: string) => {
     const i = dock.indexOf(name);
@@ -64,7 +96,7 @@ export function Stage({
   };
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startVoice = useRef(0);
-  useEffect(() => () => clearTimeout(startVoice.current), [clip?.id, sound, context]);
+  useEffect(() => () => clearTimeout(startVoice.current), [shown]);
   /* On a new clip the player resets its speed to defaultPlaybackRate, so set both. */
   useEffect(() => {
     for (const el of [videoRef.current, audioRef.current]) {
@@ -73,7 +105,7 @@ export function Stage({
         el.playbackRate = speed;
       }
     }
-  }, [speed, clip?.id, sound, context, videoRef]);
+  }, [speed, shown, videoRef]);
 
   if (!clip) {
     return (
@@ -113,27 +145,49 @@ export function Stage({
               ref={(el) => {
                 videoRef.current = el;
               }}
-              key={`${clip.id}-${sound}-${context}`}
-              src={media("video", clip.id, context)}
+              key={shown}
+              src={media("video", clip.id, context, fresh)}
               autoPlay
               playsInline
               muted={vocals}
-              onCanPlay={() => setReady(shown)}
+              onCanPlay={ready}
+              onError={() => fail("video")}
               onClick={(e) => {
-                e.currentTarget.currentTime = 0;
-                e.currentTarget.play();
+                if (e.currentTarget.paused) e.currentTarget.play().catch(() => {});
+                else e.currentTarget.pause();
               }}
-              onPlay={follow}
-              onPause={follow}
+              onPlay={(e) => {
+                setPlayingFor(shown);
+                follow(e);
+              }}
+              onPause={(e) => {
+                setPlayingFor(null);
+                follow(e);
+              }}
               onSeeked={follow}
             ></video>
             {vocals && (
               <audio
                 ref={audioRef}
-                key={`v-${clip.id}-${context}`}
-                src={media("audio", clip.id, context)}
+                key={`v-${shown}`}
+                src={media("audio", clip.id, context, fresh)}
                 preload="auto"
+                onError={() => fail("audio")}
               ></audio>
+            )}
+            {!loading && problem === undefined && (
+              <div className={`play-state ${playing ? "playing" : ""}`} aria-hidden="true">
+                {playing ? (
+                  <svg viewBox="0 0 24 24">
+                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" />
+                  </svg>
+                )}
+              </div>
             )}
           </>
         ) : (
@@ -146,16 +200,34 @@ export function Stage({
                 audioRef.current = el;
                 videoRef.current = el;
               }}
-              key={`${clip.id}-${context}`}
-              src={media("audio", clip.id, context)}
+              key={shown}
+              src={media("audio", clip.id, context, fresh)}
               autoPlay
-              onCanPlay={() => setReady(shown)}
+              onCanPlay={ready}
+              onError={() => fail("audio")}
             ></audio>
           </>
         )}
         <div className={`wait ${!hasVideo || !loading ? "hide" : ""}`}>
           <div className="spinner"></div>
         </div>
+        {problem !== undefined && (
+          <div className="wait failed">
+            <div>
+              <div>{tr("这一句放不了", "This line cannot play")}</div>
+              <div className="reason">{problem || tr("正在查原因…", "Finding out why…")}</div>
+              <button
+                onClick={() => setRetry({ for: line, times: fresh + 1 })}
+                title={tr(
+                  "丢掉存好的片段，从原视频重新切",
+                  "Throw away the saved clip and cut it again from the original",
+                )}
+              >
+                {tr("重新切一次", "Cut again")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="player">
         {hasVideo && (
@@ -193,19 +265,23 @@ export function Stage({
         <span>{clip.episode}</span>
         <span>{stamp(clip.start)}</span>
         <span>{tr(`${clip.duration.toFixed(2)} 秒`, `${clip.duration.toFixed(2)} s`)}</span>
-        <button
-          className={`context ${context ? "on" : ""}`}
-          onClick={onContext}
+        <span
+          className="context"
           title={tr(
-            "看不出是谁时，临时前后各多放一些；再按切到 15 秒、再按回到平常。换一句自动回到平常",
-            "When you can't tell who it is, play a bit more on each side. Press again for 15 seconds, again for normal. Moving to another line goes back to normal",
+            "看不出是谁时，前后各多放一些。选好的会一直用到你改回来；L 键依次切换",
+            "When you can't tell who it is, play more on each side. Your choice stays until you change it; L steps through them",
           )}
         >
-          {context
-            ? tr(`前后多放 ${context} 秒`, `±${context} s`)
-            : tr("多放前后文", "More context")}{" "}
+          {tr("多放前后文", "More context")}
+          <span className="seg">
+            {CONTEXTS.map((c) => (
+              <button key={c} className={context === c ? "on" : ""} onClick={() => setContext(c)}>
+                {c ? tr(`±${c} 秒`, `±${c} s`) : tr("不多放", "None")}
+              </button>
+            ))}
+          </span>
           <kbd>L</kbd>
-        </button>
+        </span>
       </div>
 
       {label ? (

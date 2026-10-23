@@ -611,3 +611,16 @@ def test_audio_cut_does_not_share_its_unfinished_file_with_another_app(tmp_path:
     assert sf.info(str(target)).frames == 8000
     assert other.read_bytes() == b"half"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["cut.1.part.wav", "cut.wav", "vocals.wav"]
+
+
+def test_a_broken_cut_is_cut_again_on_request(tmp_path: Path) -> None:
+    import soundfile as sf
+
+    state = AppState(_workspace(tmp_path), ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clip = state.workspace.clips[0]
+    path = state.media("audio", clip.id)
+    path.write_bytes(b"broken")
+    assert client.get(f"/media/audio/{clip.id}.wav").content == b"broken"
+    assert client.get(f"/media/audio/{clip.id}.wav?fresh=1").status_code == 200
+    assert sf.info(str(path)).duration == pytest.approx(clip.end - clip.start, abs=0.01)

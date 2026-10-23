@@ -347,11 +347,11 @@ class AppState:
 
     # Media
 
-    def media(self, kind: str, clip_id: str, context: int = 0) -> Path:
+    def media(self, kind: str, clip_id: str, context: int = 0, fresh: bool = False) -> Path:
         """Cut and return the picture or vocals of one line. When `context` is not 0, this many
         seconds are added before and after (only a value from `CONTEXT_SECONDS`). The picture and
         vocals start at the same moment. They are saved as a separate copy, and the normal copy is
-        left alone."""
+        left alone. `fresh` throws away the saved cut first, for when it will not play."""
         clip = self.workspace.by_id.get(clip_id)
         if clip is None or not SAFE_ID.fullmatch(clip_id) or context not in (0, *CONTEXT_SECONDS):
             raise KeyError(clip_id)
@@ -359,11 +359,13 @@ class AppState:
         folder = Path(episode["directory"]) / "app_media" / kind
         suffix = f".ctx{context}" if context else ""
         target = folder / f"{clip_id}{suffix}.{'wav' if kind == 'audio' else 'mp4'}"
-        if target.exists():
+        if target.exists() and not fresh:
             return target
         with self.lock:
             lock = self._cutting.setdefault(clip_id + kind + suffix, threading.Lock())
         with lock:
+            if fresh:
+                target.unlink(missing_ok=True)
             if target.exists():
                 return target
             folder.mkdir(parents=True, exist_ok=True)
@@ -912,12 +914,12 @@ def create_app(state: AppState) -> Any:
         return FileResponse(path)
 
     @app.get("/media/{kind}/{clip_id}")
-    def read_media(kind: str, clip_id: str, context: int = 0) -> Any:
+    def read_media(kind: str, clip_id: str, context: int = 0, fresh: int = 0) -> Any:
         clip_id = clip_id.rsplit(".", 1)[0]
         if kind not in ("audio", "video"):
             raise HTTPException(404)
         try:
-            return FileResponse(state.media(kind, clip_id, context))
+            return FileResponse(state.media(kind, clip_id, context, fresh=bool(fresh)))
         except KeyError as exc:
             raise HTTPException(404) from exc
         except (FileNotFoundError, ValueError) as exc:

@@ -176,16 +176,35 @@ export async function call<T>(url: string, body?: unknown): Promise<T> {
 
 export type MediaKind = "audio" | "video";
 
-export const media = (kind: MediaKind, id: string, context = 0) =>
-  `/media/${kind}/${id}.${kind === "audio" ? "wav" : "mp4"}${context ? `?context=${context}` : ""}`;
+/* `fresh` throws away the saved cut and cuts again; a different number each time also keeps the browser from
+   using its own saved copy. */
+export function media(kind: MediaKind, id: string, context = 0, fresh = 0) {
+  const query = new URLSearchParams();
+  if (context) query.set("context", String(context));
+  if (fresh) query.set("fresh", String(fresh));
+  const rest = query.size ? `?${query}` : "";
+  return `/media/${kind}/${id}.${kind === "audio" ? "wav" : "mp4"}${rest}`;
+}
+
+/* Why a clip would not play: the server's message when it could not cut it, or null when it was cut but the
+   file itself is broken. */
+export async function mediaProblem(url: string): Promise<string | null> {
+  const response = await fetch(url, { headers: { "X-Language": currentLanguage() } });
+  if (response.ok) return null;
+  try {
+    return ((await response.json()) as { detail?: string }).detail || response.statusText;
+  } catch {
+    return response.statusText;
+  }
+}
 
 /* Fetch the next few clips' media ahead of time: the server cuts it on demand, so asking early means it is
    already cut by the time you get there. */
 const warmed = new Set<string>();
-export function warm(clips: (Clip | undefined)[], kind: MediaKind) {
+export function warm(clips: (Clip | undefined)[], kind: MediaKind, context = 0) {
   for (const clip of clips) {
     if (!clip) continue;
-    const url = media(kind, clip.id);
+    const url = media(kind, clip.id, context);
     if (warmed.has(url)) continue;
     warmed.add(url);
     fetch(url, { priority: "low" }).catch(() => warmed.delete(url));

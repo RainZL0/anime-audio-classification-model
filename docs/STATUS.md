@@ -52,7 +52,8 @@ Each episode is labeled in the correction interface, with only two labels: `teo`
    - Report, for each of the three scores, the ranking accuracy at separating Teio from non-Teio clips (the share of times that a random Teio clip scores higher than a random non-Teio clip). Report it for all clips, and split by length: 0.5 to 1 second, 1 to 1.5, 1.5 to 3, and over 3 seconds.
    - Verdict: the new method must beat both controls by at least 0.02 in some length band before it is considered as a second opinion for that band. If no band reaches that, drop the idea.
 3. **Finish the remaining 60 clips of episodes 1 and 2.** Then check whether clips of 0.5 to 1 second are still usable on more data.
-4. **After the GPT-SoVITS comparison, decide whether to handle episodes 8 onward.** Each episode takes one `avoc add`, with `--text-subs` to attach the Japanese subtitles ([command](USAGE.md#processing-a-new-episode)). Label each episode as it is processed.
+4. **Have the machine suggest "low quality".** The labels are now enough to try it; what to build and measure is in [ROADMAP.md](ROADMAP.md#labeling-interface).
+5. **After the GPT-SoVITS comparison, decide whether to handle episodes 8 onward.** Each episode takes one `avoc add`, with `--text-subs` to attach the Japanese subtitles ([command](USAGE.md#processing-a-new-episode)). Label each episode as it is processed.
 
 ## Where the files are
 

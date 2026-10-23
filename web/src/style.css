@@ -314,6 +314,43 @@ kbd {
 .screen .wait.hide {
   display: none;
 }
+.screen .wait.failed {
+  background: rgba(0, 0, 0, 0.75);
+  text-align: center;
+  font-size: 13px;
+  color: #ddd;
+}
+.screen .wait.failed .reason {
+  margin: 4px 16px 10px;
+  color: #999;
+  font-size: 12px;
+}
+/* The screen is always dark, so its button is too, in both themes. */
+.screen .wait.failed button {
+  background: #2a2a2a;
+  border-color: #555;
+  color: #eee;
+}
+.screen .wait.failed button:hover {
+  background: #3a3a3a;
+}
+/* Paused: a see-through triangle. Playing: the two bars. In the bottom right corner, so it does not cover the
+   speaker's face. Clicks go through to the video. */
+.screen .play-state {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  pointer-events: none;
+}
+.screen .play-state svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  fill: rgba(255, 255, 255, 0.85);
+}
 .spinner {
   width: 22px;
   height: 22px;
@@ -356,13 +393,13 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 .line-meta .context {
-  padding: 1px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
 }
-.line-meta .context.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
+.line-meta .context .seg button {
+  padding: 1px 8px;
 }
 .ask {
   margin: 18px 0 8px;
@@ -1485,4 +1522,11 @@ kbd {
     transform: translate(-50%, 8px);
     opacity: 0;
   }
+}
+.who-row .chip.off .low {
+  cursor: default;
+}
+.chip .low .k {
+  font: 11px var(--mono);
+  color: var(--text-3);
 }

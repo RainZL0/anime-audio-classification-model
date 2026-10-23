@@ -117,8 +117,11 @@ export function App() {
     const s = Number(localStorage.getItem("speed"));
     return SPEEDS.includes(s) ? s : 1;
   });
-  /* Extra seconds played around this line, see CONTEXTS. Back to normal on the next line. */
-  const [context, setContext] = useState(0);
+  /* Extra seconds played around each line, see CONTEXTS. The choice is kept on this machine. */
+  const [context, setContext] = useState(() => {
+    const c = Number(localStorage.getItem("context"));
+    return CONTEXTS.includes(c) ? c : 0;
+  });
   const nextContext = () =>
     setContext((c) => CONTEXTS[(CONTEXTS.indexOf(c) + 1) % CONTEXTS.length]);
   const [flashes, setFlashes] = useState(() => new Set<string>());
@@ -173,6 +176,9 @@ export function App() {
   useEffect(() => {
     localStorage.setItem("speed", String(speed));
   }, [speed]);
+  useEffect(() => {
+    localStorage.setItem("context", String(context));
+  }, [context]);
   /* Write where you are after # in the address, so a refresh comes back to the same view, episode, character
      and line. */
   useEffect(() => {
@@ -390,18 +396,14 @@ export function App() {
     const at = order.indexOf(focus);
     if (at < 0) return;
     const next = order.slice(at + 1, at + 4).map((id) => byId[id]);
-    if (episodeInfo?.video) warm(next, "video");
-    if (!episodeInfo?.video || sound === "vocals") warm(next, "audio");
+    if (episodeInfo?.video) warm(next, "video", context);
+    if (!episodeInfo?.video || sound === "vocals") warm(next, "audio", context);
     /* The server first cuts the clips within a minute of this line in the background, then on to the end of the
        episode. While J/K is held down to flip fast, only the line you stop on is sent. */
     const wait = setTimeout(() => call("/api/prefetch", { clip: focus }).catch(() => {}), 300);
     return () => clearTimeout(wait);
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- only on moving to another line, not on every save
-  }, [focus, order]);
-
-  useEffect(() => {
-    setContext(0);
-  }, [focus]);
+  }, [focus, order, context]);
 
   /* The Groups order only has unlabeled lines. When a labeled one is open, find next and previous by its place
      in the group. */
@@ -1146,7 +1148,7 @@ export function App() {
             onNewRole={() => newRole()}
             onClear={clear}
             context={context}
-            onContext={nextContext}
+            setContext={setContext}
             dock={dock}
           />
         )}
@@ -1200,7 +1202,7 @@ export function App() {
               firstRun={firstRun}
               picked={picked}
               setPicked={setPicked}
-              onName={(ids, name) => assign(name, ids)}
+              onName={(ids, name, low) => assign(name, ids, low)}
               onNew={(ids) => newRole(ids)}
             />
           )}
