@@ -65,6 +65,9 @@ const VIEWS = ["groups", "scene", "roles", "export"];
 const STALE = new Error("stale");
 /* The position saved after # in the address when the page opened; see where App writes it back. */
 const saved = new URLSearchParams(location.hash.slice(1));
+/* App only rewrites the address with replaceState, which fires no hashchange. So this fires only when the person
+   edits the address or opens a link to another spot; reloading reads the new position. */
+addEventListener("hashchange", () => location.reload());
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
 /* "Other": not any of the target characters. It is a human judgment, labeled with Q. Unsure whether it is a
    target, several people talking with no target among them, cheering and sound effects: all get "other". */
@@ -243,7 +246,7 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
     </div>
     <div class="line-text">${clip.text || html`<span style="color:var(--text-3)">${tr("（字幕里没有这句的文字）", "(no text for this line in the subtitles)")}</span>`}</div>
     <div class="line-meta">
-      <span>${clip.episode}</span><span>${stamp(clip.start)}</span><span>${tr(`${clip.duration} 秒`, `${clip.duration} s`)}</span>
+      <span>${clip.episode}</span><span>${stamp(clip.start)}</span><span>${tr(`${clip.duration.toFixed(2)} 秒`, `${clip.duration.toFixed(2)} s`)}</span>
       <button class="context ${context ? "on" : ""}" onClick=${onContext}
         title=${tr("看不出是谁时，临时前后各多放一些；再按切到 15 秒、再按回到平常。换一句自动回到平常",
           "When you can't tell who it is, play a bit more on each side. Press again for 15 seconds, again for normal. Moving to another line goes back to normal")}>
@@ -332,7 +335,7 @@ function Row({ clip, roles, labelText, selected, onSelect, flash, maybeOf, showT
       </div>
       <div class="say ${clip.text ? "" : "empty"}">${clip.text || tr("（没有字幕文字）", "(no subtitle text)")}</div>
     </div>
-    <div class="t">${stamp(clip.start)}<br />${clip.duration}s</div>
+    <div class="t">${stamp(clip.start)}<br />${clip.duration.toFixed(2)}s</div>
   </div>`;
 }
 
@@ -410,7 +413,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
   return html`<div class="roles-grid">
     <div class="role-list">
       ${list.map((r) => html`<div class="role-item ${r.name === role ? "on" : ""} ${r.target ? "" : "off"}"
-          onClick=${() => setRole(r.name)} title=${r.target ? "" : tr("不是目标角色：机器不再猜 TA，TA 的标签照样留着",
+          onClick=${() => setRole(r.name)} title=${r.target ? "" : tr("不是目标角色：机器不再猜这个角色，已有的标签照样留着",
             "Not a target character: the machine no longer guesses them, their labels stay")}>
         <${Avatar} role=${r} name=${r.name} size="md" />
         <${RoleName} role=${r} name=${r.name} cls="nm" />
@@ -423,7 +426,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
     </div>
     <div>
       ${!current ? html`<div class="empty"><h2>${tr("选一个角色", "Pick a character")}</h2><p>${tr(
-        "左边上面是目标角色，就是你要收集的人；其余的人一律标「其他」。灰色数字是确认过的句数，橙色是机器归给 TA、还没人确认的句数，下面是确认过的台词累计多长。",
+        "左边上面是目标角色，就是你要收集的人；其余的人一律标「其他」。灰色数字是确认过的句数，橙色是机器归进来、还没人确认的句数，下面是确认过的台词累计多长。",
         "At the top left are the target characters, the people you want to collect; everyone else is labeled \"other\". The gray number is lines confirmed, the orange one is lines the machine gave them that no one has confirmed yet, and below is the total length of the confirmed lines.")}</p></div>`
       : html`
         <div class="role-head">
@@ -435,14 +438,14 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
             <div class="stats">${tr(`确认过 ${confirmed.length} 句`, `${lines(confirmed.length)} confirmed`)}${
               info?.seconds > 0 ? tr(`，共 ${howLong(info.seconds)}`, `, ${howLong(info.seconds)} in total`) : ""}${
               info?.low_seconds > 0 ? tr(`，其中质量低 ${howLong(info.low_seconds)}`, `, ${howLong(info.low_seconds)} of it low quality`) : ""} · ${
-              tr(`机器归给 ${other ? "其他" : "TA"} ${pending.length} 句`, `${lines(pending.length)} given by the machine`)}
+              tr(`机器归进来 ${pending.length} 句`, `${lines(pending.length)} given by the machine`)}
               ${other || current.target ? "" : tr(" · 不是目标角色", " · not a target character")}</div></div>
           <div class="role-actions">
             <button onClick=${() => setPlaying(!playing)}>${playing ? tr("停止连播", "Stop playing") : tr("连播待核对", "Play all to check")} <kbd>P</kbd></button>
             ${!other && html`<button class=${current.named === false ? "primary" : ""} onClick=${onRename}>
               ${current.named === false ? tr("起名字", "Name") : tr("改名或合并", "Rename or merge")}</button>
             <button onClick=${onToggleTarget}
-              title=${current.target ? tr("不再收集这个人：机器不再猜 TA，已标的留着，以后还能加回来",
+              title=${current.target ? tr("不再收集这个人：机器不再猜这个角色，已标的留着，以后还能加回来",
                   "Stop collecting this person: the machine stops guessing them, their labels stay, and you can add them back later")
                 : tr("重新收集这个人：以前标「其他」的台词会列进「可能漏掉的」，要复查",
                   "Collect this person again: lines labeled \"other\" before will be listed under Maybe missed for you to recheck")}>
@@ -535,7 +538,7 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
           </div>`}
           <form class="name-form" onSubmit=${submit}>
             <input list="role-names" value=${value}
-              placeholder=${g.hint ? tr(`可能是 ${g.hint.name}，听过确认是 TA 就回车`, `Maybe ${g.hint.name}. Listen, and press Enter if it is`)
+              placeholder=${g.hint ? tr(`可能是 ${g.hint.name}，听过确认就回车`, `Maybe ${g.hint.name}. Listen, and press Enter if it is`)
                 : tr("名字（可以不填）", "Name (optional)")}
               onInput=${(e) => setNames({ ...names, [g.key]: e.target.value })} />
             ${chosen
@@ -600,6 +603,9 @@ function ExportView({ state, setState, toast }) {
   });
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  /* The result appears below the button, often off screen; bring it into view. */
+  const resultBox = useRef(null);
+  useEffect(() => { if (result) resultBox.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [result]);
   const toggle = (name) => { const next = new Set(picked); next.has(name) ? next.delete(name) : next.add(name); setPicked(next); };
   const run = async () => {
     setBusy(true); setResult(null);
@@ -653,7 +659,7 @@ function ExportView({ state, setState, toast }) {
       <input style="width:100%" value=${out} onInput=${(e) => setOut(e.target.value)} /></div>
     <div><button class="primary" disabled=${busy || picked.size === 0} onClick=${run}>
       ${busy ? tr("正在导出…", "Exporting…") : tr(`导出 ${picked.size} 个角色`, `Export ${many(picked.size, "character")}`)}</button></div>
-    ${result && html`<div class="result"><b>${tr("导出好了：", "Exported: ")}</b>${tr(`${result.files} 个文件，共 ${Math.round(result.total_sec / 6) / 10} 分钟`,
+    ${result && html`<div class="result" ref=${resultBox}><b>${tr("导出好了：", "Exported: ")}</b>${tr(`${result.files} 个文件，共 ${Math.round(result.total_sec / 6) / 10} 分钟`,
         `${many(result.files, "file")}, ${Math.round(result.total_sec / 6) / 10} minutes in total`)}<br />
       ${Object.keys(result.rejected || {}).length > 0 && html`<span>${tr("没导出：", "Not exported: ")}${Object.entries(result.rejected)
         .map(([why, n]) => tr(`${why} ${n} 条`, `${why} (${n})`)).join(tr("，", ", "))}${tr("。明细见 rejected.tsv", ". Details in rejected.tsv")}<br /></span>`}

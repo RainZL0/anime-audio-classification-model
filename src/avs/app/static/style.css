@@ -184,7 +184,8 @@ kbd {
 .corner { position: fixed; top: 12px; right: 16px; }
 
 /* Scenes view: one line per sentence, like a chat log */
-.scene-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 14px 4px 6px;
+/* -8px cancels the top padding of .main, so lines don't show through above a stuck header. */
+.scene-head { position: sticky; top: -8px; z-index: 2; background: var(--bg); padding: 14px 4px 6px;
   color: var(--text-3); font-size: 12px; display: flex; gap: 8px; align-items: center; }
 .scene-head b { color: var(--text-2); font-weight: 600; }
 .row {
