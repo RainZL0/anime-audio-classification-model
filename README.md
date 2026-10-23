@@ -16,7 +16,7 @@ Tested on Windows 11 with an RTX 4060 Laptop GPU. Linux should work but has not 
 ## Quick start
 
 ```bash
-git clone https://github.com/RainbowZL0/anime-audio-classification-model.git
+git clone https://github.com/RainZL0/anime-audio-classification-model.git
 cd anime-audio-classification-model
 uv sync --locked
 uv run avs doctor

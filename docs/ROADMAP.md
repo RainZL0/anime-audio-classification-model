@@ -10,8 +10,8 @@ Updated: 2026-10-23, evening. This page covers the goals, the direction and the 
 
 ## Repo
 
-- The first release is developed locally in this repo. Nothing is pushed before release.
-- At release, replace the `main` branch of the old GitHub repo `RainbowZL0/anime-audio-classification-model`. First tag the old `main` to keep it, then push this repo's history onto it. The old repo is kept so that its existing stars and links are kept. Whether to rename it is decided before release.
+- The first release is developed locally in this repo. Nothing more is pushed before release. An early `feat/voice-sorter-v1` branch from 2026-10-18 is already on GitHub. Delete it at release.
+- At release, force-push this repo's history onto the `main` branch of the old GitHub repo `RainZL0/anime-audio-classification-model`, replacing it. The old repo is kept so that its existing stars and links are kept. The old `main` is kept as the tag `archive/old-main`, which is already pushed. Whether to rename the repo is decided before release.
 
 ## Direction
 
