@@ -357,7 +357,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
           selected=${clip.id === focus} marked=${marks.has(clip.id)} flash=${flashes.has(clip.id)}
           onSelect=${() => setFocus(clip.id)} />`)}
         ${maybe.length > 0 && html`<div class="section-title">可能漏掉的 ${maybe.length} 句</div>
-          <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。是 TA 就按 <kbd>Enter</kbd>，不是就按 <kbd>X</kbd>。
+          <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。是 TA 就按底部 TA 的数字键，不是就按 <kbd>X</kbd>；<kbd>Enter</kbd> 和别处一样，是接受机器猜的第一个。
             刚设成目标角色时，以前标成「其他」的台词也会列在这里。</p>
           ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special} maybeOf=${role}
             selected=${clip.id === focus} marked=${clip.rejects.includes(role)} flash=${flashes.has(clip.id)}
@@ -588,7 +588,7 @@ function Help({ onClose }) {
     ["/", "搜索角色，或者敲名字新建"],
     ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"],
     ["L", "看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常"], ["Z", "撤销上一步（可以一直往回撤）"],
-    ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["「可能漏掉的」里 Enter", "这句是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
+    ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
     ["截头像时 Enter / Esc", "保存 / 放弃"],
   ];
@@ -921,8 +921,6 @@ function App() {
   };
   const accept = () => {
     if (!current) return;
-    /* 角色视图「可能漏掉的」里，Enter 是「是这个角色」，不是接受机器的第一名。 */
-    if (view === "roles" && current.maybe) { assign(role); return; }
     if (current.label) { move(1); return; }
     if (current.guess.length) assign(current.guess[0].name);
   };
