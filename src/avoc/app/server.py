@@ -625,6 +625,13 @@ class SubtitleStylesBody(BaseModel):
     path: str
 
 
+class PickBody(BaseModel):
+    kind: str
+    """video, subtitles or folder"""
+    current: str = ""
+    """What the box holds now; the window opens in its folder."""
+
+
 class TextSubtitlesBody(BaseModel):
     episode: str
     path: str
@@ -878,6 +885,16 @@ def create_app(state: AppState) -> Any:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         return {**found, "marked": marked_note(found["marked"]) if found["marked"] else None}
+
+    @app.post("/api/pick")
+    def post_pick(body: PickBody) -> dict[str, Any]:
+        """Open the system's file window on this machine and wait for the person (see picker)."""
+        from avoc.app.picker import pick, start_folder
+
+        try:
+            return {"path": pick(body.kind, start_folder(body.current, Path.cwd()))}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.post("/api/add/stop")
     def post_add_stop() -> dict[str, Any]:

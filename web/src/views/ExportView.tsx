@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { call, type ExportResult, type Summary } from "../api";
 import { Avatar } from "../components/Avatar";
+import { PathInput } from "../components/PathInput";
 import { RoleName } from "../components/RoleName";
 import { pct } from "../format";
 import { lines, many, tr } from "../language";
@@ -54,14 +55,16 @@ function TextSubtitles({
                 <span className="min">{tr("还没配", "none yet")}</span>
               )}
             </span>
-            <input
+            <PathInput
+              kind="subtitles"
               placeholder={
                 t
                   ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file")
                   : tr("字幕文件的路径（ASS 或 SRT）", "Path to a subtitle file (ASS or SRT)")
               }
               value={paths[e.name] || ""}
-              onChange={(ev) => setPaths({ ...paths, [e.name]: ev.target.value })}
+              onChange={(path) => setPaths((p) => ({ ...p, [e.name]: path }))}
+              toast={toast}
             />
             <button
               disabled={busy !== null || !(paths[e.name] || "").trim()}
@@ -254,7 +257,7 @@ export function ExportView({
             "Output folder (relative paths start from where you launched avoc)",
           )}
         </label>
-        <input style={{ width: "100%" }} value={out} onChange={(e) => setOut(e.target.value)} />
+        <PathInput kind="folder" value={out} onChange={setOut} toast={toast} />
       </div>
       <div>
         <button className="primary" disabled={busy || picked.size === 0} onClick={run}>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { call, type Adding, type Check, type Summary, type SubtitleStyles as Styles } from "../api";
+import { PathInput } from "../components/PathInput";
 import { minutes } from "../format";
 import { lines, many, tr } from "../language";
 import type { Toast } from "../toast";
@@ -293,10 +294,12 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
       <form className="add-form" onSubmit={start}>
         <div className="field">
           <label className="title">{tr("视频文件", "Video file")}</label>
-          <input
+          <PathInput
+            kind="video"
             value={video}
-            onChange={(e) => setVideo(e.target.value)}
+            onChange={setVideo}
             placeholder="D:\anime\Episode 01.mkv"
+            toast={toast}
           />
         </div>
         <div className="field">
@@ -306,10 +309,12 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
               "Dialogue subtitles (ASS or SRT; lines are cut from it)",
             )}
           </label>
-          <input
+          <PathInput
+            kind="subtitles"
             value={subtitles}
-            onChange={(e) => setSubtitles(e.target.value)}
+            onChange={setSubtitles}
             placeholder="D:\anime\Episode 01.ass"
+            toast={toast}
           />
           {found && (
             <SubtitleStyles key={subtitles} found={found} chosen={chosen} setChosen={setChosen} />
@@ -322,10 +327,12 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
               "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)",
             )}
           </label>
-          <input
+          <PathInput
+            kind="subtitles"
             value={textSubtitles}
-            onChange={(e) => setTextSubtitles(e.target.value)}
+            onChange={setTextSubtitles}
             placeholder="D:\anime\Episode 01.ja.srt"
+            toast={toast}
           />
         </div>
         <div className="field">
@@ -345,8 +352,8 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
         </div>
         <div className="note">
           {tr(
-            "路径整段粘贴进来就行。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
-            'Paste the full paths. On Windows, hold Shift, right-click the file, and choose "Copy as path".',
+            "按「浏览…」选文件，或者把整段路径粘贴进框里。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
+            'Press "Browse…" to pick each file, or paste its full path into the box. On Windows, hold Shift, right-click the file, and choose "Copy as path".',
           )}
         </div>
         <div>

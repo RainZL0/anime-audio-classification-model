@@ -1124,6 +1124,19 @@ kbd {
   flex-direction: column;
   gap: 14px;
 }
+/* A path box with "Browse…" after it. */
+.path-input {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.path-input input {
+  flex: 1;
+  min-width: 0;
+}
+.path-input button {
+  flex: none;
+}
 .add-form {
   display: flex;
   flex-direction: column;
@@ -1136,7 +1149,8 @@ kbd {
   width: 120px;
   margin-bottom: 4px;
 }
-.add-form input + .note {
+.add-form input + .note,
+.add-form .path-input + .note {
   margin-top: 4px;
 }
 .style-list {

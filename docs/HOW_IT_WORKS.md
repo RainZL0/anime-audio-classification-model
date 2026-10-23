@@ -119,6 +119,7 @@ src/avoc/
   app/model.py             small classifier and similarity check
   app/video.py             cut the short video pieces shown next to each line
   app/adding.py            add an episode from the interface: runs `avoc add` in a separate process
+  app/picker.py            the "Browse…" buttons: opens the system's file window
   app/server.py            web server endpoints, starting groups, picture cutting, export
   app/static/              built front-end files, made from web/ (do not edit by hand)
 web/src/

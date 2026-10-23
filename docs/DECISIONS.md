@@ -46,6 +46,7 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 - Labels are made in the interface and stored in the workspace's `labels/` folder.
 - **The web app is written in React and TypeScript, and built with Vite** (since 2026-10-24). Preact with htm was enough, but contributors are more willing to work on a stack they already know, and changing it after release is harder.
 - **The built front-end files are committed to git, and CI checks that they match the source.** Users install with `git clone` and `uv sync`, and must not need Node.
+- **Paths are picked with a "Browse…" button: the local server opens the system's file window. Files cannot be dragged into the page.** A browser gives a page the content of a dropped or chosen file but never where it is, and a video of several gigabytes must not be copied just to learn that.
 
 **Export**
 
