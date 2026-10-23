@@ -781,6 +781,17 @@ def _cut_audio(vocals: Path, start: float, end: float, target: Path) -> None:
     temporary.replace(target)
 
 
+RELOAD_WORKSPACE = "AVOC_RELOAD_WORKSPACE"
+RELOAD_MODELS = "AVOC_RELOAD_MODELS"
+
+
+def reloaded_app() -> Any:
+    """The app for `avoc app --reload`: uvicorn starts it afresh in a new process after each code
+    change, with the workspace and models `avoc app` put in the environment."""
+    models = tuple(m for m in os.environ.get(RELOAD_MODELS, "").split(",") if m)
+    return create_app(AppState(Path(os.environ[RELOAD_WORKSPACE]), models or DEFAULT_MODELS))
+
+
 def create_app(state: AppState) -> Any:
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import FileResponse

@@ -28,14 +28,14 @@ npm --prefix web ci
 Day to day, run two terminals:
 
 ```bash
-uv run avoc app WORKSPACE --no-open
+uv run avoc app WORKSPACE --no-open --reload
 ```
 
 ```bash
 npm --prefix web run dev
 ```
 
-Open the address Vite prints (it ends in `/static/`). Edits show up in the page right away; requests to `/api` and `/media` go to the running `avoc app` on port 8765.
+Open the address Vite prints (it ends in `/static/`). Edits in `web/` show up in the page right away; requests to `/api` and `/media` go to the running `avoc app` on port 8765. `--reload` restarts that server whenever a Python file in `src/avoc/` changes (it watches with watchfiles, from the dev dependency group). Each restart loads the workspace again, takes a few seconds, and stops an episode being added, so it is for development only.
 
 Before committing a change in `web/`:
 

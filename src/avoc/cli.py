@@ -298,14 +298,38 @@ def run_app(
             "combined"
         ),
     ] = None,
+    reload: Annotated[
+        bool,
+        typer.Option(
+            help="For development: restart the server when a Python file of avoc changes. "
+            "Each restart loads the workspace again and stops an episode being added"
+        ),
+    ] = False,
 ) -> None:
     """Open the labeling and correction interface."""
+    import os
     import webbrowser
 
     import uvicorn
 
-    from avoc.app.server import AppState, create_app
+    from avoc.app.server import RELOAD_MODELS, RELOAD_WORKSPACE, AppState, create_app
     from avoc.app.workspace import DEFAULT_MODELS
+
+    if reload:
+        # The server runs in a child process that is started again after each change, so it reads
+        # its settings from the environment; see `reloaded_app`.
+        os.environ[RELOAD_WORKSPACE] = str(workspace.resolve())
+        os.environ[RELOAD_MODELS] = ",".join(model or DEFAULT_MODELS)
+        url = f"http://127.0.0.1:{port}/"
+        typer.echo(f"Open {url} (restarts when avoc's Python files change)")
+        if open_browser:
+            import threading
+
+            threading.Timer(4.0, webbrowser.open, args=[url]).start()
+        package = Path(__file__).parent
+        uvicorn.run("avoc.app.server:reloaded_app", factory=True, host="127.0.0.1", port=port,
+                    log_level="warning", reload=True, reload_dirs=[str(package)])  # fmt: skip
+        return
 
     state = AppState(workspace, tuple(model) if model else DEFAULT_MODELS)
     typer.echo(
