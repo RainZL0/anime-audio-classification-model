@@ -57,28 +57,36 @@ uv run avs app runs
 
 在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。
 
-- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，给组起名字，一次标一整组。
-- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的前三名，每个候选附一条参考音，Enter 接受第一名，数字键选底部的角色，`/` 搜索或新建角色。F 只看要人处理的。
+- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，一次标一整组：点已有角色的头像，或者定成一个新角色。名字可以不填。
+- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的前三名，每个候选附一条参考音，Enter 接受第一名，数字键选底部的角色，`/` 搜索或新建角色。F 只看要人处理的。短于 1 秒、前后 0.5 秒内没有别的台词的短句标成「太短，默认跳过」，不算要处理的，只在「整集」里出现，想标也能标。
 - **角色**（O）：按角色列出片段，从机器最没把握的开始，可以连着播。X 标出「不是这个角色」，Shift+Enter 确认其余。这里也能改名、合并角色、设头像、关掉某个角色的训练。
-- **导出**（E）：选角色和格式（GPT-SoVITS、Style-Bert-VITS2 或按角色分文件夹），可以只导人确认过的，也可以带上机器有把握的。
+- **导出**（E）：选角色和格式（GPT-SoVITS、Style-Bert-VITS2 或按角色分文件夹），可以只导人确认过的，也可以带上机器有把握的。切片段的字幕是中文译文、要训练日语模型时，「台词文字从哪来」选「每集另配的台词字幕」，在下面每集贴上日文字幕的路径，点「对齐并配上」；也可以用下面的 `set-text-subtitles` 命令配。配不上台词的片段不导出，明细在导出目录的 `rejected.tsv`。
 
-每次标注立刻落盘、立刻重训；Z 一直往回撤销。全部快捷键按 `?` 查看。
+认人主要靠头像，名字可以不起：
+
+- N 把当前这句标成一个新角色，先叫「角色 1」「角色 2」这样的临时名字，以后在「角色」视图里点「起名字」再补。
+- 没截头像的角色显示一张按编号生成的图（底色、形状、花纹三样一起变），不同角色一眼分得开。
+- 截头像：新建角色时有画面就会直接弹出来；以后在舞台上点已确认角色的头像，或在「角色」视图点「截取头像」。拖方框挪位置，拖右下角或滚轮缩放，滑块换一帧，Enter 保存。
+
+每次标注立刻落盘、立刻重训；Z 一直往回撤销。全部快捷键按 `?` 查看。页面默认白天配色，顶栏右上角可以切到夜间，选择记在浏览器里。
 
 旧的集补信息用的命令：
 
 ```powershell
 uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
 uv run avs set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
+uv run avs set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
 uv run avs import-labels runs --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --untrained 路人
 ```
 
 - `set-video`：给 `prepare` 改成必需视频之前处理的集记上视频。时长和音轨对不上就拒绝。
 - `set-subtitles`：给没记字幕的集补上字幕，偏移从已有片段推出来，按时间重叠找台词文字。
+- `set-text-subtitles`：给一集另配一份字幕（ASS 或 SRT），导出时台词文字从它取。偏移自动量，和切片段的字幕对不上就拒绝。来源以 Netflix、Amazon 的为好，电视台录的字幕带 🎤 之类的符号，不会被去掉。
 - `import-labels`：把旧的人工归档一次导进标签记录，只在记录还空着时可用，导入不能撤销。`--untrained` 的名字照样导入，但不拿来训练。
 
 ## 标注
 
-盲标检验集用这个旧页面，它不显示机器的猜测。标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
+第 1 至 3 集是用这个旧页面盲标的，它不显示机器的猜测。独立检验取消后，新的集改在修正界面里标，这个页面留着备用。标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
 
 ```powershell
 uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
@@ -109,7 +117,7 @@ uv run avs export runs/groups/uma-next.json --out out/uma-next
 `group` 的参数：
 
 - `--threshold`：不给就用这个模型自己的默认分界线，并把它打印出来。
-- `--relative`：按池子自己的距离定分界线（见[名词表](HOW_IT_WORKS.md#名词表)）。还没有独立检验，默认不开，现状见 [STATUS.md](STATUS.md)。
+- `--relative`：按池子自己的距离定分界线（见[名词表](HOW_IT_WORKS.md#名词表)）。没有经过独立检验，默认不开，现状见 [STATUS.md](STATUS.md)。
 - `--model`：`anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`。换模型要重新扫分界线。
 - `--method`：默认 `average`。另有 `single`、`complete`、`mutual_knn`、`two_stage`，都已排除，留着只为复算。
 
@@ -166,6 +174,8 @@ uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --a
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+ty check src
 uv run pytest -q
 ```
+
+类型检查用 [ty](https://github.com/astral-sh/ty)，不在项目依赖里，装在本机：`uv tool install ty`。CI 里固定用 0.0.91。
