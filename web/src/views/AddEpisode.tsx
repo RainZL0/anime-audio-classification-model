@@ -10,6 +10,7 @@ import {
 import { PathInput } from "../components/PathInput";
 import { minutes } from "../format";
 import { languageName, languageNames, lines, many, SPOKEN, tr } from "../language";
+import { needsText, type Purpose } from "../purpose";
 import type { Toast } from "../toast";
 
 /* ───────────── Adding an episode ───────────── */
@@ -205,15 +206,25 @@ export interface AddEpisodeProps {
   setAdding: (adding: Adding) => void;
   onOpen: (episode: string) => void;
   toast: Toast;
+  onPurpose: (purpose: Purpose) => void;
 }
 
 /* The form for one episode, and the progress of the `avoc add` the server runs for it. `adding` is the server's job
    status, polled by App. */
-export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpisodeProps) {
+export function AddEpisode({
+  state,
+  adding,
+  setAdding,
+  onOpen,
+  toast,
+  onPurpose,
+}: AddEpisodeProps) {
+  const text = needsText();
   const last = [...state.episodes].reverse().find((e) => e.offset != null);
   const [video, setVideo] = useState("");
   const [subtitles, setSubtitles] = useState("");
   const [textSubtitles, setTextSubtitles] = useState("");
+  const [displaySubtitles, setDisplaySubtitles] = useState("");
   const [offset, setOffset] = useState(last ? String(last.offset) : "");
   /* "" lets the audio track's tag decide. */
   const [spoken, setSpoken] = useState("");
@@ -281,7 +292,8 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
     run({
       video,
       subtitles,
-      text_subtitles: textSubtitles,
+      text_subtitles: text ? textSubtitles : "",
+      display_subtitles: displaySubtitles,
       offset: seconds,
       styles,
       spoken: spoken || null,
@@ -369,6 +381,28 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
       )}
       <form className="add-form" onSubmit={start}>
         <div className="field">
+          <label className="title">{tr("收集声音做什么用", "What the voices are for")}</label>
+          <span className="seg">
+            <button type="button" className={text ? "on" : ""} onClick={() => onPurpose("tts")}>
+              {tr("语音合成（GPT-SoVITS 等）", "Speech synthesis (GPT-SoVITS and such)")}
+            </button>
+            <button type="button" className={text ? "" : "on"} onClick={() => onPurpose("audio")}>
+              {tr("只要声音（RVC 等）", "Sound only (RVC and such)")}
+            </button>
+          </span>
+          <div className="note">
+            {text
+              ? tr(
+                  "语音合成要每句说的话，用这一集说的语言（一般是日语），所以要有这种语言的字幕。",
+                  "Speech synthesis needs the words of each line in the language spoken (usually Japanese), so subtitles in that language are needed.",
+                )
+              : tr(
+                  "只要声音就不用管台词文字，什么语言的字幕都行。以后在导出页也能改。",
+                  "Sound only needs no text, so subtitles in any language will do. You can change this later on the Export page.",
+                )}
+          </div>
+        </div>
+        <div className="field">
           <label className="title">{tr("视频文件", "Video file")}</label>
           <PathInput
             kind="video"
@@ -402,70 +436,110 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
             ))}
           </select>
           <div className="note">
-            {tr(
-              "人声从这种语言的音轨取，导出的文字也要是这种语言。双语视频里想要配音版的声音，就在这里选配音的语言。",
-              "The voices are taken from the audio track in this language, and exported text must be in it too. For the dub of a dual-audio video, pick the dub's language here.",
-            )}
+            {text
+              ? tr(
+                  "人声从这种语言的音轨取，导出的文字也要是这种语言。双语视频里想要配音版的声音，就在这里选配音的语言。",
+                  "The voices are taken from the audio track in this language, and exported text must be in it too. For the dub of a dual-audio video, pick the dub's language here.",
+                )
+              : tr(
+                  "人声从这种语言的音轨取。双语视频里想要配音版的声音，就在这里选配音的语言。",
+                  "The voices are taken from the audio track in this language. For the dub of a dual-audio video, pick the dub's language here.",
+                )}
           </div>
         </div>
         <div className="field">
           <label className="title">
-            {tr(
-              "对白字幕（ASS 或 SRT，按它切台词）",
-              "Dialogue subtitles (ASS or SRT; lines are cut from it)",
-            )}
+            {text
+              ? tr(
+                  "对白字幕（ASS 或 SRT，按它切台词。最好用说的语言的字幕）",
+                  "Dialogue subtitles (ASS or SRT; lines are cut from it. Best in the language spoken)",
+                )
+              : tr(
+                  "对白字幕（ASS 或 SRT，按它切台词）",
+                  "Dialogue subtitles (ASS or SRT; lines are cut from it)",
+                )}
           </label>
           <PathInput
             kind="subtitles"
             value={subtitles}
             onChange={setSubtitles}
-            placeholder="D:\anime\Episode 01.ass"
+            placeholder="D:\anime\Episode 01.ja.srt"
             toast={toast}
           />
           {found && (
             <SubtitleStyles key={subtitles} found={found} chosen={chosen} setChosen={setChosen} />
           )}
+          {found?.languages?.length === 1 && found.languages[0] === heard && (
+            <div className="note">
+              {text
+                ? tr(
+                    "对白字幕就是说的语言：每段片段的文字就是它自己那一句。一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
+                    "The dialogue subtitles are in the language spoken, so each clip's text is its own line. An entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
+                  )
+                : tr(
+                    "对白字幕就是说的语言：一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
+                    "The dialogue subtitles are in the language spoken: an entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
+                  )}
+            </div>
+          )}
         </div>
         <div className="field">
           <label className="title">
             {tr(
-              "台词文字字幕（可以不填。对白字幕是译文时，配一份原声语言的字幕，导出的文字从它取）",
-              "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)",
+              "显示用字幕（可以不填。对白字幕是你看不懂的语言时，配一份译文，标注时显示在台词上面；导出不用它）",
+              "Display subtitles (optional. If you don't read the dialogue subtitles' language, add a translation; it is shown above each line while labeling, and never exported)",
             )}
           </label>
           <PathInput
             kind="subtitles"
-            value={textSubtitles}
-            onChange={setTextSubtitles}
-            placeholder="D:\anime\Episode 01.ja.srt"
+            value={displaySubtitles}
+            onChange={setDisplaySubtitles}
+            placeholder="D:\anime\Episode 01.zh.ass"
             toast={toast}
           />
-          {textFound?.error && <div className="note warn">{textFound.error}</div>}
-          {textFound?.languages && (
-            <div className={`note ${textFound.languages.includes(heard) ? "" : "warn"}`}>
-              {textFound.languages.includes(heard)
-                ? tr(
-                    `${languageNames(textFound.languages)}，导出的文字取其中的${languageName(heard)}`,
-                    `${languageNames(textFound.languages)}; the ${languageName(heard)} lines are exported`,
-                  )
-                : tr(
-                    `这份字幕是${languageNames(textFound.languages)}，不是${languageName(heard)}，会被拒绝`,
-                    `These subtitles are in ${languageNames(textFound.languages)}, not ${languageName(heard)}, so they will be refused`,
-                  )}
-            </div>
-          )}
-          {!textSubtitles.trim() &&
-            found?.languages &&
-            found.languages.length > 0 &&
-            !found.languages.includes(heard) && (
-              <div className="note warn">
-                {tr(
-                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。导出 GPT-SoVITS 或 Style-Bert-VITS2 要有${languageName(heard)}台词：现在配上，或者以后在导出页配。只导出音频（RVC）不需要。`,
-                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the ${languageName(heard)} text: attach it now, or later on the Export page. Audio-only export (RVC) does not need it.`,
-                )}
+        </div>
+        {text && (
+          <div className="field">
+            <label className="title">
+              {tr(
+                "台词文字字幕（可以不填。对白字幕是译文时，配一份原声语言的字幕，导出的文字从它取）",
+                "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)",
+              )}
+            </label>
+            <PathInput
+              kind="subtitles"
+              value={textSubtitles}
+              onChange={setTextSubtitles}
+              placeholder="D:\anime\Episode 01.ja.srt"
+              toast={toast}
+            />
+            {textFound?.error && <div className="note warn">{textFound.error}</div>}
+            {textFound?.languages && (
+              <div className={`note ${textFound.languages.includes(heard) ? "" : "warn"}`}>
+                {textFound.languages.includes(heard)
+                  ? tr(
+                      `${languageNames(textFound.languages)}，导出的文字取其中的${languageName(heard)}`,
+                      `${languageNames(textFound.languages)}; the ${languageName(heard)} lines are exported`,
+                    )
+                  : tr(
+                      `这份字幕是${languageNames(textFound.languages)}，不是${languageName(heard)}，会被拒绝`,
+                      `These subtitles are in ${languageNames(textFound.languages)}, not ${languageName(heard)}, so they will be refused`,
+                    )}
               </div>
             )}
-        </div>
+            {!textSubtitles.trim() &&
+              found?.languages &&
+              found.languages.length > 0 &&
+              !found.languages.includes(heard) && (
+                <div className="note warn">
+                  {tr(
+                    `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。导出 GPT-SoVITS 或 Style-Bert-VITS2 要有${languageName(heard)}台词：现在配上，或者以后在导出页配。只导出音频（RVC）不需要。有${languageName(heard)}字幕的话，更好的做法是把它当对白字幕，这份当显示用字幕：按译文切的片段和原文时间对不齐，不少句子会导不出文字。`,
+                    `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the ${languageName(heard)} text: attach it now, or later on the Export page. Audio-only export (RVC) does not need it. If you have ${languageName(heard)} subtitles, it is better to use them as the dialogue subtitles and these as the display subtitles: clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
+                  )}
+                </div>
+              )}
+          </div>
+        )}
         <div className="field">
           <label className="title">{tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>
           <input

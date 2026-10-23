@@ -273,14 +273,33 @@ kbd {
 
 .body {
   display: grid;
-  grid-template-columns: minmax(360px, 440px) 1fr;
   min-height: 0;
 }
 .stage {
-  border-right: 1px solid var(--line);
   padding: 16px;
   overflow-y: auto;
   background: var(--panel);
+}
+/* A 1px line inside a wider strip that is easier to grab. */
+.divider {
+  width: 7px;
+  margin: 0 -3px;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat;
+}
+.divider:hover,
+.dragging-divider .divider {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-size: 3px 100%;
+}
+.dragging-divider {
+  cursor: col-resize;
+  user-select: none;
+}
+.dragging-divider video {
+  pointer-events: none;
 }
 .main {
   min-height: 0;
@@ -670,6 +689,11 @@ kbd {
 .row .say.empty {
   color: var(--text-3);
   font-style: italic;
+}
+.row .spoken {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 1px;
 }
 .row .t {
   color: var(--text-3);

@@ -5,6 +5,7 @@ import { PathInput } from "../components/PathInput";
 import { RoleName } from "../components/RoleName";
 import { pct } from "../format";
 import { languageName, lines, many, SPOKEN, tr } from "../language";
+import { needsText, type Purpose } from "../purpose";
 import type { Toast } from "../toast";
 
 /* ───────────── Export ───────────── */
@@ -140,16 +141,23 @@ export function ExportView({
   state,
   setState,
   toast,
+  onPurpose,
 }: {
   state: Summary;
   setState: (s: Summary) => void;
   toast: Toast;
+  onPurpose: (purpose: Purpose) => void;
 }) {
   const trainable = state.roles.filter((r) => r.confirmed > 0);
   const [ticked, setPicked] = useState(() => new Set<string>());
   /* Only names still on the list: a character ticked here may have been renamed or merged since. */
   const picked = new Set(trainable.map((r) => r.name).filter((n) => ticked.has(n)));
-  const [form, setForm] = useState<Form>("gpt-sovits");
+  const [form, setFormState] = useState<Form>(needsText() ? "gpt-sovits" : "folder");
+  /* The format also says what the voices are for, so the labeling views show or leave out the text parts. */
+  const setForm = (next: Form) => {
+    setFormState(next);
+    onPurpose(next === "folder" ? "audio" : "tts");
+  };
   const [includeAuto, setIncludeAuto] = useState(false);
   /* Local date: toISOString gives UTC, which is still the day before in UTC+8 until 8 in the morning. */
   const [out, setOut] = useState(() => {
@@ -250,6 +258,17 @@ export function ExportView({
             </button>
           ))}
         </span>
+        <div className="note" style={{ marginTop: "6px" }}>
+          {form === "folder"
+            ? tr(
+                "只要声音，不用文字。标注时也不再显示「导不出文字」之类的提示。这个选择会记住。",
+                'Sound only, no text. While labeling, notes such as "No text to export" are left out too. This choice is remembered.',
+              )
+            : tr(
+                "要每句说的话，用这一集说的语言。标注时会标出导不出文字的句子。这个选择会记住。",
+                "Needs the words of each line, in the language spoken. While labeling, lines that cannot be exported with text are marked. This choice is remembered.",
+              )}
+        </div>
       </div>
       {form !== "folder" && (
         <div className="field">

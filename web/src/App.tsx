@@ -21,6 +21,7 @@ import {
 } from "./clips";
 import { Avatar } from "./components/Avatar";
 import { Cropper } from "./components/Cropper";
+import { Divider } from "./components/Divider";
 import { Guide, GUIDE_SEEN } from "./components/Guide";
 import { Help } from "./components/Help";
 import { LanguageButton } from "./components/LanguageButton";
@@ -28,6 +29,8 @@ import { RoleName } from "./components/RoleName";
 import { Stage } from "./components/Stage";
 import { currentLanguage, lines, many, setLanguage, tr } from "./language";
 import { CONTEXTS, SPEEDS, type Sound } from "./playback";
+import { currentPurpose, setPurpose, type Purpose } from "./purpose";
+import { fitStage, savedStageWidth } from "./stageWidth";
 import { AddDialog } from "./views/AddEpisode";
 import { ExportView } from "./views/ExportView";
 import { GroupsView, type KeyedGroup, type Picked } from "./views/GroupsView";
@@ -130,8 +133,15 @@ export function App() {
   const [playing, setPlaying] = useState(false);
   const [crop, setCrop] = useState<Crop | null>(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  const [stageWidth, setStageWidth] = useState(savedStageWidth);
   /* Only here to re-render everything when the language changes; the strings read the module's language. */
   const [language, setLanguageState] = useState(currentLanguage());
+  /* Also only here to re-render: the views read the module's purpose (see purpose.ts). */
+  const [, setPurposeState] = useState(currentPurpose());
+  const choosePurpose = (next: Purpose) => {
+    setPurpose(next);
+    setPurposeState(next);
+  };
   const dockOrder = useRef<string[]>([]);
   const playerRef = useRef<HTMLMediaElement | null>(null);
   const refAudio = useRef<HTMLAudioElement>(null);
@@ -977,7 +987,14 @@ export function App() {
         <p>{tr("正在载入…", "Loading…")}</p>
       </div>
     );
-  const addProps = { state, adding, setAdding, onOpen: openEpisode, toast: showToast };
+  const addProps = {
+    state,
+    adding,
+    setAdding,
+    onOpen: openEpisode,
+    toast: showToast,
+    onPurpose: choosePurpose,
+  };
   if (!state.episodes.length) {
     return (
       <>
@@ -1160,7 +1177,12 @@ export function App() {
         </div>
       )}
 
-      <div className="body" style={showStage ? undefined : { gridTemplateColumns: "1fr" }}>
+      <div
+        className="body"
+        style={{
+          gridTemplateColumns: showStage ? `${fitStage(stageWidth)}px auto minmax(0, 1fr)` : "1fr",
+        }}
+      >
         {showStage && (
           <Stage
             clip={current}
@@ -1183,6 +1205,7 @@ export function App() {
             dock={dock}
           />
         )}
+        {showStage && <Divider width={fitStage(stageWidth)} setWidth={setStageWidth} />}
         <main className="main">
           {view === "scene" && (
             <SceneView
@@ -1237,7 +1260,14 @@ export function App() {
               onNew={(ids) => newRole(ids)}
             />
           )}
-          {view === "export" && <ExportView state={state} setState={setState} toast={showToast} />}
+          {view === "export" && (
+            <ExportView
+              state={state}
+              setState={setState}
+              toast={showToast}
+              onPurpose={choosePurpose}
+            />
+          )}
         </main>
       </div>
 

@@ -3,6 +3,7 @@ import type { Clip, Roles } from "../api";
 import { bestTarget, chanceOf, lowTip, whoOf, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
 import { tr } from "../language";
+import { needsText } from "../purpose";
 import { Avatar } from "./Avatar";
 import { Closest, Pill } from "./Pills";
 import { RoleName } from "./RoleName";
@@ -74,7 +75,7 @@ export function Row({
               {tr("质量低", "Low quality")}
             </span>
           )}
-          {clip.role && clip.spoken_problem && !clip.unusable && (
+          {needsText() && clip.role && clip.spoken_problem && !clip.unusable && (
             <span className="pill no-text" title={clip.spoken_problem}>
               {tr("导不出文字", "No text to export")}
             </span>
@@ -105,6 +106,8 @@ export function Row({
         <div className={`say ${clip.text ? "" : "empty"}`}>
           {clip.text || tr("（没有字幕文字）", "(no subtitle text)")}
         </div>
+        {/* The text written on export, in the language spoken, when it differs from the subtitles. */}
+        {clip.spoken && clip.spoken !== clip.text && <div className="spoken">{clip.spoken}</div>}
       </div>
       <div className="t">
         {stamp(clip.start)}

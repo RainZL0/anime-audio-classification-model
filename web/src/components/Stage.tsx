@@ -3,14 +3,16 @@ import { media, mediaProblem, type Clip, type Roles } from "../api";
 import { lowTip, OTHER, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
 import { tr } from "../language";
+import { needsText } from "../purpose";
 import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
 import { RoleName } from "./RoleName";
 
 /* The text that export writes for this line, in the language spoken, when it differs from the subtitles shown
-   above. For a target character's line that cannot be exported with text, the reason. */
+   above. For a target character's line that cannot be exported with text, the reason, unless only the sound is
+   collected (see purpose.ts). */
 function SpokenLine({ clip }: { clip: Clip }) {
-  if (clip.role && clip.spoken_problem)
+  if (needsText() && clip.role && clip.spoken_problem)
     return (
       <div className="spoken-line warn">
         {tr("导出时没有文字：", "No text on export: ")}
