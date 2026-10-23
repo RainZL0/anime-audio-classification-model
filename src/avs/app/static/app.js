@@ -261,7 +261,8 @@ function Row({ clip, roles, special, selected, marked, onSelect, flash, maybeOf 
 
 /* ───────────── 场景视图 ───────────── */
 
-function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, setOnlyWork, flashes, episode }) {
+function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, setOnlyWork, showShort, setShowShort,
+  flashes, episode }) {
   const shown = new Set(order);
   const scenes = [];
   for (const clip of clips) {
@@ -276,8 +277,10 @@ function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, se
     <div class="toolbar">
       <h2>${episode}</h2>
       <span class="sub">${clips.length} 句 · 还有 ${left} 句要你看</span>
-      ${skipped > 0 && html`<span class="sub" title="短于 1 秒、前后 0.5 秒内没有别的台词，训练用不上。在「整集」里还能看到，想标也可以标">
-        · 跳过 ${skipped} 句短句</span>`}
+      ${skipped > 0 && html`<span class="sub" title="短于 1 秒、前后 0.5 秒内没有别的台词，训练用不上，默认不显示">
+        · 跳过 ${skipped} 句短句</span>
+        ${!onlyWork && html`<button class="short ${showShort ? "on" : ""}" onClick=${() => setShowShort(!showShort)}
+          title="在「整集」里显示跳过的短句，想标也可以标">${showShort ? "隐藏短句" : "显示短句"}</button>`}`}
       <span class="spacer"></span>
       <span class="seg">
         <button class=${!onlyWork ? "on" : ""} onClick=${() => setOnlyWork(false)}>整集</button>
@@ -713,6 +716,8 @@ function App() {
   const [clips, setClips] = useState([]);
   const [focus, setFocus] = useState(null);
   const [onlyWork, setOnlyWork] = useState(false);
+  /* 「整集」里是否列出默认跳过的短句（status 为 skipped）；标过的短句总是列出。 */
+  const [showShort, setShowShort] = useState(() => localStorage.getItem("avs-show-short") === "1");
   const [role, setRole] = useState(null);
   const [marks, setMarks] = useState(() => new Set());
   const [groups, setGroups] = useState([]);
@@ -749,6 +754,7 @@ function App() {
     else delete document.documentElement.dataset.theme;
     localStorage.setItem("avs-theme", theme);
   }, [theme]);
+  useEffect(() => { localStorage.setItem("avs-show-short", showShort ? "1" : "0"); }, [showShort]);
 
   const showToast = useCallback((message, isError = false, extra = null) => {
     clearTimeout(toastTimer.current);
@@ -802,7 +808,7 @@ function App() {
   /* 当前视图里「上下一句」走的顺序 */
   const order = useMemo(() => {
     if (view === "scene") {
-      if (!onlyWork) return clips.map((c) => c.id);
+      if (!onlyWork) return clips.filter((c) => showShort || c.status !== "skipped").map((c) => c.id);
       if (!stableOrder.current) stableOrder.current = clips.filter((c) => NEEDS_WORK.has(c.status)).map((c) => c.id);
       return stableOrder.current;
     }
@@ -811,7 +817,7 @@ function App() {
     }
     if (view === "groups") return groups.flatMap((g) => g.clips.filter((c) => !c.label).map((c) => c.id));
     return [];
-  }, [view, clips, onlyWork, role, groups]);
+  }, [view, clips, onlyWork, showShort, role, groups]);
   useEffect(() => { stableOrder.current = null; }, [onlyWork, episode]);
 
   const byId = useMemo(() => Object.fromEntries(clips.map((c) => [c.id, c])), [clips]);
@@ -1111,7 +1117,8 @@ function App() {
         context=${context} onContext=${nextContext} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
-          roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork} flashes=${flashes} episode=${episode} />`}
+          roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork}
+          showShort=${showShort} setShowShort=${setShowShort} flashes=${flashes} episode=${episode} />`}
         ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} special=${special} role=${role} setRole=${setRole}
           clips=${clips} focus=${focus} setFocus=${pick} marks=${marks} toggleMark=${toggleMark}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
