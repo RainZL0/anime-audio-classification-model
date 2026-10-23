@@ -434,6 +434,8 @@ class LabelBody(BaseModel):
     """角色名或特殊标签；空表示清掉标签。"""
     new_role: bool = False
     """标成一个新建的、还没起名字的角色，这时 `label` 不用给。"""
+    unusable: bool = False
+    """同时标「质量低」。只对目标角色有效；标成别的、或清掉标签时一律关掉。"""
 
 
 class ChangesBody(BaseModel):
@@ -539,7 +541,18 @@ def create_app(state: AppState) -> Any:
             raise HTTPException(400, "片段不存在")
         with state.lock:
             label = state.store.new_role() if body.new_role else body.label
-            changes = [{"clip": c, "label": label} for c in body.clips]
+            # 一次选择就定下「是谁」和「质量低」：标成干净的就把以前的「质量低」关掉。
+            changes: list[dict[str, Any]] = [{"clip": c, "label": label} for c in body.clips]
+            role = state.store.role(label) if label else None
+            # 新名字会建成目标角色，所以没在角色表里的也算。
+            unusable = (
+                body.unusable
+                and label is not None
+                and label != OTHER
+                and not is_special(label)
+                and (role is None or bool(role.get("target")))
+            )
+            changes += [{"clip": c, "unusable": unusable} for c in body.clips]
             return {"role": label, **state.change(lambda: state.store.apply(changes))}
 
     @app.post("/api/changes")

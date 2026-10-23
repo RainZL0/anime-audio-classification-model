@@ -29,12 +29,9 @@ const confidence = (clip) => clip.guess[0]?.p ?? 0;
 const OTHER = "__other__";
 /* 特殊标签（无法确认、不止一个人、不是说话）不再给键：只问是不是目标角色，拿不准、
    几个人同时说话但没有目标角色、欢呼音效这类不是说话的，都标「其他」；以前标的照样显示。 */
-/* 标成目标角色之后的第二层开关，名字照常是 TA。没标成目标角色时按钮是灰的。
-   以前还有一个「多人」，已并进「质量低」。 */
-const FLAGS = [
-  { key: "c", flag: "unusable", text: "质量低",
-    tip: "背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人，导出时跳过" },
-];
+/* 每个目标角色有两个选项：干净的 TA 和「TA·质量低」，后者按 Shift + 数字。只对目标角色有，
+   「其他」本来就不导出。以前还有一个「多人」，已并进「质量低」。 */
+const LOW_TIP = "背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人，导出时跳过";
 const chanceOf = (clip, name) => clip.guess.find((g) => g.name === name)?.p ?? 0;
 
 /* 当前片段属于谁：人标的优先，其次机器最像的那个。 */
@@ -129,7 +126,7 @@ function Pill({ clip }) {
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
 function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPlayRef, hasVideo, videoRef, onAvatar,
-  onNewRole, onFlag }) {
+  onNewRole }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   useEffect(() => { setLoading(true); }, [clip?.id, sound]);
@@ -164,8 +161,9 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
         <div class="confirmed-box">
           <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} size="lg"
             onClick=${!isSpecial && useVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
-          <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}</div>
-          <div style="font-size:12px">要改的话，直接按别的数字键或在下面选</div></div>
+          <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
+            ${roles[clip.label]?.target && clip.unusable && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
+          <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
           ${!isSpecial && useVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
             title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
         </div>`
@@ -194,10 +192,6 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
 
     <div class="specials">
       <button onClick=${() => onAssign(OTHER)} title="不是任何一个目标角色">其他 <kbd>Q</kbd></button>
-      ${FLAGS.map((f) => html`<button class=${clip[f.flag] ? "on" : ""} onClick=${() => onFlag(f.flag)}
-        disabled=${!roles[clip.label]?.target}
-        title=${roles[clip.label]?.target ? f.tip : "先标成目标角色才能选；「其他」本来就不导出"}>
-        ${clip[f.flag] ? `已标${f.text}` : f.text} <kbd>${f.key.toUpperCase()}</kbd></button>`)}
     </div>
     ${clip.rejects.length > 0 && html`<div class="note" style="margin-top:8px">你说过这句不是：${clip.rejects.join("、")}</div>`}
     <div class="hint">
@@ -227,8 +221,7 @@ function Row({ clip, roles, special, selected, marked, onSelect, flash, maybeOf 
             : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : "未知"}</span>
         <${Pill} clip=${clip} />
         ${marked && html`<span class="pill reject">不是这个角色</span>`}
-        ${roles[clip.label]?.target && FLAGS.filter((f) => clip[f.flag]).map((f) => html`
-          <span class="pill unusable" title=${f.tip}>${f.text}</span>`)}
+        ${roles[clip.label]?.target && clip.unusable && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
         ${clip.maybe && html`<span class="pill maybe" title="机器没归给这个角色，但听起来有可能是">可能漏掉 ${pct(chanceOf(clip, maybeOf))}</span>`}
       </div>
       <div class="say ${clip.text ? "" : "empty"}">${clip.text || "（没有字幕文字）"}</div>
@@ -551,10 +544,11 @@ function Palette({ roles, onPick, onNew, onClose }) {
 function Help({ onClose }) {
   const rows = [
     ["J / ↓，K / ↑", "下一句，上一句"], ["空格", "从头重播这一句"], ["Enter", "接受机器猜的第一个"],
-    ["1 – 9", "标成底部角色栏里对应的目标角色"], ["Q", "其他：不是任何一个目标角色"],
+    ["1 – 9", "标成底部角色栏里对应的目标角色"],
+    ["Shift + 1 – 9", "同一个目标角色，但质量低：背景音太重或有人同时出声。不拿来认人，导出时跳过"],
+    ["Q", "其他：不是任何一个目标角色"],
     ["N", "标成一个新的目标角色，名字以后再起；有画面时接着截头像"],
     ["/", "搜索角色，或者敲名字新建"],
-    ["C", "开关「质量低」：已标成目标角色、但背景音太重或有人同时出声。不拿来认人，导出时跳过"],
     ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"], ["Z", "撤销上一步（可以一直往回撤）"],
     ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["「可能漏掉的」里 Enter", "这句是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
@@ -857,11 +851,12 @@ function App() {
     return run;
   };
 
-  const assign = (name, ids = current ? [current.id] : []) => {
+  /* 一次选择定下是谁和质量好坏：low 为真就是「TA·质量低」，否则是干净的 TA，以前的「质量低」会关掉。 */
+  const assign = (name, ids = current ? [current.id] : [], low = false) => {
     if (!ids.length || !name) return;
     const from = focus;
-    const label = special[name] ? `已标为「${special[name]}」` : `已标为 ${name}`;
-    send("/api/label", { clips: ids, label: name }, ids.length > 1 ? `${ids.length} 句${label}` : label,
+    const label = special[name] ? `已标为「${special[name]}」` : `已标为 ${name}${low ? "·质量低，导出时跳过" : ""}`;
+    send("/api/label", { clips: ids, label: name, unusable: low }, ids.length > 1 ? `${ids.length} 句${label}` : label,
       () => setFocus(from));
     if (view === "groups") setFocus(order.find((id) => !ids.includes(id)));
     else if (ids.length === 1) advance(from);
@@ -888,15 +883,6 @@ function App() {
     } catch (e) { showToast(e.message, true); }
   };
 
-  /* 开关「质量低」：只对已经标成目标角色的句子有意义，「其他」本来就不导出。 */
-  const toggleFlag = (flag) => {
-    if (!current) return;
-    const { text } = FLAGS.find((f) => f.flag === flag);
-    if (!roles[current.label]?.target) { showToast(`先把这句标成目标角色，才能标${text}`); return; }
-    const on = !current[flag];
-    send("/api/changes", { changes: [{ clip: current.id, [flag]: on }] },
-      on ? `已标${text}，导出时跳过` : `已取消${text}`);
-  };
   /* 「可能漏掉的」里按 X：马上记下「不是这个角色」，不等一键确认。 */
   const rejectMaybe = () => {
     const from = focus;
@@ -995,9 +981,10 @@ function App() {
       }
       else if (e.key === "Enter" && e.shiftKey && view === "roles") { handled(); confirmRest(); }
       else if (e.key === "Enter") { handled(); accept(); }
-      else if (/^[1-9]$/.test(e.key)) {
-        const name = dock[Number(e.key) - 1];
-        if (name) { handled(); assign(name); }
+      else if (/^(Digit|Numpad)[1-9]$/.test(e.code)) {
+        /* 按 e.code 认数字：按住 Shift 时 e.key 是「!」「@」之类。Shift + 数字是同一个人、质量低。 */
+        const name = dock[Number(e.code.at(-1)) - 1];
+        if (name) { handled(); assign(name, undefined, e.shiftKey); }
       }
       else if (k === "q") { handled(); assign(OTHER); }
       else if (e.key === "/") { handled(); setPalette(true); }
@@ -1006,7 +993,6 @@ function App() {
       else if (k === "z") { handled(); undo(); }
       else if (k === "x" && view === "roles" && current?.maybe) { handled(); rejectMaybe(); }
       else if (k === "x" && view === "roles" && current && !current.label) { handled(); toggleMark(current.id); move(1); }
-      else if (current && FLAGS.some((f) => f.key === k)) { handled(); toggleFlag(FLAGS.find((f) => f.key === k).flag); }
       else if (e.key === "Backspace") { handled(); clear(); }
       else if (k === "r" && current?.guess.length) { handled(); playRef(current.guess[0].name); }
       else if (k === "f" && view === "scene") { handled(); setOnlyWork(!onlyWork); }
@@ -1065,8 +1051,7 @@ function App() {
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
       ${showStage && html`<${Stage} clip=${current} roles=${roles} special=${special} sound=${sound} setSound=${setSound}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
-        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()}
-        onFlag=${toggleFlag} />`}
+        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${setFocus}
           roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork} flashes=${flashes} episode=${episode} />`}
@@ -1086,7 +1071,9 @@ function App() {
       ${dock.slice(0, 9).map((name, i) => html`<div class="chip" key=${name}
           title=${`按 ${i + 1} 标成 ${name}`} onClick=${() => assign(name)}>
         <${Avatar} role=${roles[name]} name=${name} size="md" /><${RoleName} role=${roles[name]} name=${name} />
-        <span class="k">${i + 1}</span></div>`)}
+        <span class="k">${i + 1}</span>
+        <button class="low" title=${`按 Shift + ${i + 1} 标成 ${name}·质量低：${LOW_TIP}`}
+          onClick=${(e) => { e.stopPropagation(); assign(name, undefined, true); }}>质量低 <span class="k">⇧${i + 1}</span></button></div>`)}
       <div class="chip" title="不是任何一个目标角色" onClick=${() => assign(OTHER)}>
         <${Avatar} special=${true} size="md" /><span class="rn">其他</span><span class="k">Q</span></div>
       <button class="ghost" onClick=${() => current && newRole()} disabled=${!current || view === "export"}>新角色 <kbd>N</kbd></button>

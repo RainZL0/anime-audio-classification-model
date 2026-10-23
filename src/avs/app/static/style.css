@@ -204,7 +204,6 @@ kbd {
 .pill.special { color: var(--text-2); background: var(--line); }
 .pill.reject { color: var(--bad); background: var(--bad-soft); }
 .pill.unusable { color: var(--bad); background: transparent; border: 1px solid var(--bad); line-height: 16px; }
-.specials button.on { border-color: var(--bad); color: var(--bad); }
 .pill.maybe { color: var(--warn); background: transparent; border: 1px dashed var(--warn); line-height: 16px; }
 
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 4px 4px; flex-wrap: wrap; }
@@ -222,6 +221,9 @@ kbd {
 .chip:hover { border-color: var(--accent); }
 .chip .k { font: 11px var(--mono); color: var(--text-3); }
 .chip.flash { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.chip .low { padding: 1px 7px; font-size: 11px; border-radius: 99px; color: var(--bad); border-color: var(--bad-soft);
+  background: transparent; margin-left: 2px; }
+.chip .low:hover { border-color: var(--bad); }
 .dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
 .dock > button { white-space: nowrap; flex: none; }
 

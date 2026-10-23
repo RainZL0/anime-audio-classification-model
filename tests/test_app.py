@@ -329,6 +329,28 @@ def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: 
     assert none.status_code == 400 and "2 条都标了质量低" in none.json()["detail"]
 
 
+def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
+    """一层选择：「TA·质量低」一次标好；改标成干净的 TA、「其他」或清掉时，「质量低」跟着关掉。"""
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clip = state.workspace.clips[0].id
+
+    def label(name: str | None, unusable: bool = False) -> dict:
+        body = {"clips": [clip], "label": name, "unusable": unusable}
+        return client.post("/api/label", json=body).json()["updated"][0]
+
+    view = label("A", unusable=True)
+    assert view["label"] == "A" and view["unusable"] is True
+    assert label("A")["unusable"] is False
+    label("A", unusable=True)
+    assert label(OTHER, unusable=True)["unusable"] is False
+    label("A", unusable=True)
+    assert label(None)["unusable"] is False
+    client.post("/api/undo")
+    assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
+
+
 def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
     """以前单独的「多人」开关已并进「质量低」，旧记录回放、撤销都按「质量低」算。"""
     folder = tmp_path / "labels"
