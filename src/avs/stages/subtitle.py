@@ -75,11 +75,13 @@ def find_offset(
     subtitle = _mask(lines, length)
     spoken = _mask(speech, length)
 
+    # 按整格挪：报出去的偏移就是打分时挪的那么多，不会因为浮点取整差一格
     best_offset, best_score = 0.0, -1.0
-    for shift in np.arange(-SEARCH_SECONDS, SEARCH_SECONDS, STEP):
-        moved = np.roll(subtitle, int(shift / STEP))
+    reach = round(SEARCH_SECONDS / STEP)
+    for steps in range(-reach, reach):
+        moved = np.roll(subtitle, steps)
         union = float(((moved + spoken) > 0).sum())
         score = float((moved * spoken).sum()) / union if union else 0.0
         if score > best_score:
-            best_offset, best_score = float(shift), score
+            best_offset, best_score = steps * STEP, score
     return round(best_offset, 3), round(best_score, 4)
