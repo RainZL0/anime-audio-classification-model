@@ -1,6 +1,6 @@
 # Roadmap to the first release
 
-Updated: 2026-10-23, evening. This page covers the goals, the direction and the standards up to the first release. The next steps for now are in [STATUS.md](STATUS.md). The direction has been settled ([DECISIONS.md](DECISIONS.md#settled)). The labeling interface has a first version. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
+Updated: 2026-10-24. This page covers the goals, the direction and the standards up to the first release. The next steps for now are in [STATUS.md](STATUS.md). The direction has been settled ([DECISIONS.md](DECISIONS.md#settled)). The labeling interface has a first version. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
 
 ## Goal
 
@@ -36,10 +36,11 @@ The first item used to be "prove with numbers that classification is clearly bet
 
 1. **Labeling interface**: naming whole groups, two views of the same clips (Scenes and Characters), keyboard use, undo, and immediate retraining after each edit. The first version is done and is still being polished.
 2. **Export**: at least the GPT-SoVITS list format, with the dialogue text. GPT-SoVITS, Style-Bert-VITS2 and one folder per character are already supported, with the text taken from the subtitles (format in [COMPETITORS.md](COMPETITORS.md#2-dataset-format-expected-by-training)). When the subtitles used for cutting are translations, each episode can have a separate Japanese subtitle file for the text. No speech-to-text is needed.
-3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avoc add`. Windows and Linux both install the CUDA build of torch, and the CPU is used automatically when there is no graphics card. Linux and macOS have not been run in practice yet. A one-click Windows package can come after the first release.
-4. **README**: a demo GIF at the top, and one sentence saying what the tool is for. The README is English only, so the pushed repo has no Chinese README. The English version is written. The GIF is still missing. The license is settled: MIT for the code. The scope of use for the extracted material is written in the "Usage rules" section of the README. The MIT license itself allows commercial use, so the "no commercial use" rule applies to the extracted material, not to the code.
+3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avoc add`. Only Windows is supported for the first release. Linux and macOS have first support in the install setup ([TOOLS.md](TOOLS.md)) but have not been tested; the README lists them as untested, and testing them comes after the first release. A one-click Windows package can come after the first release too.
+4. **README**: a demo GIF at the top, and one sentence saying what the tool is for, laid out like popular open-source repos (centered title, badges, short feature list, then quick start). The README is English only, so the pushed repo has no Chinese README. The English version is written. The GIF is still missing. The license is settled: MIT for the code.
+5. **No pictures or videos in git.** Screenshots and GIFs for the README and docs are uploaded as attachments to one GitHub issue, and the Markdown links to their addresses there. This keeps the repo small for `git clone`. The scope of use for the extracted material is written in the "Usage rules" section of the README. The MIT license itself allows commercial use, so the "no commercial use" rule applies to the extracted material, not to the code.
 
 ## Release
 
-- First, find about 10 target users to try it and fix the problems they find. Then release on the same day on Bilibili, Zhihu, V2EX, Reddit, Hacker News and X.
+- Release in two steps. First, push the first version to `main` once the standards above are met (the repo steps are under [Repo](#repo)). No trial users are sought before this (decided 2026-10-24). Later, announce it on the same day on Bilibili, Zhihu, V2EX, Reddit, Hacker News and X.
 - In Japan, permission to use voice actors' voices is a sensitive topic. The README states the limits of use clearly. The promotion focuses on organizing and searching the lines.
