@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -293,7 +294,7 @@ def test_an_added_target_lists_old_others_that_may_be_it(tmp_path: Path) -> None
     assert state.store.labels[ids[0]] == "A"
 
 
-def test_unusable_clips_still_teach_the_model_but_are_not_exported(tmp_path: Path) -> None:
+def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: Path) -> None:
     store = LabelStore(tmp_path / "labels")
     store.apply([{"clip": "a", "unusable": True}])
     assert store.unusable == {"a"}
@@ -312,9 +313,11 @@ def test_unusable_clips_still_teach_the_model_but_are_not_exported(tmp_path: Pat
     client = TestClient(create_app(state))
     first, second = (c.id for c in state.workspace.clips[:2])
     client.post("/api/label", json={"clips": [first, second], "label": "A"})
-    marked = client.post("/api/changes", json={"changes": [{"clip": first, "unusable": True}]})
-    assert marked.json()["updated"][0]["unusable"] is True
     assert state.trained["labels"] == 2
+    marked = client.post("/api/changes", json={"changes": [{"clip": first, "unusable": True}]})
+    view = marked.json()["updated"][0]
+    assert view["unusable"] is True and view["label"] == "A"
+    assert state.trained["labels"] == 1
 
     body = {"roles": ["A"], "form": "folder"}
     part = client.post("/api/export", json={**body, "out": str(tmp_path / "part")}).json()
@@ -323,28 +326,21 @@ def test_unusable_clips_still_teach_the_model_but_are_not_exported(tmp_path: Pat
 
     client.post("/api/changes", json={"changes": [{"clip": second, "unusable": True}]})
     none = client.post("/api/export", json={**body, "out": str(tmp_path / "none")})
-    assert none.status_code == 400 and "2 条都标了质量低或多人" in none.json()["detail"]
+    assert none.status_code == 400 and "2 条都标了质量低" in none.json()["detail"]
 
 
-def test_overlap_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: Path) -> None:
-    import soundfile as sf
-
-    root = _workspace(tmp_path)
-    sf.write(root / "episodes/ep1/ep1.wav", np.zeros(44100 * 10), 44100)
-    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
-    client = TestClient(create_app(state))
-    first, second = (c.id for c in state.workspace.clips[:2])
-    client.post("/api/label", json={"clips": [first, second], "label": "A"})
-    assert state.trained["labels"] == 2
-    marked = client.post("/api/changes", json={"changes": [{"clip": first, "overlap": True}]})
-    view = marked.json()["updated"][0]
-    assert view["overlap"] is True and view["label"] == "A"
-    assert state.trained["labels"] == 1
-
-    out = tmp_path / "out"
-    result = client.post("/api/export", json={"roles": ["A"], "form": "folder", "out": str(out)})
-    assert result.json()["rejected"] == {"人标了多人": 1}
-
-    client.post("/api/undo")
-    assert state.store.overlap == set() and state.trained["labels"] == 2
-    assert LabelStore(root / "labels").overlap == set()
+def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
+    """以前单独的「多人」开关已并进「质量低」，旧记录回放、撤销都按「质量低」算。"""
+    folder = tmp_path / "labels"
+    folder.mkdir()
+    old = {
+        "batch": 1, "time": "2026-01-01T00:00:00+00:00", "source": "human", "undo_of": None,
+        "changes": [{"clip": "a", "overlap": True, "before": False, "after": True}],
+    }  # fmt: skip
+    (folder / "events.jsonl").write_text(json.dumps(old) + "\n", encoding="utf-8")
+    store = LabelStore(folder)
+    assert store.unusable == {"a"}
+    assert store.apply([{"clip": "a", "unusable": True}]) is None
+    store.undo()
+    assert store.unusable == set()
+    assert LabelStore(folder).unusable == set()

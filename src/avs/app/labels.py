@@ -53,14 +53,24 @@ UNNAMED = "角色 {}"
 OTHER = "__other__"
 """「其他」：不是当时任何一个目标角色。它是人下的判断，不算特殊标签。"""
 
-FLAGS = ("unusable", "overlap")
-"""标成目标角色之后还能打开的开关，跟名字分开记，名字照常是 TA：
+FLAGS = ("unusable",)
+"""标成目标角色之后还能打开的开关，跟名字分开记，名字照常是 TA。
 
-- `unusable`「质量低」：声音是 TA 一个人的，但背景音太重之类。照样拿来认人，导出时跳过。
-- `overlap`「多人」：TA 说话时还有别人同时出声。声纹混了几个人，不拿来认人，导出时也跳过。
-
+`unusable`「质量低」：背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人
+（既不当 TA 的例子，也不当反例：里面确实有 TA 的声音），导出时跳过。
 几个人同时说话、里面没有目标角色的，直接标「其他」，用不着开关。
 """
+
+OLD_FLAGS = {"overlap": "unusable"}
+"""改过名或合并掉的开关：以前单独有「多人」，后来并进「质量低」。回放旧记录时按新名字算。"""
+
+
+def flag_of(change: dict[str, Any]) -> str | None:
+    """这条改动动的是哪个开关，旧名字换成新名字；不是开关改动时返回 None。"""
+    for key in (*FLAGS, *OLD_FLAGS):
+        if key in change:
+            return OLD_FLAGS.get(key, key)
+    return None
 
 
 def is_special(name: str | None) -> bool:
@@ -82,7 +92,6 @@ class LabelStore:
         self.flags: dict[str, set[str]] = {flag: set() for flag in FLAGS}
         """各个开关打开的片段，见 `FLAGS`。"""
         self.unusable = self.flags["unusable"]
-        self.overlap = self.flags["overlap"]
         self.batches: list[dict[str, Any]] = []
         self.roles: list[dict[str, Any]] = []
         self._lock = threading.RLock()
@@ -148,16 +157,17 @@ class LabelStore:
                              "after": bool(change["on"])}
                         )  # fmt: skip
                     continue
-                flag = next((f for f in FLAGS if f in change), None)
+                flag = flag_of(change)
                 if flag is not None:
                     before = clip in self.flags[flag]
-                    if before != bool(change[flag]):
+                    on = next(v for k, v in change.items() if OLD_FLAGS.get(k, k) == flag)
+                    if before != bool(on):
                         effective.append(
                             {
                                 "clip": clip,
                                 flag: True,
                                 "before": before,
-                                "after": bool(change[flag]),
+                                "after": bool(on),
                             }
                         )
                     continue
@@ -205,8 +215,7 @@ class LabelStore:
                     inverse.append(
                         {"clip": change["clip"], "reject": change["reject"], "on": change["before"]}
                     )
-                elif any(f in change for f in FLAGS):
-                    flag = next(f for f in FLAGS if f in change)
+                elif (flag := flag_of(change)) is not None:
                     inverse.append({"clip": change["clip"], flag: change["before"]})
                 else:
                     back: dict[str, Any] = {"clip": change["clip"], "label": change["before"]}
@@ -294,8 +303,8 @@ class LabelStore:
                     names.add(change["reject"])
                 else:
                     names.discard(change["reject"])
-            elif any(f in change for f in FLAGS):
-                flagged = self.flags[next(f for f in FLAGS if f in change)]
+            elif (flag := flag_of(change)) is not None:
+                flagged = self.flags[flag]
                 if change["after"]:
                     flagged.add(clip)
                 else:

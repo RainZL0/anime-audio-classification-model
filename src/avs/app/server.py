@@ -29,8 +29,6 @@ MAYBE_FLOOR = 0.05
 """角色视图「可能漏掉的」只列「是 TA」的概率不低于这个数的片段。"""
 UNUSABLE = "人标了质量低"
 """导出时跳过人标了「质量低」的片段，在 rejected.tsv 里写的原因。"""
-OVERLAP = "人标了多人"
-"""导出时跳过人标了「多人」的片段，在 rejected.tsv 里写的原因。"""
 MAYBE_LIMIT = 100
 """「可能漏掉的」最多列这么多条，从最像的往下排。"""
 
@@ -51,7 +49,7 @@ class AppState:
 
     def retrain(self) -> None:
         """每个目标角色的正例是标成 TA 的片段；反例是标成别的名字的、标「其他」时 TA 已经是
-        目标的，以及人说过不是 TA 的。听不清之类的特殊标签和标了「多人」的不进训练。"""
+        目标的，以及人说过不是 TA 的。听不清之类的特殊标签和标了「质量低」的不进训练。"""
         targets = self.store.targets()
         examples: dict[str, tuple[list[int], list[int]]] = {t: ([], []) for t in targets}
         used: set[int] = set()
@@ -61,7 +59,7 @@ class AppState:
                 clip is None
                 or clip.row is None
                 or is_special(name)
-                or clip_id in self.store.overlap
+                or clip_id in self.store.unusable
             ):
                 continue
             against = self.store.against.get(clip_id, set())
@@ -125,7 +123,6 @@ class AppState:
             "label": self.store.labels.get(clip.id),
             "rejects": sorted(self.store.rejects.get(clip.id, ())),
             "unusable": clip.id in self.store.unusable,
-            "overlap": clip.id in self.store.overlap,
             "guess": [
                 {"name": n, "p": p} for n, p in zip(guess.names, guess.probabilities, strict=True)
             ]
@@ -391,15 +388,13 @@ class AppState:
                 role = top if top in assigned else None
             if role is None:
                 continue
-            if clip.id in self.store.overlap:
-                rejected.append({"role": role, "clip": clip, "reason": OVERLAP, "text": ""})
-            elif clip.id in self.store.unusable:
+            if clip.id in self.store.unusable:
                 rejected.append({"role": role, "clip": clip, "reason": UNUSABLE, "text": ""})
             else:
                 assigned[role].append(clip)
         if not any(assigned.values()):
             raise ValueError(
-                f"没有可导出的片段：{len(rejected)} 条都标了质量低或多人"
+                f"没有可导出的片段：{len(rejected)} 条都标了质量低"
                 if rejected
                 else "没有可导出的片段"
             )
