@@ -323,4 +323,28 @@ def test_unusable_clips_still_teach_the_model_but_are_not_exported(tmp_path: Pat
 
     client.post("/api/changes", json={"changes": [{"clip": second, "unusable": True}]})
     none = client.post("/api/export", json={**body, "out": str(tmp_path / "none")})
-    assert none.status_code == 400 and "2 条都标了质量低" in none.json()["detail"]
+    assert none.status_code == 400 and "2 条都标了质量低或多人" in none.json()["detail"]
+
+
+def test_overlap_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: Path) -> None:
+    import soundfile as sf
+
+    root = _workspace(tmp_path)
+    sf.write(root / "episodes/ep1/ep1.wav", np.zeros(44100 * 10), 44100)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    first, second = (c.id for c in state.workspace.clips[:2])
+    client.post("/api/label", json={"clips": [first, second], "label": "A"})
+    assert state.trained["labels"] == 2
+    marked = client.post("/api/changes", json={"changes": [{"clip": first, "overlap": True}]})
+    view = marked.json()["updated"][0]
+    assert view["overlap"] is True and view["label"] == "A"
+    assert state.trained["labels"] == 1
+
+    out = tmp_path / "out"
+    result = client.post("/api/export", json={"roles": ["A"], "form": "folder", "out": str(out)})
+    assert result.json()["rejected"] == {"人标了多人": 1}
+
+    client.post("/api/undo")
+    assert state.store.overlap == set() and state.trained["labels"] == 2
+    assert LabelStore(root / "labels").overlap == set()
