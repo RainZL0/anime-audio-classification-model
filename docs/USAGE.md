@@ -175,11 +175,4 @@ uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --a
 
 ## 检查
 
-```powershell
-uv run ruff check .
-uv run ruff format --check .
-ty check src
-uv run pytest -q
-```
-
-类型检查用 [ty](https://github.com/astral-sh/ty)，不在项目依赖里，装在本机：`uv tool install ty`。CI 里固定用 0.0.91。
+提交前跑的命令列在 [CLAUDE.md](../CLAUDE.md#检查)。类型检查用 [ty](https://github.com/astral-sh/ty)，不在项目依赖里，装在本机：`uv tool install ty`。CI 里固定用 0.0.91。
