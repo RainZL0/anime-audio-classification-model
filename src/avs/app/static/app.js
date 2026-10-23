@@ -31,6 +31,8 @@ const OTHER = "__other__";
    几个人同时说话但没有目标角色、欢呼音效这类不是说话的，都标「其他」；以前标的照样显示。 */
 /* 每个目标角色有两个选项：干净的 TA 和「TA·质量低」，后者按 Shift + 数字。只对目标角色有，
    「其他」本来就不导出。以前还有一个「多人」，已并进「质量低」。 */
+/* 视频片段比台词前后各多切的秒数，跟服务端 avs.labeling.VIDEO_PAD 一致。 */
+const VIDEO_PAD = 0.5;
 const LOW_TIP = "背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人，导出时跳过";
 const chanceOf = (clip, name) => clip.guess.find((g) => g.name === name)?.p ?? 0;
 
@@ -129,23 +131,41 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
   onNewRole }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
-  useEffect(() => { setLoading(true); }, [clip?.id, sound]);
+  const startVoice = useRef(0);
+  useEffect(() => { setLoading(true); return () => clearTimeout(startVoice.current); }, [clip?.id, sound]);
 
   if (!clip) {
     return html`<aside class="stage"><div class="screen"><div class="wait">在右边选一句台词</div></div></aside>`;
   }
-  const useVideo = hasVideo && sound === "original";
+  const vocals = hasVideo && sound === "vocals";
+  /* 只听人声时画面照放、静音，声音换成分离出的人声，跟着画面播放、暂停、跳转。视频片段比台词
+     早开始 VIDEO_PAD 秒（一集开头不够就少留），人声要等画面走到台词开始才出声。 */
+  const follow = (e) => {
+    const voice = audioRef.current;
+    if (!vocals || !voice) return;
+    clearTimeout(startVoice.current);
+    const at = e.target.currentTime - Math.min(VIDEO_PAD, clip.start);
+    voice.currentTime = Math.max(0, at);
+    if (e.target.paused) voice.pause();
+    else if (at >= 0) voice.play().catch(() => {});
+    else {
+      voice.pause();
+      startVoice.current = setTimeout(() => voice.play().catch(() => {}), -at * 1000);
+    }
+  };
   const who = whoOf(clip);
   const isSpecial = clip.label && special[clip.label];
   return html`<aside class="stage">
     <div class="screen">
-      ${useVideo
-        ? html`<video ref=${videoRef} key=${clip.id} src=${media("video", clip.id)} autoplay playsinline
-            onCanPlay=${() => setLoading(false)} onClick=${(e) => { e.target.currentTime = 0; e.target.play(); }}></video>`
-        : html`<div class="wait">${hasVideo ? "正在听分离出的人声" : "这一集没有视频，只有人声"}</div>
+      ${hasVideo
+        ? html`<video ref=${videoRef} key=${`${clip.id}-${sound}`} src=${media("video", clip.id)} autoplay playsinline muted=${vocals}
+            onCanPlay=${() => setLoading(false)} onClick=${(e) => { e.target.currentTime = 0; e.target.play(); }}
+            onPlay=${follow} onPause=${follow} onSeeked=${follow}></video>
+          ${vocals && html`<audio ref=${audioRef} key=${`v-${clip.id}`} src=${media("audio", clip.id)} preload="auto"></audio>`}`
+        : html`<div class="wait">这一集没有视频，只有人声</div>
           <audio ref=${(el) => { audioRef.current = el; if (videoRef) videoRef.current = el; }} key=${clip.id}
             src=${media("audio", clip.id)} autoplay onCanPlay=${() => setLoading(false)}></audio>`}
-      <div class="wait ${!useVideo || !loading ? "hide" : ""}"><div class="spinner"></div></div>
+      <div class="wait ${!hasVideo || !loading ? "hide" : ""}"><div class="spinner"></div></div>
     </div>
     <div class="line-text">${clip.text || html`<span style="color:var(--text-3)">（字幕里没有这句的文字）</span>`}</div>
     <div class="line-meta">
@@ -160,11 +180,11 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
       ? html`<div class="ask">已经确认</div>
         <div class="confirmed-box">
           <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} size="lg"
-            onClick=${!isSpecial && useVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
+            onClick=${!isSpecial && hasVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
           <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
             ${roles[clip.label]?.target && clip.unusable && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
-          ${!isSpecial && useVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
+          ${!isSpecial && hasVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
             title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
         </div>`
       : html`<div class="ask">${clip.guess.length ? "这是谁？机器的猜测" : clip.voiced ? "这是谁？" : "这句太短，机器听不出来，请直接选人"}</div>
@@ -543,7 +563,7 @@ function Palette({ roles, onPick, onNew, onClose }) {
 
 function Help({ onClose }) {
   const rows = [
-    ["J / ↓，K / ↑", "下一句，上一句"], ["空格", "从头重播这一句"], ["Enter", "接受机器猜的第一个"],
+    ["J / ↓，K / ↑", "下一句，上一句"], ["空格", "从头重播这一句；再点一下选中的那句也一样"], ["Enter", "接受机器猜的第一个"],
     ["1 – 9", "标成底部角色栏里对应的目标角色"],
     ["Shift + 1 – 9", "同一个目标角色，但质量低：背景音太重或有人同时出声。不拿来认人，导出时跳过"],
     ["Q", "其他：不是任何一个目标角色"],
@@ -784,7 +804,8 @@ function App() {
     const at = order.indexOf(focus);
     if (at < 0) return;
     const next = order.slice(at + 1, at + 4).map((id) => byId[id]).filter(Boolean);
-    warm(next, episodeInfo?.video && sound === "original" ? "video" : "audio");
+    if (episodeInfo?.video) warm(next, "video");
+    if (!episodeInfo?.video || sound === "vocals") warm(next, "audio");
   }, [focus, order]);
 
   const move = (step) => {
@@ -924,7 +945,7 @@ function App() {
   const hasFrame = () => !!playerRef.current?.videoWidth;
   const openCrop = (name, then = null) => {
     if (!hasFrame()) {
-      showToast(episodeInfo?.video ? "画面还没出来，或者正在只听人声" : "这一集没有视频，截不了头像", true);
+      showToast(episodeInfo?.video ? "画面还没出来" : "这一集没有视频，截不了头像", true);
       then?.();
       return;
     }
@@ -954,6 +975,13 @@ function App() {
     else onward();
   };
 
+  /* 从头重播这一句。点列表里的一句：没选中就选中（会自动播），已经选中就重播，跟空格一样。 */
+  const replay = () => {
+    const p = playerRef.current;
+    if (p) { p.currentTime = 0; p.play().catch(() => {}); }
+  };
+  const pick = (id) => (id === focus ? replay() : setFocus(id));
+
   /* 角色视图的连播：放完一句自动跳到下一句待核对的 */
   useEffect(() => {
     if (!playing || view !== "roles") return;
@@ -974,11 +1002,7 @@ function App() {
       const handled = () => e.preventDefault();
       if (k === "j" || e.key === "ArrowDown") { handled(); move(1); }
       else if (k === "k" || e.key === "ArrowUp") { handled(); move(-1); }
-      else if (e.key === " ") {
-        handled();
-        const p = playerRef.current;
-        if (p) { p.currentTime = 0; p.play().catch(() => {}); }
-      }
+      else if (e.key === " ") { handled(); replay(); }
       else if (e.key === "Enter" && e.shiftKey && view === "roles") { handled(); confirmRest(); }
       else if (e.key === "Enter") { handled(); accept(); }
       else if (/^(Digit|Numpad)[1-9]$/.test(e.code)) {
@@ -1053,12 +1077,12 @@ function App() {
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
         onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} />`}
       <main class="main">
-        ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${setFocus}
+        ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
           roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork} flashes=${flashes} episode=${episode} />`}
         ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} special=${special} role=${role} setRole=${setRole}
-          clips=${clips} focus=${focus} setFocus=${setFocus} marks=${marks} toggleMark=${toggleMark}
+          clips=${clips} focus=${focus} setFocus=${pick} marks=${marks} toggleMark=${toggleMark}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
-          onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video && sound === "original"}
+          onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
         ${view === "groups" && html`<${GroupsView} groups=${groups} loading=${groupsLoading} roles=${roles}
           focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
