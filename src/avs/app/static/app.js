@@ -224,8 +224,6 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
             ${clip.unusable && !labelText[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
           <span class="actions">
-            ${!isOther && hasVideo && html`<button class="ghost"
-              title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
             <button class="ghost" title="清掉这句的标签，回到机器的猜测"
               onClick=${onClear}>清掉标签 <kbd>Backspace</kbd></button></span>
         </div>`
@@ -380,9 +378,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
               ${other || current.target ? "" : " · 不是目标角色"}</div></div>
           <div class="role-actions">
             <button onClick=${() => setPlaying(!playing)}>${playing ? "停止连播" : "连播待核对"} <kbd>P</kbd></button>
-            ${!other && html`<button onClick=${onAvatar} disabled=${!canCrop}
-              title=${canCrop ? "从左边的画面里框出一块" : "左边放出画面后才能截"}>截取头像</button>
-            <button class=${current.named === false ? "primary" : ""} onClick=${onRename}>
+            ${!other && html`<button class=${current.named === false ? "primary" : ""} onClick=${onRename}>
               ${current.named === false ? "起名字" : "改名或合并"}</button>
             <button onClick=${onToggleTarget}
               title=${current.target ? "不再收集这个人：机器不再猜 TA，已标的留着，以后还能加回来" : "重新收集这个人：以前标「其他」的台词会列进「可能漏掉的」，要复查"}>
