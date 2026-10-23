@@ -24,6 +24,7 @@ from avoc.project import (
     validate_name,
     write_json,
 )
+from avoc.stages.captions import marked_note
 
 TOKEN_PAGE = "https://huggingface.co/pyannote/speaker-diarization-community-1"
 TOKEN_HOWTO = Words(
@@ -292,6 +293,7 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     is below `MIN_AGREEMENT`, or fewer than `MIN_MATCHED` of the clips touch a line.
     """
     from avoc.app.workspace import subtitle_lines
+    from avoc.stages.captions import marked
     from avoc.stages.text_subtitle import (
         MIN_AGREEMENT,
         MIN_MATCHED,
@@ -339,6 +341,7 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
         "text_subtitles": str(subtitles.resolve()),
         "text_subtitle_offset": offset,
         "text_subtitle_agreement": agreement,
+        "text_subtitle_marked": marked(x.text for x in lines),
     }
     write_json(directory / "episode.json", {**episode, **result})
     return {"episode": episode["name"], **result, "matched": round(matched, 4)}
@@ -427,9 +430,11 @@ def add_episode(
                 )
             )
         if subtitles.is_file():  # A missing file is reported by `prepare`.
-            from avoc.stages.subtitle import styles_note
+            from avoc.stages.subtitle import marked_dialogue, styles_note
 
             report(styles_note(subtitles, styles))
+            if found := marked_dialogue(subtitles, styles):
+                report(marked_note(found))
         report(
             say(
                 "提取音轨、分离人声、按字幕切片段（这一步最慢）",
@@ -483,6 +488,8 @@ def add_episode(
                 f"{own['matched']:.1%} of clips match dialogue",
             )
         )
+        if own.get("text_subtitle_marked"):
+            report(marked_note(own["text_subtitle_marked"]))
 
     _, rows = load_episode(out)
     return {"episode": name, "directory": str(out), "segments": len(rows), "models": models}

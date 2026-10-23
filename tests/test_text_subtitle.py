@@ -128,6 +128,7 @@ def test_export_takes_text_from_the_attached_subtitles_and_reports_the_rest(
     summary = client.post("/api/text-subtitles", json={"episode": "ep1", "path": f'"{ja}"'}).json()
     attached = summary["episodes"][0]["text_subtitles"]
     assert attached["file"] == "ja.srt" and attached["offset"] == -2.0
+    assert attached["marked"] is None  # Every mark in it is known.
     assert read_json(root / "episodes/ep1/episode.json")["text_subtitle_offset"] == -2.0
 
     out = tmp_path / "out"

@@ -603,7 +603,8 @@ function TextSubtitles({ state, setState, toast }) {
       return html`<div class="text-sub">
         <span class="ep">${e.name}</span>
         <span class="now">${t
-          ? html`${t.file} <span class="min">${tr(`偏移 ${t.offset} 秒，重合 ${pct(t.agreement)}`, `offset ${t.offset} s, ${pct(t.agreement)} overlap`)}</span>`
+          ? html`${t.file} <span class="min">${tr(`偏移 ${t.offset} 秒，重合 ${pct(t.agreement)}`, `offset ${t.offset} s, ${pct(t.agreement)} overlap`)}</span>
+            ${t.marked && html`<div class="note warn">${t.marked}</div>`}`
           : html`<span class="min">${tr("还没配", "none yet")}</span>`}</span>
         <input placeholder=${t ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file") : tr("字幕文件的路径（ASS 或 SRT）", "Path to a subtitle file (ASS or SRT)")}
           value=${paths[e.name] || ""}
@@ -723,7 +724,9 @@ function SubtitleStyles({ found, chosen, setChosen }) {
   if (!found.styles) return html`<div class="note">${tr("正在读字幕…", "Reading the subtitles…")}</div>`;
   const read = tr(`${found.format.toUpperCase()}，${found.encoding}`, `${found.format.toUpperCase()}, ${found.encoding}`);
   if (found.styles.length === 0) return html`<div class="note warn">${tr(`字幕里没有台词（${read}）`, `There are no dialogue lines in the subtitles (${read})`)}</div>`;
-  if (found.styles.length === 1) return html`<div class="note">${tr(`读到 ${found.styles[0].lines} 句台词（${read}）`, `Read ${lines(found.styles[0].lines)} of dialogue (${read})`)}</div>`;
+  /* Marks such as speaker names that the text cleaning does not know, found in the picked styles. */
+  const marked = found.marked && html`<div class="note warn">${found.marked}</div>`;
+  if (found.styles.length === 1) return html`<div class="note">${tr(`读到 ${found.styles[0].lines} 句台词（${read}）`, `Read ${lines(found.styles[0].lines)} of dialogue (${read})`)}</div>${marked}`;
   const toggle = (name) => {
     const next = new Set(chosen);
     if (next.has(name)) next.delete(name); else next.add(name);
@@ -745,6 +748,7 @@ function SubtitleStyles({ found, chosen, setChosen }) {
       `还有 ${hidden.length} 种样式，共 ${hidden.reduce((n, s) => n + s.lines, 0)} 句`,
       `${many(hidden.length, "more style")}, ${lines(hidden.reduce((n, s) => n + s.lines, 0))} in all`)}</button></div>`}
     ${chosen.size === 0 && html`<div class="note warn">${tr("至少勾一种", "Tick at least one")}</div>`}
+    ${marked}
   </div>`;
 }
 
@@ -823,7 +827,7 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
       <div class="field"><label class="title">${tr("对白字幕（ASS 或 SRT，按它切台词）", "Dialogue subtitles (ASS or SRT; lines are cut from it)")}</label>
         <input value=${subtitles} onInput=${(e) => setSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ass" />
         ${found && html`<${SubtitleStyles} key=${subtitles} found=${found} chosen=${chosen} setChosen=${setChosen} />`}</div>
-      <div class="field"><label class="title">${tr("日文台词字幕（可以不填，导出日文文字时用）", "Japanese text subtitles (optional; used for Japanese export text)")}</label>
+      <div class="field"><label class="title">${tr("台词文字字幕（可以不填。对白字幕是译文时，配一份原声语言的字幕，导出的文字从它取）", "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)")}</label>
         <input value=${textSubtitles} onInput=${(e) => setTextSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ja.srt" /></div>
       <div class="field"><label class="title">${tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>
         <input class="offset" value=${offset} onInput=${(e) => setOffset(e.target.value)} placeholder=${tr("自动测", "measure")} />

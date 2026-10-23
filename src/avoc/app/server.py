@@ -25,6 +25,7 @@ from avoc.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avoc.app.video import VIDEO_PAD, cut_video
 from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avoc.language import LANGUAGE, Words, say
+from avoc.stages.captions import marked_note, spoken
 
 STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
@@ -528,7 +529,9 @@ class AppState:
                 if rejected
                 else say("没有可导出的片段", "nothing to export")
             )
-        texts = {c.id: c.text for c in self.workspace.clips}
+        # Without text subtitles, the text of the subtitles used for cutting, with the same
+        # cleaning: names, sound notes and caption marks are not spoken.
+        texts = {c.id: spoken(c.text) for c in self.workspace.clips}
         if text_subtitles and form != "folder":
             texts, unmatched = self._retext(assigned)
             rejected += unmatched
@@ -635,6 +638,7 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
         "file": Path(meta["text_subtitles"]).name,
         "offset": meta.get("text_subtitle_offset"),
         "agreement": meta.get("text_subtitle_agreement"),
+        "marked": marked_note(found) if (found := meta.get("text_subtitle_marked")) else None,
     }
 
 
@@ -870,9 +874,10 @@ def create_app(state: AppState) -> Any:
                 raise ValueError(
                     say(f"找不到字幕文件：{path}", f"cannot find the subtitles: {path}")
                 )
-            return describe_styles(path)
+            found = describe_styles(path)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+        return {**found, "marked": marked_note(found["marked"]) if found["marked"] else None}
 
     @app.post("/api/add/stop")
     def post_add_stop() -> dict[str, Any]:

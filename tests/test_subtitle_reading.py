@@ -185,6 +185,17 @@ def test_styles_are_described_for_checking(tmp_path: Path) -> None:
     assert "  Sign: 10 lines" in result.output
 
 
+def test_marks_the_cleaning_does_not_know_are_reported(tmp_path: Path) -> None:
+    lines = spread("Default", 40, "（テイオー）ねえ") + spread("Default", 3, "〈ナレーター〉昔々")
+    path = write(tmp_path, ass(lines))
+    assert describe_styles(path)["marked"] == {
+        "lines": 3,
+        "examples": ["〈ナレーター〉昔々 0", "〈ナレーター〉昔々 1", "〈ナレーター〉昔々 2"],
+    }
+    result = CliRunner().invoke(app, ["styles", str(path)])
+    assert "3 lines still contain marks the rules do not know" in result.output
+
+
 def test_the_interface_can_ask_for_the_styles(tmp_path: Path) -> None:
     from fastapi.testclient import TestClient
 

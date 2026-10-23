@@ -11,6 +11,7 @@ import typer
 
 from avoc import pipeline
 from avoc.language import say
+from avoc.stages.captions import marked_note
 
 app = typer.Typer(
     name="avoc",
@@ -185,6 +186,8 @@ def show_styles(
         )
         for sample in style["samples"]:
             typer.echo(f"      {sample[:60]}")
+    if found["marked"]:
+        typer.echo(marked_note(found["marked"]))
 
 
 @app.command()
@@ -249,6 +252,8 @@ def set_text_subtitles(
         f"overlap with the clip subtitles {result['text_subtitle_agreement']:.0%}, "
         f"{result['matched']:.1%} of clips match a dialogue line"
     )
+    if result["text_subtitle_marked"]:
+        typer.echo(marked_note(result["text_subtitle_marked"]))
 
 
 @app.command("app")

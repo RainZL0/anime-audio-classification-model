@@ -195,12 +195,21 @@ def describe_styles(path: Path) -> dict[str, Any]:
                 "samples": [" ".join(events[i].plaintext.split()) for i in picks],
             }
         )
+    picked = pick_styles(subs)
     return {
         "format": subs.format,
         "encoding": ENCODING_NAMES.get(encoding, encoding),
         "styles": styles,
-        "picked": pick_styles(subs),
+        "picked": picked,
+        "marked": marked_dialogue(path, picked) if picked else None,
     }
+
+
+def marked_dialogue(path: Path, styles: list[str] | None = None) -> dict[str, Any] | None:
+    """The dialogue lines that would still carry marks into exported text; see captions.py."""
+    from avoc.stages.captions import marked, spoken
+
+    return marked(spoken(line["text"]) for line in load_dialogue(path, styles))
 
 
 def styles_note(path: Path, styles: list[str] | None = None) -> str:

@@ -7,17 +7,14 @@ different line breaks and times. So first measure how many seconds the separate 
 shifted to line up with the audio. Then find the dialogue for each clip, one clip at a time. A clip
 whose dialogue cannot be found in full is not exported, and the reason is recorded.
 
-Common patterns in Japanese subtitles are handled here:
-- Several lines in one subtitle entry are often two people each saying one sentence. So the entry
-  is split into lines, and its time is shared among the lines by character count.
-- A speaker tag such as (Name) at the start of a line names the speaker. It is used to spot other
-  people's lines that got mixed in, and it is removed from the text.
-- Other brackets hold sound notes, such as （歓声）, and they are removed.
+Several lines in one subtitle entry are often two people each saying one sentence. So the entry is
+split into lines, and its time is shared among the lines by character count. Speaker names, sound
+notes and other marks are removed by the rules in captions.py. A speaker name, where the subtitles
+give one, is used to spot other people's lines that got mixed in.
 """
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -60,9 +57,6 @@ OWN_TAG_SHARE = 0.5
 """For a character's clips, one name must make up at least this share of the named lines they
 touch. Only then is that name accepted as the character's name in the subtitles."""
 
-_TAG = re.compile(r"^[（(]([^）)]*)[）)]")
-_NOTE = re.compile(r"[（(][^）)]*[）)]")
-
 
 @dataclass(frozen=True)
 class TextLine:
@@ -74,23 +68,16 @@ class TextLine:
 
 
 def load_text_lines(path: Path) -> list[TextLine]:
-    """Read an ASS or SRT file, split it into lines, remove speaker tags and sound notes, and sort
-    by time. The times are the subtitle file's own."""
+    """Read an ASS or SRT file, split it into lines of spoken words, and sort by time. The times
+    are the subtitle file's own."""
+    from avoc.stages.captions import spoken_lines
     from avoc.stages.subtitle import read_subtitles
 
     lines: list[TextLine] = []
     for event in read_subtitles(path):
         if event.end <= event.start or not event.is_text:  # Comments and drawings have no lines.
             continue
-        parts = []
-        for raw in event.plaintext.split("\n"):
-            text, speaker = raw.strip(), ""
-            tag = _TAG.match(text)
-            if tag:
-                speaker, text = tag.group(1).strip(), text[tag.end() :]
-            text = _NOTE.sub("", text).strip()
-            if text:
-                parts.append((text, speaker))
+        parts = spoken_lines(event.plaintext)
         total = sum(len(text) for text, _ in parts)
         at, span = event.start / 1000.0, (event.end - event.start) / 1000.0
         for text, speaker in parts:
@@ -143,6 +130,12 @@ def own_tag(hits: Iterable[TextLine]) -> str | None:
     return name if count >= OWN_TAG_SHARE * sum(tags.values()) else None
 
 
+def same_name(a: str, b: str) -> bool:
+    """Whether two speaker names are the same person. Subtitles often give the full name once and
+    a short one after: トウカイテイオー and テイオー. テイオーたち is other people too."""
+    return a.endswith(b) or b.endswith(a)
+
+
 def match(
     lines: list[TextLine], start: float, end: float, tag: str | None = None
 ) -> tuple[str, str | None]:
@@ -155,7 +148,7 @@ def match(
     """
     hits = touching(lines, start, end)
     named = {x.speaker for x in hits if x.speaker}
-    others = [x for x in hits if x.speaker and x.speaker != tag] if tag else []
+    others = [x for x in hits if x.speaker and not same_name(x.speaker, tag)] if tag else []
     if any(_shared(x, start, end) > MIXED for x in others) or (not tag and len(named) > 1):
         return "", say("台词里有别人的话", "someone else's line is mixed in")
     hits = [x for x in hits if x not in others]
