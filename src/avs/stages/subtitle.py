@@ -1,4 +1,5 @@
-"""读取对白字幕并估计它相对音轨的偏移；片段直接采用字幕边界。"""
+"""Read a dialogue subtitle file and estimate its offset from the audio track. Clips take the
+subtitle boundaries directly."""
 
 from __future__ import annotations
 
@@ -13,10 +14,12 @@ MIN_OVERLAP_RATIO = 0.6
 
 
 def load_dialogue(path: Path) -> list[dict[str, Any]]:
-    """读一个 ASS 字幕文件，只挑出对白行，按时间排好，带上台词正文。
+    """Read one ASS subtitle file, keep only the dialogue lines, sort them by time, and include the
+    line text.
 
-    挑的规矩见 `DIALOGUE_STYLE` 和 `MAX_LINE`。另外还会扔掉两种东西：正文是空的
-    （那种整行都是排版指令），以及字幕组用来分段的 `====` 分隔行。
+    The selection rules are in `DIALOGUE_STYLE` and `MAX_LINE`. Two more kinds of line are dropped
+    as well: lines whose text is empty (those lines are only layout commands), and the `====`
+    separator lines that fansub groups (subtitle teams) use to split sections.
     """
     import pysubs2
 
@@ -38,12 +41,14 @@ def load_dialogue(path: Path) -> list[dict[str, Any]]:
 
 
 def load_lines(path: Path) -> list[tuple[float, float]]:
-    """对白行的时间，按时间排好。切段只关心时间，正文见 `load_dialogue`。"""
+    """The times of the dialogue lines, sorted by time. Clipping only needs the times. For the text,
+    see `load_dialogue`."""
     return [(line["start"], line["end"]) for line in load_dialogue(path)]
 
 
 def _mask(spans: list[tuple[float, float]], length: int) -> Any:
-    """把一串时间区间画成一条 10 毫秒一格的时间线，有东西的地方是 1。"""
+    """Draw a list of time spans as a timeline with one cell per 10 milliseconds. Cells that contain
+    something are 1."""
     import numpy as np
 
     grid = np.zeros(length, dtype=np.float64)
@@ -58,16 +63,20 @@ def _mask(spans: list[tuple[float, float]], length: int) -> Any:
 def find_offset(
     lines: list[tuple[float, float]], speech: list[tuple[float, float]], duration: float
 ) -> tuple[float, float]:
-    """字幕跟这一集的音轨差多少秒。返回（偏移, 对上之后的重合度）。
+    """How many seconds the subtitles differ from this episode's audio track. Returns (offset,
+    overlap score).
 
-    **为什么必须量而不能写死。** 字幕是给视频配的，而我们手上的音轨是另外抽出来的，两边
-    差多少取决于片源。第 1 集实测差 0.94 秒；第 5 集起换了片源版本，偏移几乎肯定不一样。
+    **Why it must be measured and not written in as a fixed number.** The subtitles were made for
+    the video, while the audio track we have was extracted separately, so the difference depends on
+    the source. In episode 1 it measured 0.94 seconds. From episode 5 on, the source version
+    changed, so the offset is almost certainly different.
 
-    量法：把「字幕在显示」和「模型认为有人说话」两条时间线错开着比，看错开多少时重合最多。
-    重合度是两条线的交集除以并集，1.0 表示完全重合。
+    How it is measured: slide the "subtitle is showing" timeline against the "model thinks someone
+    is speaking" timeline, and find the shift at which they overlap the most. The overlap score is
+    the intersection of the two lines divided by their union, so 1.0 means a perfect match.
 
-    重合度太低（低于 `MIN_OVERLAP_RATIO`）说明字幕根本不是这一集的，调用方要当错误处理，
-    别硬着头皮往下切。
+    If the overlap score is too low (below `MIN_OVERLAP_RATIO`), the subtitles do not belong to this
+    episode. The caller must treat that as an error and not push on with cutting.
     """
     import numpy as np
 
@@ -75,7 +84,8 @@ def find_offset(
     subtitle = _mask(lines, length)
     spoken = _mask(speech, length)
 
-    # 按整格挪：报出去的偏移就是打分时挪的那么多，不会因为浮点取整差一格
+    # Shift by whole cells, so the offset reported is exactly the shift used for scoring. A rounding
+    # difference of one cell cannot creep in.
     best_offset, best_score = 0.0, -1.0
     reach = round(SEARCH_SECONDS / STEP)
     for steps in range(-reach, reach):

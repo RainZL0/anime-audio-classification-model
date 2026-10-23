@@ -1,4 +1,8 @@
-"""全量片段、缓存一致、身份真值精确匹配、原采样率导出的回归测试。"""
+"""Regression tests.
+
+Covers: all clips included, cache consistency, exact matching of identity
+labels, and export at the original sample rate.
+"""
 
 from __future__ import annotations
 
@@ -56,7 +60,7 @@ def test_group_export_includes_every_clip_and_small_groups(tmp_path: Path) -> No
     assert exported["files"] == 6
     assert len(list((tmp_path / "export/_unassigned").glob("*.wav"))) == 2
     assert all(sf.info(p).samplerate == 44100 for p in (tmp_path / "export").rglob("*.wav"))
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         pipeline.export_groups(out, tmp_path / "export")
 
 
@@ -64,7 +68,7 @@ def test_grouping_and_cached_embed_do_not_load_models(tmp_path: Path, monkeypatc
     directory = episode(tmp_path, "ep1")
 
     def fail(*args: Any, **kwargs: Any) -> Any:
-        pytest.fail("缓存复用不应调用声纹模型")
+        pytest.fail("Reusing the cache should not call the voiceprint model")
 
     monkeypatch.setattr(pipeline, "embed_segments", fail)
     assert pipeline.embed(directory)["cached"]
@@ -114,7 +118,7 @@ def test_exact_annotations_and_unassigned_are_not_hidden(tmp_path: Path) -> None
     assert report["metrics"]["pair_precision"] is None
     assert evaluate(groups, [archive, archive])["metrics"]["labeled_clips"] == 2
     write_json(archive, {"source": "wrong.wav", "clips": []})
-    with pytest.raises(ValueError, match="音轨"):
+    with pytest.raises(ValueError, match="audio track"):
         evaluate(groups, [archive])
 
 
@@ -152,7 +156,7 @@ def test_prepare_uses_subtitle_boundaries_keeps_short_lines(
     monkeypatch.setattr(audio, "make_analysis_copy", lambda src, dst: dst.write_bytes(b"analysis"))
 
     def fail(*args: Any, **kwargs: Any) -> Any:
-        pytest.fail("显式偏移不应加载对齐模型")
+        pytest.fail("An explicit offset should not load the alignment model")
 
     monkeypatch.setattr(audio, "diarize", fail)
     video = tmp_path / "ep1.mp4"
@@ -173,9 +177,9 @@ def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: 
     video = tmp_path / "ep1.mp4"
     video.write_bytes(b"video")
     monkeypatch.setattr(pipeline, "video_seconds", lambda path: 999.0)
-    with pytest.raises(ValueError, match="时长对不上"):
+    with pytest.raises(ValueError, match="different durations"):
         pipeline.prepare(video, subtitles, tmp_path / "x", "new", audio=directory / "ep1.wav")
-    with pytest.raises(ValueError, match="视频不存在"):
+    with pytest.raises(ValueError, match="Video does not exist"):
         pipeline.prepare(tmp_path / "none.mp4", subtitles, tmp_path / "y", "new")
 
 
@@ -217,7 +221,7 @@ def test_add_names_the_next_episode_and_resumes_after_a_failure(
     def embed_then_fail(directory: Path, model: str, device: str) -> Any:
         if model == "anime-char" and "anime-char" not in embedded:
             embedded.append(model)
-            raise RuntimeError("显存不够")
+            raise RuntimeError("not enough GPU memory")
         embedded.append(model)
 
     monkeypatch.setattr(pipeline, "embed", embed_then_fail)
@@ -230,7 +234,7 @@ def test_add_names_the_next_episode_and_resumes_after_a_failure(
 
     other = tmp_path / "b.mp4"
     other.write_bytes(b"video")
-    with pytest.raises(ValueError, match="另一个视频"):
+    with pytest.raises(ValueError, match="another video"):
         pipeline.add_episode(workspace, other, subtitles, name="ep04", device="cpu")
 
 
@@ -238,11 +242,11 @@ def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -
     def broken(video: Path, subtitles: Path, out: Path, *args: Any) -> Any:
         out.mkdir(parents=True)
         (out / "source.flac").write_bytes(b"half")
-        raise ValueError("字幕对齐重合度太低")
+        raise ValueError("Subtitle alignment overlap is too low")
 
     monkeypatch.setattr(pipeline, "prepare", broken)
     workspace = tmp_path / "ws"
-    with pytest.raises(ValueError, match="重合度"):
+    with pytest.raises(ValueError, match="overlap is too low"):
         pipeline.add_episode(workspace, tmp_path / "a.mp4", tmp_path / "a.ass", device="cpu")
     assert not (workspace / "episodes" / "ep01").exists()
 

@@ -1,7 +1,10 @@
-"""安排身份标注：整集随机抽样，或按计划只标某个候选分组改动过的片段。
+"""Arrange identity labeling: random sampling over a whole episode, or label only the clips changed
+by a candidate grouping, according to a plan.
 
-每次提交直接原子保存到人工归档。计划只决定标哪些片段，归档里仍按时间排序，
-因为标注者是顺着画面往下找人，来回跳时间点比多标几条还慢。
+Each submission is saved straight to the human archive, atomically. The plan only decides which
+clips to label. The archive still stays sorted by time, because the labeler
+finds people by going forward along the picture, and jumping back and forth in time is slower than
+labeling a few more clips.
 """
 
 from __future__ import annotations
@@ -19,34 +22,44 @@ from typing import Any
 
 from avs.project import digest, load_episode, read_json, time_key, write_json
 
-SPECIAL = {"__unclear__": "无法确认", "__multiple__": "不止一个人", "__not_speech__": "不是说话"}
+SPECIAL = {
+    "__unclear__": "unclear",
+    "__multiple__": "more than one person",
+    "__not_speech__": "not speech",
+}
 PLAN_SCHEMA = "avs.label_plan.v1"
 VIDEO_PAD = 0.5
-"""切视频片段时前后各留几秒。只看台词那一瞬间常常看不出是谁在说，得有点前后文。"""
+"""Seconds to keep before and after each video cut. The dialogue line alone often does not show who
+is speaking, so some context is needed."""
 VIDEO_HEIGHT = 360
-"""转出来的画面高度。够看清是谁在说就行，越小切得越快、载入越快。"""
+"""Height of the exported picture. Tall enough to see who is speaking. Smaller means faster cutting
+and loading."""
 
 
 def build_plan(
     candidate: Path, baseline: Path, annotations: list[Path], out: Path
 ) -> dict[str, Any]:
-    """列出候选分组挂进多条组、而人工归档还没覆盖的短片段，按集分开、按时间排序。
+    """List short clips that the candidate grouping attaches to several groups and that the human
+    archive does not cover yet, split by episode and sorted by time.
 
-    这些片段决定候选值不值得替换默认分组：它们几乎都没有标签，而候选正是靠挂上
-    它们才把该合没合降下来。同时记下每条在两套分组里的归属是否一致，`moved` 的那些
-    是两条规则给出不同答案的片段。
+    These clips decide whether the candidate is worth replacing the default grouping. They almost
+    never have labels, and the candidate only lowers missed merges by attaching them.
+    The plan also records whether each clip is assigned the same way in both groupings. The ones
+    marked `moved` are clips where the two rules give different answers.
     """
     from avs.evaluation.identity import annotated_clip_ids
     from avs.stages.cluster import SHORT_SECONDS
 
     if out.exists():
-        raise ValueError(f"计划已存在，使用新文件名以保留上次计划：{out}")
+        raise ValueError(
+            f"The plan already exists. Use a new file name to keep the previous plan: {out}"
+        )
     candidate_data = read_json(candidate)
     baseline_data = read_json(baseline)
     rows = {r["id"]: r for r in candidate_data["assignments"]}
     baseline_groups = {r["id"]: r["speaker"] for r in baseline_data["assignments"]}
     if rows.keys() != baseline_groups.keys():
-        raise ValueError("两份分组的片段不一致，不能对照")
+        raise ValueError("The clips in the two groupings do not match, so they cannot be compared")
     covered = annotated_clip_ids(candidate_data, annotations)
     sizes = Counter(r["speaker"] for r in rows.values() if r["speaker"] is not None)
 
@@ -68,7 +81,9 @@ def build_plan(
             }
         )
     if not episodes:
-        raise ValueError("没有需要新标注的片段，候选没有改动未标注的短片段")
+        raise ValueError(
+            "No clips need new labels. The candidate does not change any unlabeled short clip"
+        )
 
     plan = {
         "schema": PLAN_SCHEMA,
@@ -85,7 +100,8 @@ def build_plan(
             }
             for episode, entries in episodes.items()
         },
-        "note": "只安排人工归档尚未覆盖的片段；标完只用这份新归档验收，不与旧标签混算。",
+        "note": "Only schedules clips that the human archive does not cover yet. "
+        "After labeling, accept using only this new archive; do not mix it with the old labels.",
     }
     write_json(out, plan)
     return plan
@@ -100,31 +116,39 @@ def build_sample(
 ) -> dict[str, Any]:
     episode, rows = load_episode(directory)
     if count < 1:
-        raise ValueError("抽样条数必须为正数")
+        raise ValueError("The number of clips to sample must be positive")
     if every and plan is not None:
-        raise ValueError("整集标和按计划标只能选一个")
+        raise ValueError("Labeling a whole episode and labeling by plan can only choose one")
     if archive.exists():
         data: dict[str, Any] = read_json(archive)
         source = str(data["source"]).replace("\\", "/").rsplit("/", 1)[-1]
         if source != Path(episode["vocals"]).name:
-            raise ValueError("已有标注不是这一集，不能覆盖")
+            raise ValueError(
+                "The existing labels are not for this episode, so they cannot be overwritten"
+            )
         times = {time_key(row) for row in rows}
         if any(time_key(c) not in times for c in data["clips"]):
-            raise ValueError("已有标注包含旧切段，换一个归档文件名以保留旧标签")
+            raise ValueError(
+                "The existing labels include old clip cuts. Use a different archive file name to "
+                "keep the old labels"
+            )
         if every:
             data = _fill_in(data, rows, archive)
         return data
     if every:
         chosen = list(rows)
-        method = "整集全部片段按时间顺序，对照画面确认身份"
+        method = "Whole episode, all clips in time order, confirm identities against the picture"
         extra: dict[str, Any] = {}
     elif plan is None:
         chosen = random.Random(0).sample(rows, min(count, len(rows)))
-        method = "全量片段随机抽样，对照画面确认身份"
+        method = "All clips, random sample, confirm identities against the picture"
         extra = {"seed": 0}
     else:
         chosen, extra = _plan_rows(plan, episode, rows)
-        method = "按计划标候选分组改动的短片段，对照画面确认身份"
+        method = (
+            "Short clips changed by the candidate grouping, "
+            "labeled by plan, confirm identities against the picture"
+        )
     data = {
         "source": episode["vocals"],
         "episode": episode["name"],
@@ -140,10 +164,12 @@ def build_sample(
 
 
 def _fill_in(data: dict[str, Any], rows: list[dict[str, Any]], archive: Path) -> dict[str, Any]:
-    """整集标时，把片段表里后来补进来的片段以空标签追加到已有归档，已标的一条不动。
+    """When labeling a whole episode, append clips that were added to the clip table later to the
+    existing archive as empty labels. Labeled clips are not touched.
 
-    片段 ID 是集名加时间范围的哈希，补片段不会改动已有片段，所以旧标签照旧有效，
-    只需要把新出现的那些排进来接着标。
+    Clip IDs are a hash of the episode name and time range, so adding clips does not change existing
+    clips. Old labels therefore stay valid, and only the newly appearing clips need to be added to
+    be labeled.
     """
     have = {time_key(clip) for clip in data["clips"]}
     fresh = [row for row in rows if time_key(row) not in have]
@@ -156,11 +182,14 @@ def _fill_in(data: dict[str, Any], rows: list[dict[str, Any]], archive: Path) ->
 
 
 def known_names(sources: list[Path]) -> list[str]:
-    """页面词表的角色名，去掉特殊标签。只是名字，不参与任何评分。
+    """Character names for the page's name list, with special labels removed. These are names only;
+    they do not take part in any scoring.
 
-    两种来源都收：人工归档（从 `clips` 的 name 取，按出现条数从多到少排），以及只有名字
-    的词表文件（`names` 列表，保持文件里的顺序）。常用角色排在前面，数字键才落在真正
-    常按的名字上；词表排在归档之后，两边都有的名字以先出现的位置为准。
+    Both sources are read: human archives (taken from the name field of `clips`, sorted from most to
+    fewest clips), and name-only list files (the `names` list, in file order).
+    Common characters come first, so the number keys land on the names you really use often. The
+    name list comes after the archives, and a name found in both keeps the position where it first
+    appears.
     """
     found: Counter[str] = Counter()
     listed: list[str] = []
@@ -178,15 +207,18 @@ def known_names(sources: list[Path]) -> list[str]:
 
 
 def stamp(start: float) -> str:
-    """分:秒，和视频进度条对得上。"""
+    """Minutes:seconds, matching the video progress bar."""
     return f"{int(start // 60):02d}:{start % 60:05.2f}"
 
 
 def reference_clips(archives: list[Path], directory: Path) -> dict[str, list[dict[str, Any]]]:
-    """每个已有角色名下的旧标签片段，供标注时回放对照。
+    """The old-label clips under each existing character name, for playing back during labeling to
+    compare.
 
-    旧归档记的音轨路径可能已经搬过位置，所以按文件名去 `runs/episodes` 下的各集里找同名
-    人声轨；找不到的那份归档就整份跳过，宁可没有参考音，也不拿别的音轨凑。
+    Old archives may record audio track paths that have since moved, so the matching vocal track is
+    found by file name in each episode under `runs/episodes`.
+    An archive with no match is skipped entirely: it is better to have no reference audio than to
+    fill the gap with a different track.
     """
     root = directory.resolve().parent
     sources: dict[str, tuple[str, str]] = {}
@@ -226,11 +258,14 @@ def reference_clips(archives: list[Path], directory: Path) -> dict[str, list[dic
 
 
 def cut_video(video: Path, start: float, end: float, out: Path) -> None:
-    """用 ffmpeg 切一小段视频，转成浏览器一定放得动的 H.264 mp4。
+    """Cut a short piece of video with ffmpeg and convert it to H.264 mp4, which browsers can always
+    play.
 
-    源片是 HEVC，浏览器对它的支持看机器看版本，不能赌；这里统一转码，顺带压到
-    `VIDEO_HEIGHT` 高。一段两三秒的画面实测不到半秒就切好，所以按需现切，不预先批量转。
-    `-ss` 放在 `-i` 前面是快速定位，不这样做每次都要从头解码。
+    The source is HEVC, and browser support for it depends on the browser version, so it cannot be
+    relied on. So this always transcodes, and also scales the picture down to `VIDEO_HEIGHT`.
+    In measurements, a 2-3 second clip is cut in under half a second, so clips are cut on demand
+    rather than all in advance.
+    `-ss` goes before `-i` for fast seeking. Without this, every cut would decode from the start.
     """
     out.parent.mkdir(parents=True, exist_ok=True)
     temporary = out.with_suffix(".part.mp4")
@@ -247,7 +282,9 @@ def cut_video(video: Path, start: float, end: float, out: Path) -> None:
         subprocess.run(command, check=True, capture_output=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         temporary.unlink(missing_ok=True)
-        raise ValueError(f"切视频失败，确认 ffmpeg 可用且视频能读：{exc}") from exc
+        raise ValueError(
+            f"Video cut failed. Check that ffmpeg is available and the video can be read: {exc}"
+        ) from exc
     temporary.replace(out)
 
 
@@ -262,14 +299,17 @@ def _plan_rows(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     data = read_json(plan)
     if data.get("schema") != PLAN_SCHEMA:
-        raise ValueError("不是标注计划文件")
+        raise ValueError("Not a labeling plan file")
     entries = data["episodes"].get(episode["name"])
     if not entries:
-        raise ValueError(f"计划里没有 {episode['name']} 需要标注的片段")
+        raise ValueError(f"The plan has no clips for {episode['name']} to label")
     by_id = {row["id"]: row for row in rows}
     missing = [e["clip_id"] for e in entries if e["clip_id"] not in by_id]
     if missing:
-        raise ValueError("计划里的片段不在当前切段中，切段变了就要重新做计划")
+        raise ValueError(
+            "The plan's clips are not in the current cuts. If the cuts change, the plan must be "
+            "made again"
+        )
     return [by_id[e["clip_id"]] for e in entries], {"plan": str(plan.resolve())}
 
 
@@ -280,7 +320,7 @@ def apply_names(data: dict[str, Any], names: Any) -> dict[str, Any]:
         or any(k not in valid for k in names)
         or any(not isinstance(v, str) or not v.strip() for v in names.values())
     ):
-        raise ValueError("提交必须是本次片段 ID 对应的非空人名")
+        raise ValueError("The submission must be non-empty names keyed by this archive's clip IDs")
     return {**data, "clips": [dict(c, name=names.get(c["clip_id"])) for c in data["clips"]]}
 
 
@@ -310,7 +350,7 @@ def run(
     clips = []
     for c in data["clips"]:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", c["clip_id"]):
-            raise ValueError("片段 ID 不能用作文件名")
+            raise ValueError("A clip ID cannot be used as a file name")
         _cut(sf, vocals, c["start"], c["end"], clip_dir / f"{c['clip_id']}.wav")
         clips.append(
             {
@@ -319,7 +359,8 @@ def run(
                 "seconds": round(c["end"] - c["start"], 2),
             }
         )
-    # 旧标签的参考音也切出来；vocals/start/end 只用于切，不必送进页面。
+    # Also cut the reference audio for the old labels. vocals/start/end are only used for cutting,
+    # so they do not need to be sent to the page.
     for entries in history.values():
         for entry in entries:
             source, start, end = entry.pop("vocals"), entry.pop("start"), entry.pop("end")
@@ -345,7 +386,8 @@ def run(
             super().__init__(*args, directory=str(clip_dir), **kwargs)
 
         def send_head(self) -> Any:
-            # 视频按需现切：只有真正翻到那一条才切，翻不到的那些一辈子不用切。
+            # The video is cut on demand: a clip is only cut once the user actually reaches it.
+            # Clips never reached are never cut.
             wanted = re.fullmatch(r"/video/([A-Za-z0-9_-]+)\.mp4", self.path)
             if wanted and video is not None:
                 target = clip_dir / "video" / f"{wanted[1]}.mp4"
@@ -369,7 +411,7 @@ def run(
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 1_000_000:
-                    raise ValueError("提交过大或为空")
+                    raise ValueError("The submission is too large or empty")
                 names = json.loads(self.rfile.read(length))
                 with saving:
                     write_json(archive, apply_names(data, names))
@@ -383,19 +425,25 @@ def run(
             pass
 
     print(
-        f"打开 http://127.0.0.1:{port}/ ，每条直接保存到 {archive}；"
-        f"页面词表里有 {len(roster)} 个已有角色名，"
-        f"{sum(len(v) for v in history.values())} 条旧标签可以回放对照"
-        + ("；画面按需从视频现切" if video else "；没给 --video，只有分离后的人声"),
+        f"Open http://127.0.0.1:{port}/ . Each label is saved straight to {archive}. "
+        f"The page's name list has {len(roster)} existing character names, "
+        f"{sum(len(v) for v in history.values())} old labels can be played back for comparison"
+        + (
+            "; pictures are cut from the video on demand"
+            if video
+            else "; no --video given, so only the separated vocals are available"
+        ),
         flush=True,
     )
-    # 多线程：按需切视频要几百毫秒，单线程会把这段时间里的保存请求一起堵住。
+    # Multi-threaded: cutting video on demand takes a few hundred milliseconds. A single thread
+    # would block the save requests that arrive during that time.
     with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server, suppress(KeyboardInterrupt):
         server.serve_forever()
 
 
 def _roster_archives(known: list[Path] | None, plan: Path | None) -> list[Path]:
-    """没指定词表来源时，用计划里记下的那几份人工归档，名字才跟旧标签对得上。"""
+    """If no name list source is given, use the human archives recorded in the plan, so the names
+    match the old labels."""
     if known:
         return known
     if plan is None:
@@ -403,5 +451,8 @@ def _roster_archives(known: list[Path] | None, plan: Path | None) -> list[Path]:
     paths = [Path(item["path"]) for item in read_json(plan).get("annotations", [])]
     missing = [p for p in paths if not p.exists()]
     if missing:
-        raise ValueError(f"计划里记的归档已不在原处，请用 --known 指定：{missing[0]}")
+        raise ValueError(
+            f"An archive recorded in the plan is no longer where it was. "
+            f"Use --known to specify it: {missing[0]}"
+        )
     return paths

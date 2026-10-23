@@ -33,10 +33,10 @@ def test_compare_matches_clip_ids_despite_different_cache_order(tmp_path: Path) 
         {"model": m, "method": "average", "threshold": 0.5} for m in models
     ]
     assert all(r["labeled_clips"] == 2 for r in report["results"])
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         compare([directory], [annotation], models, [0.5], out)
 
     np.save(second / "vectors.npy", np.load(first / "vectors.npy")[:1])
     write_json(second / "metadata.json", records[:1])
-    with pytest.raises(ValueError, match="覆盖的片段不同"):
+    with pytest.raises(ValueError, match="cover different clips"):
         compare([directory], [annotation], models, [0.5], tmp_path / "bad.json")

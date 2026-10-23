@@ -1,13 +1,17 @@
-"""按分好的组导出成品 wav，一组一个目录。
+"""Export the sorted groups as finished wav files, one folder per group.
 
-**这一步有一个绝对不能犯的错**：切片必须回到**原始采样率的人声轨**上去切，不能拿 16 kHz
-的分析副本。音色模型大多在 40 到 48 kHz 上训练，拿 16 kHz 升采样回去当成品，高频信息已经
-永久丢了，补不回来。麻烦的是这种损坏**听着不明显、程序也不报错**，可能训完一个音色模型才
-发现效果不对还查不出原因。所以这里会**主动检查采样率**，低于 32 kHz 直接报错不导。
+**This step has one mistake that must never be made.** Clips must be cut from the
+**original-sample-rate vocal track**, not from the 16 kHz analysis copy. Most voice models are
+trained at 40 to 48 kHz. If a 16 kHz file is upsampled and used as the finished output, the
+high-frequency information is permanently lost and cannot be recovered. The trouble is that this
+damage **is not obvious to the ear, and the program reports no error**. You could train a voice
+model and only find out much later that the results are wrong, with no clear cause. So this step
+**checks the sample rate** and refuses to export anything below 32 kHz.
 
-**响度统一，但不能压到破音。** 用的是广播那套 ITU-R BS.1770 的响度算法（`pyloudnorm`），
-不是简单的音量平均 —— 后者会让安静的耳语和大喊听起来差很多。调完之后如果峰值要溢出，就
-整体压回去，宁可这一条响度差一点，也不要削顶。
+**Loudness is unified, but without clipping.** It uses the broadcast loudness algorithm ITU-R
+BS.1770 (through `pyloudnorm`), not a simple average volume, because a plain average makes a whisper
+and a shout sound very different. After adjustment, if the peak would overflow, the whole clip is
+scaled back down. It is better for one clip to be slightly off in loudness than to be clipped.
 """
 
 from __future__ import annotations
@@ -17,21 +21,25 @@ from pathlib import Path
 from typing import Any
 
 TARGET_LUFS = -23.0
-"""统一到这个响度，单位 LUFS。-23 是广播标准，留了充足的余量不至于破音。"""
+"""Loudness to normalize to, in LUFS (a standard loudness unit). -23 is the broadcast standard, and
+it leaves enough room to avoid clipping."""
 
 PEAK_CEILING = -1.0
-"""调完响度之后峰值不许超过这个值，单位 dBFS。超了就整体压回去。"""
+"""The peak must not exceed this after the loudness adjustment, in dBFS (decibels relative to full
+scale). If it does, the whole clip is scaled back down."""
 
 MIN_SAMPLE_RATE = 32_000
-"""人声轨低于这个采样率就拒绝导出，见模块开头那段。"""
+"""Vocal tracks below this sample rate are refused for export. See the note at the top of this
+module."""
 
 MIN_LOUDNESS_SECONDS = 0.4
-"""短于这个长度算不出可靠的响度，那一条就不调响度，原样导出。单位秒。"""
+"""Clips shorter than this cannot be measured reliably, so their loudness is left alone and they are
+exported unchanged. In seconds."""
 
 
 @dataclass(frozen=True)
 class Written:
-    """导出的一条成品。"""
+    """One exported file."""
 
     name: str
     path: Path
@@ -47,7 +55,8 @@ class Written:
 
 
 def _normalize(mono: Any, sample_rate: int) -> tuple[Any, float | None, float]:
-    """把一段音频调到目标响度，峰值溢出就压回去。返回（音频, 原来的响度, 加了多少分贝）。"""
+    """Adjust a piece of audio to the target loudness, and scale it back down if the peak overflows.
+    Returns (audio, original loudness, gain added in dB)."""
     import numpy as np
     import pyloudnorm
 
@@ -75,23 +84,26 @@ def export(
     vocals: dict[str, Path],
     out_dir: Path,
 ) -> list[Written]:
-    """把分好的组切出来写成 wav。`vocals` 是「集名 -> 那一集的原始采样率人声轨」。
+    """Cut the clips of each assigned group and write them as wav files. `vocals` maps "episode name
+    -> that episode's original-sample-rate vocal track".
 
-    一组一个目录，文件名带集数和时间点，这样出问题能一眼回溯到源头。
+    One folder per group. File names include the episode and the time points, so any problem can be
+    traced back to its source at a glance.
     """
     import numpy as np
     import soundfile as sf
 
     if not any(assigned.values()):
-        raise ValueError("没有可导出的片段")
+        raise ValueError("There are no clips to export")
     infos = {}
     for episode, path in vocals.items():
         infos[episode] = sf.info(str(path))
         rate = infos[episode].samplerate
         if rate < MIN_SAMPLE_RATE:
             raise ValueError(
-                f"{episode} 的人声轨是 {rate} Hz，低于 {MIN_SAMPLE_RATE} Hz。"
-                "成品必须从原始采样率的音轨上切，不能用 16 kHz 的分析副本"
+                f"{episode} vocal track is {rate} Hz, below {MIN_SAMPLE_RATE} Hz. "
+                "Finished files must be cut from the original sample rate track, not from the 16 "
+                "kHz analysis copy"
             )
 
     for clips in assigned.values():
@@ -102,7 +114,7 @@ def export(
                 and np.isfinite(clip.end)
                 and 0 <= clip.start < clip.end <= info.duration + 1 / info.samplerate
             ):
-                raise ValueError("片段超出人声轨时间范围")
+                raise ValueError("A clip is outside the time range of its vocal track")
 
     written: list[Written] = []
     for name, clips in assigned.items():
@@ -137,10 +149,11 @@ def export(
 
 
 def write_manifest(written: list[Written], out_dir: Path) -> Path:
-    """写一张表，记录每条成品是从哪来的。
+    """Write a table recording where each exported file came from.
 
-    出了问题能顺着它查回去 —— 哪一集、第几秒、响度调了多少。用 parquet 是因为它自带列
-    的类型，不像 csv 那样什么都变成字符串。
+    If something goes wrong, it can be traced back: which episode, which second, and how much the
+    loudness was adjusted. Parquet is used because it stores the column types itself, unlike csv,
+    which turns everything into strings.
     """
     import pandas as pd
 
@@ -165,7 +178,7 @@ def write_manifest(written: list[Written], out_dir: Path) -> Path:
 
 
 def summarize(written: list[Written]) -> dict[str, Any]:
-    """导出来多少东西，按组分。"""
+    """How much was exported, per group."""
     from collections import defaultdict
 
     per: dict[str, list[float]] = defaultdict(list)

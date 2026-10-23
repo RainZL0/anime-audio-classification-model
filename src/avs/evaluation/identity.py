@@ -1,4 +1,5 @@
-"""只评价说话人身份：精确时间匹配、错误合并、该合没合和每角色散成很多小组数。"""
+"""Evaluate speaker identity only: exact time matching, wrong merges, missed merges, and how many
+small groups each character is split into."""
 
 from __future__ import annotations
 
@@ -10,15 +11,17 @@ from avs.project import read_json, time_key
 
 
 def pair_counts(truth: list[str], predicted: list[Any]) -> tuple[int, int, int]:
-    """数出连上、错误合并、该合没合三个配对数。
+    """Count three totals of clip pairs: correctly linked same-person pairs, wrong merges, and
+    missed merges.
 
-    按人工名字乘机器组号的计数表算，不逐对循环：扫分界线时同一批标签要数上千遍，
-    逐对循环慢到不能用，而两种算法的结果完全一样。
+    Computed from a table that counts each (human name, machine group number) combination, not by
+    looping over every pair. During the threshold scan the same labels are counted thousands of
+    times, and a pair-by-pair loop is too slow to use. The two methods give exactly the same result.
     """
     import numpy as np
 
     if len(truth) != len(predicted):
-        raise ValueError("人工标签和预测长度不同")
+        raise ValueError("Human labels and predictions have different lengths")
     _, names = np.unique(np.asarray(truth, dtype=str), return_inverse=True)
     _, groups = np.unique(np.asarray(predicted, dtype=str), return_inverse=True)
     table = np.zeros((names.max(initial=-1) + 1, groups.max(initial=-1) + 1), dtype=np.int64)
@@ -32,7 +35,8 @@ def pair_counts(truth: list[str], predicted: list[Any]) -> tuple[int, int, int]:
 
 
 def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
-    """同时报错误合并与该合没合，防止把每条独立成组伪装成完美识别。"""
+    """Report wrong merges and missed merges together, so that putting every clip in its own group
+    cannot pass as perfect recognition."""
     from sklearn.metrics import adjusted_rand_score
 
     hits, false_merges, missed_links = pair_counts(truth, predicted)
@@ -56,20 +60,25 @@ def identity_metrics(truth: list[str], predicted: list[int]) -> dict[str, Any]:
 
 
 def episode_by_source(data: dict[str, Any]) -> dict[str, str]:
-    """人声文件名到集名的映射；人工归档只记了音轨文件，靠它找回是哪一集。"""
+    """Map a vocals file name to its episode name. The human archive only records the audio track
+    file, so this mapping is how the episode is recovered from it."""
     if data.get("schema") != "avs.groups.v1":
-        raise ValueError("不是当前分组文件")
+        raise ValueError("Not a current grouping file")
     sources: dict[str, str] = {}
     for episode, info in data["episodes"].items():
         key = str(info["vocals"]).replace("\\", "/").rsplit("/", 1)[-1]
         if key in sources:
-            raise ValueError("不同集使用同名人声文件，无法安全匹配旧标注")
+            raise ValueError(
+                "Different episodes use vocals files with the same name, "
+                "so old labels cannot be matched safely"
+            )
         sources[key] = episode
     return sources
 
 
 def annotated_clip_ids(data: dict[str, Any], annotations: list[Path]) -> set[str]:
-    """人工归档里已经出现过的片段，含特殊标签和留空的。用于不重复安排标注。"""
+    """Clips that already appear in the human archive, including special labels and blank ones. Used
+    so that labeling is not scheduled twice."""
     sources = episode_by_source(data)
     by_time = {(r["episode"], time_key(r)): r["id"] for r in data["assignments"]}
     covered: set[str] = set()
@@ -77,7 +86,7 @@ def annotated_clip_ids(data: dict[str, Any], annotations: list[Path]) -> set[str
         annotation = read_json(path)
         source = str(annotation["source"]).replace("\\", "/").rsplit("/", 1)[-1]
         if source not in sources:
-            raise ValueError(f"{path} 的音轨不在此次分组中")
+            raise ValueError(f"{path} has an audio track that is not in this grouping")
         for clip in annotation["clips"]:
             clip_id = by_time.get((sources[source], time_key(clip)))
             if clip_id is not None:
@@ -88,7 +97,8 @@ def annotated_clip_ids(data: dict[str, Any], annotations: list[Path]) -> set[str
 def match_annotations(
     data: dict[str, Any], annotations: list[Path]
 ) -> tuple[dict[str, str], int, int]:
-    """只返回精确匹配的人工身份；供评估和参考样本划分共用。"""
+    """Return only exactly matched human identities. Shared by evaluation and reference-sample
+    splitting."""
     sources = episode_by_source(data)
     by_time = {(r["episode"], time_key(r)): r for r in data["assignments"]}
     matched: dict[str, str] = {}
@@ -97,7 +107,7 @@ def match_annotations(
         annotation = read_json(path)
         source = str(annotation["source"]).replace("\\", "/").rsplit("/", 1)[-1]
         if source not in sources:
-            raise ValueError(f"{path} 的音轨不在此次分组中")
+            raise ValueError(f"{path} has an audio track that is not in this grouping")
         for clip in annotation["clips"]:
             name = clip.get("name")
             if not name:
@@ -110,7 +120,7 @@ def match_annotations(
                 unmatched += 1
                 continue
             if row["id"] in matched and matched[row["id"]] != name:
-                raise ValueError("同一片段有冲突的人工身份标签")
+                raise ValueError("The same clip has conflicting human identity labels")
             matched[row["id"]] = name
     return matched, unmatched, special
 
@@ -118,7 +128,8 @@ def match_annotations(
 def evaluate(
     groups_file: Path, annotations: list[Path], exclude_ids: set[str] | None = None
 ) -> dict[str, Any]:
-    """精确对照身份；参考片段自动排除，额外排除用于公平的基线对照。"""
+    """Exact comparison against identities. Reference clips are excluded automatically, plus any
+    extra ids excluded for a fair baseline comparison."""
     data = read_json(groups_file)
     matched, unmatched, special = match_annotations(data, annotations)
     excluded = set(data.get("support", {}).get("clip_ids", [])) | (exclude_ids or set())
@@ -157,5 +168,6 @@ def evaluate(
             }
             for name in sorted(set(truth))
         },
-        "note": "只评价已标注且时间精确对应的片段；同批调参结果不是独立验证。",
+        "note": "Only clips that are labeled and whose times match exactly are evaluated. "
+        "Results tuned on the same batch are not an independent check.",
     }

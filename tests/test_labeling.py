@@ -1,4 +1,8 @@
-"""标注计划：只安排候选改动过、且人工归档还没覆盖的短片段。"""
+"""Labeling plan.
+
+Schedules only the short clips that the candidate changed and that no human
+archive covers yet.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +20,8 @@ from avs.labeling import (
 )
 from avs.project import read_json, segment_rows, write_json
 
-# 0.5 秒的算短片段，2 秒的算长片段；分界取自 avs.stages.cluster.SHORT_SECONDS。
+# Clips of 0.5 seconds count as short, and 2 seconds count as long.
+# The threshold comes from avs.stages.cluster.SHORT_SECONDS.
 SPANS = [
     {"start": 0, "end": 2},
     {"start": 3, "end": 3.5},
@@ -67,14 +72,15 @@ def test_plan_takes_only_short_clips_the_candidate_attached_and_not_yet_labelled
     directory, rows = make_episode(tmp_path, "ep1")
     candidate = tmp_path / "candidate.json"
     baseline = tmp_path / "baseline.json"
-    # 候选把 3 条短片段挂进 speaker_001，第 5 条留在只有自己的组里。
+    # The candidate attaches 3 short clips to speaker_001; clip 5 stays in its own group.
     make_groups(
         candidate,
         directory,
         rows,
         ["speaker_001", "speaker_001", "speaker_001", "speaker_001", "speaker_002"],
     )
-    # 基线只认下第 2 条；第 3、4 条在两套分组里归属不同。
+    # The baseline accepts only clip 2. Clips 3 and 4 belong to different
+    # groups under the two groupings.
     make_groups(
         baseline,
         directory,
@@ -89,7 +95,7 @@ def test_plan_takes_only_short_clips_the_candidate_attached_and_not_yet_labelled
 
     plan = build_plan(candidate, baseline, [annotation], tmp_path / "plan.json")
     entries = plan["episodes"]["ep1"]
-    # 长片段（第 1 条）、已标过的（第 2 条）、独自成组的（第 5 条）都不该出现。
+    # Long clip (1), already labeled clip (2), and clip alone in its group (5) must not appear.
     assert [e["clip_id"] for e in entries] == [rows[2]["id"], rows[3]["id"]]
     assert [e["reason"] for e in entries] == ["moved", "moved"]
     assert plan["summary"]["ep1"] == {"clips": 2, "moved": 2, "seconds": 1.0}
@@ -107,7 +113,7 @@ def test_plan_marks_clips_both_rules_agree_on_and_refuses_to_overwrite(tmp_path:
 
     plan = build_plan(candidate, baseline, [], out)
     assert [e["reason"] for e in plan["episodes"]["ep1"]] == ["kept"] * 4
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         build_plan(candidate, baseline, [], out)
 
 
@@ -117,7 +123,7 @@ def test_plan_refuses_two_groupings_over_different_clips(tmp_path: Path) -> None
     baseline = tmp_path / "baseline.json"
     make_groups(candidate, directory, rows, ["speaker_001"] * 5)
     make_groups(baseline, directory, rows[:4], ["speaker_001"] * 4)
-    with pytest.raises(ValueError, match="片段不一致"):
+    with pytest.raises(ValueError, match="do not match"):
         build_plan(candidate, baseline, [], tmp_path / "plan.json")
 
 
@@ -136,7 +142,8 @@ def test_sample_from_plan_takes_exactly_the_planned_clips_in_time_order(tmp_path
     assert all(c["name"] is None for c in data["clips"])
     assert data["plan"] == str(out.resolve())
     assert "seed" not in data
-    # 归档已存在就原样返回，计划不会再覆盖已经标过的名字。
+    # If the archive already exists, it is returned as it is. The plan does not
+    # overwrite names that were already labeled.
     write_json(archive, {**data, "clips": [dict(c, name="A") for c in data["clips"]]})
     assert [c["name"] for c in build_sample(directory, archive, 1, out)["clips"]] == ["A"] * 4
 
@@ -151,7 +158,7 @@ def test_sample_refuses_a_plan_made_for_other_segments(tmp_path: Path) -> None:
     out = tmp_path / "plan.json"
     build_plan(candidate, baseline, [], out)
 
-    with pytest.raises(ValueError, match="计划里没有 ep1"):
+    with pytest.raises(ValueError, match="The plan has no clips for ep1"):
         build_sample(directory, tmp_path / "ep1-short.json", 1, out)
 
 
@@ -182,7 +189,7 @@ def test_roster_falls_back_to_the_archives_the_plan_recorded(tmp_path: Path) -> 
     assert _roster_archives(None, None) == []
 
     annotation.unlink()
-    with pytest.raises(ValueError, match="已不在原处"):
+    with pytest.raises(ValueError, match="no longer where it was"):
         _roster_archives(None, out)
 
 
@@ -193,7 +200,8 @@ def test_reference_clips_group_old_labels_by_name_and_find_moved_audio(tmp_path:
     _, second_rows = make_episode(root, "ep2")
     old = tmp_path / "ep1-old.json"
     other = tmp_path / "ep2-old.json"
-    # 旧归档记的是搬走以前的路径，只有文件名还对得上。
+    # The old archive records the path from before the files were moved.
+    # Only the file name still matches.
     write_json(
         old,
         {
@@ -234,7 +242,7 @@ def test_all_clips_sample_takes_the_whole_episode_in_time_order(tmp_path: Path) 
     data = build_sample(directory, tmp_path / "ep1-full.json", count=2, every=True)
     assert [c["clip_id"] for c in data["clips"]] == [row["id"] for row in rows]
     assert "seed" not in data and "plan" not in data
-    with pytest.raises(ValueError, match="只能选一个"):
+    with pytest.raises(ValueError, match="can only choose one"):
         build_sample(directory, tmp_path / "clash.json", 2, tmp_path / "plan.json", every=True)
 
 
@@ -243,7 +251,8 @@ def test_known_names_also_reads_a_plain_name_list(tmp_path: Path) -> None:
     roster = tmp_path / "names.json"
     write_json(archive, {"source": "a.wav", "clips": [{"name": "teo"}, {"name": "teo"}]})
     write_json(roster, {"names": ["皇帝", "teo", "__unclear__"]})
-    # 归档里的名字按条数在前，词表补上没标过的，重复的不再出现一次。
+    # Names from the archive come first, ordered by clip count. The name list
+    # fills in names not yet labeled, and duplicates appear only once.
     assert known_names([archive, roster]) == ["teo", "皇帝"]
     assert known_names([roster]) == ["皇帝", "teo"]
 
@@ -263,7 +272,7 @@ def test_all_clips_archive_picks_up_segments_added_later(tmp_path: Path) -> None
     data = build_sample(directory, archive, count=1, every=True)
     write_json(archive, {**data, "clips": [dict(c, name="A") for c in data["clips"]]})
 
-    # 片段表后来补进两条，已有片段一条没动。
+    # Two clips were added to the clip table later; none of the existing clips changed.
     extra = [*SPANS, {"start": 7.0, "end": 7.4}, {"start": 8.0, "end": 8.6}]
     write_json(directory / "segments.json", segment_rows("ep1", extra))
     grown = build_sample(directory, archive, count=1, every=True)
@@ -272,5 +281,5 @@ def test_all_clips_archive_picks_up_segments_added_later(tmp_path: Path) -> None
     assert [c["name"] for c in grown["clips"]] == ["A"] * len(SPANS) + [None, None]
     assert [c["start"] for c in grown["clips"]] == sorted(c["start"] for c in grown["clips"])
     assert read_json(archive) == grown
-    # 不是整集标的时候不动已有归档。
+    # When labeling is not for the whole episode, the existing archive is left alone.
     assert build_sample(directory, archive, count=1) == grown

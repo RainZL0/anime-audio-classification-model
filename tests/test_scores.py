@@ -1,4 +1,7 @@
-"""分数归一化与分离度：归一化改的是不同片段之间还能不能用同一个阈值。"""
+"""Score normalisation and separation.
+
+Normalisation changes whether one threshold can still be used across different clips.
+"""
 
 from __future__ import annotations
 
@@ -48,11 +51,14 @@ def make_episode(root: Path, name: str, vectors: np.ndarray) -> Path:
 
 
 def test_normalisation_pulls_down_a_clip_that_is_close_to_everything() -> None:
-    """归一化要治的就是这种情形：一条片段跟谁都有点像，它的高分不说明什么。
+    """Normalisation exists for this case: a clip that looks a bit like everything
+    gives a high score that means nothing.
 
-    0 号坐在一堆片段中间，1 号离它 10 度；2 与 3 是远处独立的一对，相隔 12 度。
-    原始余弦下 0-1 分更高，但那只是因为 0 号本来就跟谁都像；按各自的干扰分布归一化后，
-    2-3 才是真正突出的一对。
+    Clip 0 sits in the middle of a crowd of clips, and clip 1 is 10 degrees away
+    from it. Clips 2 and 3 are a separate pair far away, 12 degrees apart.
+    With raw cosine similarity, the 0-1 score is higher, but only because clip 0
+    is similar to everything. After normalising each clip by its own distribution
+    of other scores, 2-3 is the pair that really stands out.
     """
     angle = np.deg2rad
     vectors = unit(
@@ -75,9 +81,9 @@ def test_normalisation_pulls_down_a_clip_that_is_close_to_everything() -> None:
 
 def test_normalisation_rejects_unknown_method_and_passes_tiny_pools() -> None:
     vectors = unit([[1.0, 0.0], [0.0, 1.0]])
-    with pytest.raises(ValueError, match="归一化只能是"):
+    with pytest.raises(ValueError, match="Normalization must be one of"):
         normalized_similarity(vectors, "zzz")
-    # 少于三条时没有干扰集可用，原样返回余弦。
+    # With fewer than three clips there is no distractor set to use, so the raw cosine is returned.
     assert np.allclose(normalized_similarity(vectors, "snorm"), vectors @ vectors.T)
 
 
@@ -89,7 +95,7 @@ def test_separation_reads_higher_is_more_alike() -> None:
     assert own["eer"] == 0.0
     assert own["same_pairs"] == 3
     assert separation(np.array([]), other)["auc"] is None
-    # 完全重叠时 AUC 应当掉到 0.5 附近。
+    # When the two sets fully overlap, the AUC should drop to about 0.5.
     assert 0.4 <= separation(same, same)["auc"] <= 0.6
 
 
@@ -125,7 +131,7 @@ def test_compare_norms_reports_each_method_and_keeps_the_old_report(tmp_path: Pa
     assert report["results"][0]["overall"]["same_pairs"] == 2
     assert read_json(out) == report
 
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         compare_norms([directory], [annotation], ["redimnet2-b6"], out)
-    with pytest.raises(ValueError, match="归一化只能是"):
+    with pytest.raises(ValueError, match="Normalization must be one of"):
         compare_norms([directory], [annotation], ["redimnet2-b6"], tmp_path / "x.json", ["nope"])

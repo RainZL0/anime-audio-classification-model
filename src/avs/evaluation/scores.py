@@ -1,15 +1,20 @@
-"""分数归一化值不值得接进分组：先只看同一角色和不同角色的配对分不分得开。
+"""Check whether normalized similarity scores are worth plugging into grouping: first look only at
+whether the pair scores of the same character and of different characters can be told apart.
 
-分组规则只决定「哪些分数算连上」，改不了分数本身。所以先在人工标签的配对上量两件事，
-分不开就没必要往聚类里接：
+Grouping rules only decide which scores count as "linked". They cannot change the scores
+themselves. So first measure two things on the pairs from human labels. If the two groups cannot
+be separated, there is no point in plugging the scores into clustering:
 
-- **排序正确率**（`auc`）：随机拿一对同角色片段和一对不同角色片段，同角色那对分数更高的比例。
-  完全随机是 0.50。
-- **相等错误率**（`eer`）：把分界线挪到「同角色被错误分开」和「不同角色被错误合并」这两种
-  错误一样多的位置，那时候的错误率。
+- **Ranking accuracy** (`auc`): take a random pair of clips from the same character and a random
+  pair from different characters, and count how often the same-character pair gets the higher
+  score. Pure chance gives 0.50.
+- **Equal error rate** (`eer`): move the threshold to the spot where "same character wrongly split
+  apart" and "different characters wrongly merged" happen equally often. The error rate at that
+  spot is the number reported.
 
-按片段时长和是否跨集分层，因为有些手段只在某一档上起作用，总体数字持平也可能在短片段上
-有改善。
+Results are split by clip duration and by whether the pair crosses episodes, because some tricks
+only help in one range. An overall figure that looks flat can still hide an improvement on short
+clips.
 """
 
 from __future__ import annotations
@@ -21,8 +26,9 @@ from typing import Any
 from avs.project import write_json
 
 DURATION_BINS = ((0.0, 0.5), (0.5, 1.0), (1.0, 1.5), (1.5, 3.0), (3.0, 6.0))
-"""短的一端分得细：所有已知的劣势都集中在那里，1 秒上下差多少直接决定要不要把
-1 秒以下的片段收进来。长的一端反正差别不大，不必细分。"""
+"""The short end is split finely, because all the known weak spots are concentrated there, and
+whether to include clips under 1 second depends directly on how much the difference is around 1
+second. The long end does not differ much anyway, so it does not need a fine split."""
 
 
 def duration_bin(seconds: float) -> str:
@@ -33,7 +39,8 @@ def duration_bin(seconds: float) -> str:
 
 
 def separation(same: Any, other: Any) -> dict[str, Any]:
-    """同角色与不同角色的分数分得开不开。分数越大表示越像。"""
+    """Whether the scores of same-character and different-character pairs can be told apart. A
+    higher score means more alike."""
     import numpy as np
     from sklearn.metrics import roc_auc_score
 
@@ -42,7 +49,8 @@ def separation(same: Any, other: Any) -> dict[str, Any]:
     labels = np.concatenate([np.ones(len(same)), np.zeros(len(other))])
     scores = np.concatenate([same, other])
     auc = float(roc_auc_score(labels, scores))
-    # 相等错误率：扫过所有候选分界，取两种错误率最接近的那一点。
+    # Equal error rate: scan all candidate thresholds and take the point where the two error rates
+    # are closest.
     grid = np.quantile(scores, np.linspace(0, 1, 401))
     miss = np.array([float((same < cut).mean()) for cut in grid])
     false = np.array([float((other >= cut).mean()) for cut in grid])
@@ -65,7 +73,8 @@ def compare_norms(
     methods: list[str] | None = None,
     window: float = 0.0,
 ) -> dict[str, Any]:
-    """在人工标签的配对上，对照原始余弦与各种归一化的分离度。"""
+    """On the pairs from human labels, compare the separation of raw cosine similarity against each
+    normalization."""
     import numpy as np
 
     from avs.evaluation.diagnose import load_pool
@@ -73,10 +82,12 @@ def compare_norms(
     from avs.stages.normalize import NORMS, normalized_similarity
 
     if out.exists():
-        raise ValueError(f"报告已存在，换个文件名以保留上次结果：{out}")
+        raise ValueError(
+            f"Report already exists. Use another file name to keep the previous result: {out}"
+        )
     chosen = list(methods or NORMS)
     if any(m not in NORMS for m in chosen) or len(set(chosen)) != len(chosen):
-        raise ValueError(f"归一化只能是 {', '.join(NORMS)}，且不能重复")
+        raise ValueError(f"Normalization must be one of {', '.join(NORMS)}, and must not repeat")
 
     info, records, vectors = load_pool(episodes, models, window)
     matched, unmatched, special = match_annotations(
@@ -85,7 +96,7 @@ def compare_norms(
     index = {row["id"]: i for i, row in enumerate(records)}
     labeled = [(index[i], name) for i, name in matched.items() if i in index]
     if len(labeled) < 3:
-        raise ValueError("能精确对上的人工标签太少，无法比较分离度")
+        raise ValueError("Too few human labels can be matched exactly to compare separation")
 
     pairs = list(itertools.combinations(sorted(labeled), 2))
     same = np.array([a[1] == b[1] for a, b in pairs])
@@ -123,9 +134,12 @@ def compare_norms(
         "special_labels": special,
         "pairs": len(pairs),
         "results": results,
-        "note": "只比较分得开不开，不做分组。作基准的无关片段就是本批全部片段，"
-        "没有另一批与本作无关的片段可用，所以 asnorm 挑出的最像 k 条里会混进同一角色的"
-        "片段，等于拿同角色的分数当基准，这会削弱它的效果。",
+        "note": "Only compares how well the scores separate the groups; no grouping is done. "
+        "No separate batch of unrelated clips is available to use as the reference set, "
+        "so the reference clips are all clips in this batch. "
+        "That means the k most similar clips that asnorm picks will include clips of the same "
+        "character, so same-character scores are effectively used as the baseline, "
+        "which weakens its effect.",
     }
     write_json(out, report)
     return report

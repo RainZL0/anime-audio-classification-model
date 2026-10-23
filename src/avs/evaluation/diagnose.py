@@ -1,7 +1,10 @@
-"""固定片段、人工标签与缓存声纹，诊断身份区分能力；只定位证据，不挑方案。
+"""Diagnose whether identities can be told apart, using fixed clips, human labels, and cached
+voiceprints. This only locates evidence; it does not pick a method.
 
-近邻检索排除查询自身；只有一条标签的角色不作查询，但留在候选池当陪衬。
-未标注片段的近邻只算线索，不算错人。两模型使用完全相同的候选池。
+Nearest-neighbor search (finding the closest other clip) leaves out the query clip itself. A role
+with only one label is not used as a query, but it stays in the candidate pool as a distractor.
+A nearest neighbor that is unlabeled is only treated as a clue, not as a wrong match. The two
+models use exactly the same candidate pool.
 """
 
 from __future__ import annotations
@@ -25,26 +28,27 @@ def duration_bin(seconds: float) -> str:
     for low, high in DURATION_BINS:
         if low <= seconds < high:
             return f"{low:g}-{high:g}s" if math.isfinite(high) else f">={low:g}s"
-    raise ValueError("片段时长必须是非负有限数")
+    raise ValueError("Clip duration must be a non-negative finite number")
 
 
 def load_pool(
     episodes: list[Path], models: list[str], window: float = 0.0
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
-    """所有模型必须覆盖同一批片段；各模型的矩阵按片段 ID 对齐到同一行序。"""
+    """All models must cover the same set of clips. Each model's matrix is aligned to the same row
+    order by clip ID."""
     import numpy as np
 
     if not models or len(set(models)) != len(models):
-        raise ValueError("需要不重复的模型名")
+        raise ValueError("Need model names that are not repeated")
     if not episodes or len({p.resolve() for p in episodes}) != len(episodes):
-        raise ValueError("至少需要一个不重复的集目录")
+        raise ValueError("Need at least one episode folder, with no repeats")
     info: dict[str, Any] = {}
     records: list[dict[str, Any]] = []
     parts: dict[str, list[Any]] = defaultdict(list)
     for directory in episodes:
         episode, _ = load_episode(directory)
         if episode["name"] in info:
-            raise ValueError("集名重复，请为各集使用不同名字")
+            raise ValueError("Episode names repeat. Use a different name for each episode")
         info[episode["name"]] = {
             "vocals": episode["vocals"],
             "directory": str(directory.resolve()),
@@ -57,7 +61,9 @@ def load_pool(
             if model == models[0]:
                 base = own
             elif set(order) != {r["id"] for r in base}:
-                raise ValueError("模型覆盖的片段不同，不能直接比较")
+                raise ValueError(
+                    "Models cover different clips, so they cannot be compared directly"
+                )
             parts[model].append(vectors[[order[r["id"]] for r in base]])
         records.extend(base)
     vectors = {m: np.concatenate(parts[m]) if parts[m] else np.empty((0, 0)) for m in models}
@@ -91,7 +97,8 @@ def analyse(
     groups: dict[str, str | None] | None,
     threshold: float,
 ) -> dict[str, Any]:
-    """一个模型的逐查询近邻、配对距离与分层统计。"""
+    """Per-query nearest neighbors, pair distances, and breakdowns by duration and role for one
+    model."""
     import numpy as np
     from sklearn.metrics import roc_auc_score
 
@@ -317,7 +324,8 @@ def select_examples(
     matched: dict[str, str],
     groups: dict[str, str | None] | None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """按事先固定的规则挑错误实例，每条片段在同一类中最多出现一次。"""
+    """Pick error examples by a rule fixed in advance. Each clip appears at most once in each
+    category."""
     by_id = {r["id"]: r for r in records}
 
     def clip(clip_id: str) -> dict[str, Any]:
@@ -365,11 +373,12 @@ def diagnose(
     groups_file: Path | None = None,
     threshold: float = 0.5,
 ) -> dict[str, Any]:
-    """不重跑音频模型，不改分组；输出报告、逐配对距离和可试听错误实例。"""
+    """Does not rerun the audio model or change the grouping. Outputs the report, per-pair
+    distances, and error examples that can be listened to."""
     from avs.stages.export import export
 
     if out.exists():
-        raise ValueError(f"输出目录已存在：{out}")
+        raise ValueError(f"Output directory already exists: {out}")
     info, records, vectors = load_pool(episodes, models)
     matched, unmatched, special = match_annotations(
         {"schema": "avs.groups.v1", "episodes": info, "assignments": records}, annotations
@@ -378,10 +387,12 @@ def diagnose(
     if groups_file is not None:
         data = read_json(groups_file)
         if data.get("schema") != "avs.groups.v1" or data.get("support"):
-            raise ValueError("需要当前 group 命令生成、未使用参考的分组文件")
+            raise ValueError(
+                "Needs a grouping file made by the current group command, with no references used"
+            )
         for name, own in info.items():
             if data["episodes"].get(name, {}).get("segments_sha256") != own["segments_sha256"]:
-                raise ValueError("分组文件与当前片段不一致")
+                raise ValueError("The grouping file does not match the current clips")
         by_id = {r["id"]: r["speaker"] for r in data["assignments"]}
         groups = {r["id"]: by_id[r["id"]] for r in records}
         threshold = float(data["threshold"])
@@ -389,7 +400,10 @@ def diagnose(
     names = [matched[records[i]["id"]] for i in labeled]
     counts = Counter(names)
     if len(counts) < 2 or max(counts.values()) < 2:
-        raise ValueError("至少需要两个角色，且有角色拥有两条以上有声纹的标签")
+        raise ValueError(
+            "Need at least two characters, and at least one character with two or more "
+            "labeled clips that have voiceprints"
+        )
     results = {m: analyse(vectors[m], records, labeled, names, groups, threshold) for m in models}
     examples = select_examples(results[models[0]], records, matched, groups)
     distances = {m: {(p["a"], p["b"]): p["distance"] for p in results[m]["pairs"]} for m in models}
@@ -406,7 +420,9 @@ def diagnose(
         export(assigned, {name: Path(own["vocals"]) for name, own in info.items()}, out)
     report = {
         "schema": "avs.embedding_diagnosis.v1",
-        "note": "固定片段与两模型缓存的诊断；只定位证据，近邻失败不证明向量完全没有身份信息。",
+        "note": "Diagnosis of fixed clips and the two models' caches. This only locates evidence. "
+        "A nearest-neighbor failure does not prove that the vectors carry no identity "
+        "information at all.",
         "inputs": [
             {
                 "episode": own["directory"],
@@ -433,8 +449,10 @@ def diagnose(
         "models": {m: {k: v for k, v in results[m].items() if k != "pairs"} for m in models},
         "examples": {
             "model": models[0],
-            "rule": "同一角色里距离最远的配对、不同角色里距离最近的配对、"
-            "最近邻找错人且领先最多的查询；每类每条片段只出现一次。",
+            "rule": "For each character, the pair that is farthest apart. "
+            "For different characters, the pair that is closest. "
+            "And the queries where the nearest neighbor is the wrong person and leads by the "
+            "most. Each clip appears at most once per kind.",
             **examples,
         },
     }
