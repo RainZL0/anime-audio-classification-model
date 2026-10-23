@@ -171,6 +171,38 @@ def test_add_names_the_next_episode_and_resumes_after_a_failure(
         pipeline.add_episode(workspace, other, subtitles, name="ep04", device="cpu")
 
 
+def test_text_subtitles_are_kept_for_a_run_that_carries_on(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A run stopped before the text subtitles were attached still attaches them when it carries
+    on, even if --text-subs is not given again (as the interface's Carry on does)."""
+    workspace = tmp_path / "ws"
+    (workspace / "episodes").mkdir(parents=True)
+    video, subtitles, japanese = tmp_path / "a.mp4", tmp_path / "a.ass", tmp_path / "a.ja.srt"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(pipeline, "prepare", _fake_prepare([]))
+    attached: list[Path] = []
+    monkeypatch.setattr(
+        pipeline,
+        "attach_text_subtitles",
+        lambda out, path: attached.append(path) or {"text_subtitle_offset": 0.0, "matched": 1.0},
+    )
+    stopped = []
+
+    def stop_once(directory: Path, model: str, device: str) -> None:
+        if not stopped:
+            stopped.append(model)
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(pipeline, "embed", stop_once)
+    with pytest.raises(KeyboardInterrupt):
+        pipeline.add_episode(workspace, video, subtitles, text_subtitles=japanese, device="cpu")
+    pipeline.add_episode(workspace, video, subtitles, device="cpu")
+    assert attached == [japanese.resolve()]
+    meta = read_json(workspace / "episodes" / "ep01" / "episode.json")
+    assert "pending_text_subtitles" not in meta
+
+
 def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -> None:
     def broken(video: Path, subtitles: Path, out: Path, *args: Any) -> Any:
         out.mkdir(parents=True)

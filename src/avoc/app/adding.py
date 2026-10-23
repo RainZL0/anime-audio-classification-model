@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from avoc.language import LANGUAGE, say
+from avoc.pipeline import PROGRESS_MARK
 
 KEEP_LINES = 200
 """How many of the latest output lines are kept for the page."""
@@ -135,6 +136,7 @@ class Adding:
         environment = {
             **os.environ,
             "AVOC_LANGUAGE": LANGUAGE.get(),
+            "AVOC_MARK_PROGRESS": "1",
             "PYTHONIOENCODING": "utf-8",
             "PYTHONUNBUFFERED": "1",
             # A plain traceback instead of typer's boxed one: its last line is the reason, and
@@ -200,12 +202,15 @@ class Adding:
     def _collect(self, stream: Any, into: str) -> None:
         for line in stream:
             line = COLOR_CODES.sub("", line).rstrip()
-            if into == "errors" and PROGRESS_BAR.search(line):
+            # Output lines without the mark come from a library printing to the same output.
+            target = "errors" if into == "lines" and not line.startswith(PROGRESS_MARK) else into
+            line = line.removeprefix(PROGRESS_MARK)
+            if PROGRESS_BAR.search(line):
                 with self.lock:
                     self.bar = line.strip()
             elif line:
                 with self.lock:
-                    setattr(self, into, [*getattr(self, into)[-(KEEP_LINES - 1) :], line])
+                    setattr(self, target, [*getattr(self, target)[-(KEEP_LINES - 1) :], line])
 
     def stop(self) -> dict[str, Any]:
         """Stop the running command, and wait until it has ended and been cleaned up. Clips and

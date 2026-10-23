@@ -1061,17 +1061,19 @@ function App() {
   const addingState = adding?.state;
   useEffect(() => {
     if (addingState !== "running") return;
-    const timer = setInterval(async () => {
-      try {
-        const now = await call("/api/add");
-        setAdding(now);
-        if (now.state === "running") return;
-        setState(await call("/api/state"));
-        if (now.state === "done") showToast(tr(`${now.episode} 加好了`, `${now.episode} is added`));
-        else if (now.state === "failed") { showToast(tr(`${now.episode} 没加成，点「加一集」看原因`, `${now.episode} failed; open "Add an episode" to see why`), true); }
-      } catch {}
-    }, 1500);
+    const timer = setInterval(() => call("/api/add").then(setAdding).catch(() => {}), 1500);
     return () => clearInterval(timer);
+  }, [addingState]);
+  /* However it ended (done, failed, or stopped from the dialog), fetch the overview again: a new episode, or one
+     left unfinished, shows up only then. */
+  const addingBefore = useRef(addingState);
+  useEffect(() => {
+    const before = addingBefore.current;
+    addingBefore.current = addingState;
+    if (before !== "running" || addingState === "running" || !adding) return;
+    call("/api/state").then(setState).catch(() => {});
+    if (addingState === "done") showToast(tr(`${adding.episode} 加好了`, `${adding.episode} is added`));
+    else if (addingState === "failed") showToast(tr(`${adding.episode} 没加成，点「加一集」看原因`, `${adding.episode} failed; open "Add an episode" to see why`), true);
   }, [addingState]);
   /* The first episode added from the welcome page: open it, starting in Groups. */
   useEffect(() => {

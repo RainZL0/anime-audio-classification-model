@@ -633,7 +633,9 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _recorded_files(root: Path, name: str) -> tuple[Path, Path, Path | None, float | None, str]:
-    """The files an unfinished episode was started with, read from its episode.json, to carry on."""
+    """The files an unfinished episode was started with, read from its episode.json, to carry on.
+    Text subtitles not attached yet are noted in episode.json too, and avoc add picks them up by
+    itself."""
     from avoc.project import read_json, validate_name
 
     validate_name(name)
@@ -646,9 +648,7 @@ def _recorded_files(root: Path, name: str) -> tuple[Path, Path, Path | None, flo
             )
         )
     meta = read_json(path)
-    text = meta.get("text_subtitles")
-    return (Path(meta["video"]), Path(meta["subtitles"]), Path(text) if text else None,
-            meta.get("subtitle_offset"), name)  # fmt: skip
+    return Path(meta["video"]), Path(meta["subtitles"]), None, meta.get("subtitle_offset"), name
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:

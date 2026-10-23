@@ -82,20 +82,31 @@ def add(
 ) -> None:
     """Add one episode: cut clips, compute the voiceprints the interface needs, and attach text
     subtitles if given. If it stops partway, run the same command again to continue."""
+    import os
+
+    # When the interface runs this command, it asks for our own lines to be marked, so it can
+    # tell them apart from what the libraries print.
+    mark = pipeline.PROGRESS_MARK if os.environ.get("AVOC_MARK_PROGRESS") else ""
+
+    def report(line: str) -> None:
+        typer.echo(mark + line)
+
     try:
         result = pipeline.add_episode(
-            workspace, video, subs, name, text_subs, audio, offset, device, report=typer.echo
+            workspace, video, subs, name, text_subs, audio, offset, device, report=report
         )
     except ValueError as exc:
         typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
         raise typer.Exit(1) from exc
-    typer.echo(
+    report(
         say(
-            f"{result['episode']} 加好了，{result['segments']} 个片段。打开界面：",
-            f"{result['episode']} added, {result['segments']} clips. To open the interface:",
+            f"{result['episode']} 加好了，{result['segments']} 个片段",
+            f"{result['episode']} added, {result['segments']} clips",
         )
     )
-    typer.echo(f"  uv run avoc app {workspace}")
+    if not mark:  # Run from the interface, it is already open.
+        typer.echo(say("打开界面：", "To open the interface:"))
+        typer.echo(f"  uv run avoc app {workspace}")
 
 
 @app.command()

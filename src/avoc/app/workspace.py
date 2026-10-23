@@ -187,9 +187,9 @@ def load_workspace(
             # does not fail to open.
             skipped[episode["name"]] = (
                 Words(
-                    "声纹没算全，再运行一遍加这一集的 avoc add 命令会接着算",
-                    "voiceprints are incomplete; "
-                    "run the same avoc add command again to finish them",
+                    "声纹没算全。在界面里点「接着做」，或者再运行一遍加这一集的 avoc add 命令",
+                    "voiceprints are incomplete. Press Carry on in the interface, "
+                    "or run the same avoc add command again",
                 )
                 if isinstance(exc, FileNotFoundError)
                 else Words(

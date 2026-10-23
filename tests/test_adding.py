@@ -19,7 +19,8 @@ args = sys.argv[1:]
 workspace, video, name = Path(args[1]), args[2], args[args.index("--name") + 1]
 folder = workspace / "episodes" / name
 folder.mkdir(parents=True, exist_ok=True)
-print("cutting", flush=True)
+print("Failed to load a library", flush=True)
+print("\\x1fcutting", flush=True)
 print(" 50%|#####     | 1/2 [00:01<00:01]", end="\\r", file=sys.stderr, flush=True)
 if "slow" in video:
     time.sleep(60)
@@ -28,7 +29,7 @@ if "bad" in video:
     sys.exit(1)
 meta = {"name": name, "video": str(Path(video).resolve())}
 (folder / "episode.json").write_text(json.dumps(meta))
-print("done", flush=True)
+print("\\x1fdone", flush=True)
 """
 
 
@@ -61,7 +62,9 @@ def test_a_finished_episode_is_loaded_and_named_in_order(files: Path) -> None:
     status = finished(job)
     assert status["state"] == "done"
     assert status["lines"] == ["cutting", "done"]
-    assert status["bar"].startswith("50%|") and status["errors"] == []
+    assert status["bar"].startswith("50%|")
+    # A library line on the same output is kept apart from the progress.
+    assert status["errors"] == ["Failed to load a library"]
     assert loaded == ["ep01"]
     # Same video again: the same episode, so a rerun carries on instead of making ep02.
     assert job.start(files / "good.mkv", files / "ep.ass", offset=0)["episode"] == "ep01"
@@ -75,7 +78,8 @@ def test_a_failed_run_keeps_its_output(files: Path) -> None:
     status = finished(job)
     assert status["state"] == "failed"
     assert status["lines"] == ["cutting"]
-    assert status["errors"] == ["Error: no luck"]
+    # Two outputs read side by side, so their order is not fixed.
+    assert sorted(status["errors"]) == ["Error: no luck", "Failed to load a library"]
     assert loaded == []
 
 

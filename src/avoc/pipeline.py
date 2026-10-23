@@ -40,6 +40,11 @@ NO_TOKEN_HINT = Words(
     "group, so enter the value measured for an earlier episode), or " + TOKEN_HOWTO.en,
 )
 
+PROGRESS_MARK = "\x1f"
+"""Put in front of each progress line of `avoc add` when the interface runs it (environment
+variable `AVOC_MARK_PROGRESS`). Some libraries print warnings to the same output, and the interface
+shows only the marked lines as progress. The character is invisible."""
+
 
 def has_hf_token() -> bool:
     from huggingface_hub import get_token
@@ -421,6 +426,16 @@ def add_episode(
             )
         )
 
+    # The text subtitles are attached last. Note them down now, so a run that stops before then
+    # still attaches them when it carries on, even without --text-subs.
+    episode = read_json(out / "episode.json")
+    if text_subtitles is None:
+        pending = episode.get("pending_text_subtitles")
+        text_subtitles = Path(pending) if pending else None
+    elif episode.get("pending_text_subtitles") != str(text_subtitles.resolve()):
+        episode["pending_text_subtitles"] = str(text_subtitles.resolve())
+        write_json(out / "episode.json", episode)
+
     models = list(dict.fromkeys((*DEFAULT_MODELS, GROUPING_MODEL)))
     for model in models:
         report(say(f"计算声纹：{model}", f"Computing voiceprints: {model}"))
@@ -428,7 +443,14 @@ def add_episode(
 
     if text_subtitles is not None:
         report(say("配台词字幕", "Attaching text subtitles"))
-        own = attach_text_subtitles(out, text_subtitles)
+        try:
+            own = attach_text_subtitles(out, text_subtitles)
+        finally:
+            # Also when they are refused: the episode itself is finished, and they can be
+            # attached again from the Export view or with set-text-subtitles.
+            episode = read_json(out / "episode.json")
+            episode.pop("pending_text_subtitles", None)
+            write_json(out / "episode.json", episode)
         report(
             say(
                 f"偏移 {own['text_subtitle_offset']:+.2f} 秒，"
