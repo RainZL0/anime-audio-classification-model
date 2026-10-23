@@ -53,11 +53,20 @@ or more. With two running in parallel, about thirty lines before and after, with
 cut in about ten seconds."""
 
 
+def _code_stamp() -> float:
+    """When the program's own Python files last changed. The page files are read from disk on
+    every request, so after an update (git pull) a running server would serve the new page with
+    its old code; comparing this stamp with the one at start tells the page to ask for a
+    restart."""
+    return max(p.stat().st_mtime for p in Path(__file__).parents[1].rglob("*.py"))
+
+
 class AppState:
     def __init__(
         self, root: Path, models: tuple[str, ...] = DEFAULT_MODELS, grouping: str = GROUPING_MODEL
     ) -> None:
         self.models, self.grouping_model = models, grouping
+        self.code_stamp = _code_stamp()
         self.workspace = load_workspace(root, models, grouping)
         self.store = LabelStore(self.workspace.labels_dir)
         self.adding = Adding(root, lambda _: self.reload())
@@ -262,6 +271,7 @@ class AppState:
             "other": counts(OTHER),
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
+            "outdated": _code_stamp() > self.code_stamp,
         }
 
     def _blocked(self) -> Counter[str]:

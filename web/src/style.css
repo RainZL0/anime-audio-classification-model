@@ -1428,6 +1428,18 @@ kbd {
 .help td:first-child {
   width: 150px;
 }
+.shell:has(> .banner) {
+  grid-template-rows: auto auto 1fr auto;
+}
+.banner {
+  padding: 8px 18px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.banner.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
 .help.guide {
   width: min(760px, 94vw);
   max-height: 84vh;

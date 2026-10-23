@@ -1151,6 +1151,14 @@ export function App() {
           <kbd>?</kbd>
         </button>
       </header>
+      {state.outdated !== false && (
+        <div className="banner warn">
+          {tr(
+            "avoc 已经更新，但正在运行的服务还是旧的，有些内容会显示不出来。关掉运行 avoc app 的窗口（或按 Ctrl+C），再重新运行它，然后刷新这个页面。",
+            "avoc was updated, but the running server is still the old one, so some things will not show. Close the window running avoc app (or press Ctrl+C), run it again, then refresh this page.",
+          )}
+        </div>
+      )}
 
       <div className="body" style={showStage ? undefined : { gridTemplateColumns: "1fr" }}>
         {showStage && (

@@ -117,6 +117,8 @@ export interface Summary {
   other: Counts;
   model: Model;
   can_undo: boolean;
+  /* The program was updated after this server started. Missing when the server is older than this page. */
+  outdated?: boolean;
 }
 
 /* The answer to a label change, an undo or a character change. */
