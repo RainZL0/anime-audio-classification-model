@@ -21,6 +21,7 @@ import {
 } from "./clips";
 import { Avatar } from "./components/Avatar";
 import { Cropper } from "./components/Cropper";
+import { Guide, GUIDE_SEEN } from "./components/Guide";
 import { Help } from "./components/Help";
 import { LanguageButton } from "./components/LanguageButton";
 import { RoleName } from "./components/RoleName";
@@ -105,6 +106,7 @@ export function App() {
     setPickedState(pickedNow.current);
   }, []);
   const [help, setHelp] = useState(false);
+  const [guide, setGuide] = useState(false);
   /* The server's job that adds an episode (see AddEpisode), and whether its dialog is open. */
   const [adding, setAdding] = useState<Adding | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -857,10 +859,11 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (crop) return;
-      if (help || addOpen) {
+      if (help || addOpen || guide) {
         if (e.key === "Escape") {
           setHelp(false);
           setAddOpen(false);
+          closeGuide();
         }
         return;
       }
@@ -941,6 +944,16 @@ export function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  /* The guide opens by itself once: the first time there are episodes but nothing is labeled. */
+  const firstLook = !!state?.episodes.length && !state.model.labels;
+  useEffect(() => {
+    if (firstLook && !localStorage.getItem(GUIDE_SEEN)) setGuide(true);
+  }, [firstLook]);
+  const closeGuide = () => {
+    localStorage.setItem(GUIDE_SEEN, "1");
+    setGuide(false);
+  };
 
   const corner = (
     <div className="corner">
@@ -1122,6 +1135,16 @@ export function App() {
         </button>
         <button
           className="ghost"
+          onClick={() => setGuide(true)}
+          title={tr(
+            "四个页面是做什么的，怎么上手",
+            "What the four views are for, and how to start",
+          )}
+        >
+          {tr("指南", "Guide")}
+        </button>
+        <button
+          className="ghost"
           onClick={() => setHelp(true)}
           title={tr("全部快捷键", "All shortcuts")}
         >
@@ -1289,7 +1312,24 @@ export function App() {
           onClose={crop.naming ? cancelNew : closeCrop}
         />
       )}
-      {help && <Help onClose={() => setHelp(false)} />}
+      {help && (
+        <Help
+          onClose={() => setHelp(false)}
+          onGuide={() => {
+            setHelp(false);
+            setGuide(true);
+          }}
+        />
+      )}
+      {guide && (
+        <Guide
+          onClose={closeGuide}
+          onStart={() => {
+            closeGuide();
+            setView("groups");
+          }}
+        />
+      )}
       {addOpen && <AddDialog onClose={() => setAddOpen(false)} {...addProps} />}
       {toast && (
         <div className={`toast ${toast.isError ? "error" : ""}`}>

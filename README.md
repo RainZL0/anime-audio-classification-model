@@ -116,8 +116,7 @@ The code is released under the [MIT License](LICENSE). The audio and text you ex
 
 - to use extracted material only for personal research or study;
 - not to use extracted audio or text, or models trained on them, for any commercial purpose;
-- not to use extracted voices to impersonate a character or voice actor, or to make content that could be mistaken for their own;
-- not to distribute extracted audio publicly.
+- not to use extracted voices to impersonate a character or voice actor.
 
 ## Acknowledgements
 

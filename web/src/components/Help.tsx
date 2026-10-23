@@ -1,6 +1,6 @@
 import { tr } from "../language";
 
-export function Help({ onClose }: { onClose: () => void }) {
+export function Help({ onClose, onGuide }: { onClose: () => void; onGuide: () => void }) {
   const rows = [
     [tr("J / ↓，K / ↑", "J / ↓, K / ↑"), tr("下一句，上一句", "Next line, previous line")],
     [
@@ -88,6 +88,14 @@ export function Help({ onClose }: { onClose: () => void }) {
             "每次标注都立刻保存，并让机器重新学一次。标注、新建、改名和合并角色都能撤销；头像和设不设目标角色不算标注，直接改回去就行。",
             "Every label is saved at once and retrains the machine. Labeling, making, renaming and merging characters can all be undone; avatars and target settings are not labels, just change them back.",
           )}
+        </p>
+        <p className="note">
+          <button className="ghost" onClick={onGuide}>
+            {tr(
+              "打开上手指南：四个页面各是做什么的",
+              "Open the getting-started guide: what each of the four views is for",
+            )}
+          </button>
         </p>
       </div>
     </div>

@@ -62,30 +62,32 @@ function SpokenTexts({
         return (
           <div className="text-sub" key={e.name}>
             <span className="ep">{e.name}</span>
+            <select
+              value={s.language}
+              disabled={busy !== null}
+              onChange={(event) => speak(e.name, event.target.value)}
+              title={
+                s.assumed
+                  ? tr(
+                      "视频音轨没标语言，按日语算。不对就改",
+                      "The audio track has no language tag, so Japanese is taken. Change it if wrong",
+                    )
+                  : tr("这一集说的语言", "The language spoken in this episode")
+              }
+            >
+              {SPOKEN.map((code) => (
+                <option key={code} value={code}>
+                  {languageName(code)}
+                  {code === s.language && s.assumed ? tr("（猜的）", " (assumed)") : ""}
+                </option>
+              ))}
+            </select>
             <span className="now">
-              <select
-                value={s.language}
-                disabled={busy !== null}
-                onChange={(event) => speak(e.name, event.target.value)}
-                title={
-                  s.assumed
-                    ? tr(
-                        "视频音轨没标语言，按日语算。不对就改",
-                        "The audio track has no language tag, so Japanese is taken. Change it if wrong",
-                      )
-                    : tr("这一集说的语言", "The language spoken in this episode")
-                }
-              >
-                {SPOKEN.map((code) => (
-                  <option key={code} value={code}>
-                    {languageName(code)}
-                    {code === s.language && s.assumed ? tr("（猜的）", " (assumed)") : ""}
-                  </option>
-                ))}
-              </select>{" "}
               {s.source === "text" && t ? (
                 <>
-                  {t.file}{" "}
+                  <span className="file" title={t.file}>
+                    {t.file}
+                  </span>
                   <span className="min">
                     {tr(
                       `偏移 ${t.offset} 秒，重合 ${pct(t.agreement ?? 0)}`,
