@@ -54,6 +54,10 @@ You only name the characters you want (the targets). Everyone else gets a single
 
 Z undoes the last step. Run `uv run avoc --help` to list all commands.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Usage rules
 
 The code is released under the [MIT License](LICENSE). The audio and text you extract with it belong to the rights holders of the original work. The MIT License does not cover them. By using this tool you agree:

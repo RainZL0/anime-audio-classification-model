@@ -44,7 +44,7 @@ Labeling and export then happen in the [interface](#labeling-and-correction-inte
 
 ## Labeling and correction interface
 
-`avoc app` starts a web server that only listens on this machine. The front end has no build step. Its static files sit directly in `src/avoc/app/static/`.
+`avoc app` starts a web server that only listens on this machine. The front end's source is in `web/`. The server sends the built files in `src/avoc/app/static/`, which are committed, so running the app needs no Node. How to change the front end is in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 **Target characters and "Other".** The user names only the characters they want to collect. These are the target characters. Everyone else is labeled "Other", using the Q key. A workspace can have several target characters, and you can add or remove them while labeling:
 - Each "Other" label records which target characters existed at that moment. It counts as "not this target" only for those characters.
@@ -120,5 +120,13 @@ src/avoc/
   app/video.py             cut the short video pieces shown next to each line
   app/adding.py            add an episode from the interface: runs `avoc add` in a separate process
   app/server.py            web server endpoints, starting groups, picture cutting, export
-  app/static/              front-end pages
+  app/static/              built front-end files, made from web/ (do not edit by hand)
+web/src/
+  main.tsx                 starts the page
+  App.tsx                  views, shortcuts, saving labels in order, undo
+  api.ts                   calls to the server and the shapes of its answers
+  language.ts              Chinese or English: tr(Chinese, English)
+  clips.ts                 who a line belongs to, and the lists of the Characters view
+  components/              the stage, one line, avatars, the avatar cropper, help
+  views/                   Groups, Scenes, Characters, Export, adding an episode, welcome page
 ```

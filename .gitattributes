@@ -11,5 +11,9 @@
 *.pth binary
 *.onnx binary
 
-# Lock file: do not expand it in diffs
+# Lock files: do not expand them in diffs
 uv.lock -diff linguist-generated
+web/package-lock.json -diff linguist-generated
+
+# Built web app files, made from web/ by `npm run build`
+src/avoc/app/static/** -diff linguist-generated

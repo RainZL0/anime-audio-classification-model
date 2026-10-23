@@ -32,3 +32,30 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+  # The web app's source is in web/. Its built files are committed in src/avoc/app/static/, so users need no
+  # Node; this job checks them against the source.
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint, format, types and tests
+        run: npm run check
+
+      - name: Built files match the source
+        run: |
+          npm run build
+          git diff --exit-code -- ../src/avoc/app/static
+          test -z "$(git status --porcelain -- ../src/avoc/app/static)"

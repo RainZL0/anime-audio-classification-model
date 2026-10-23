@@ -25,7 +25,8 @@ The actual versions are in `pyproject.toml` and `uv.lock`. Which model was chose
 ## Interface
 
 - **FastAPI + uvicorn**: the web server for `avoc app`. It listens only on 127.0.0.1.
-- **Preact + htm**: the front end. It uses the single-file build of htm 3.1.1 (`src/avoc/app/static/vendor/preact-htm.js`, Apache-2.0; the license is in the same folder). No Node and no build tool are needed.
+- **React + TypeScript, built with Vite**: the front end. TypeScript is JavaScript with types written in the code, so mistakes such as a wrong field name show up before the page runs. Vite turns the source in `web/` into the plain JavaScript and CSS in `src/avoc/app/static/`. The versions are in `web/package.json` and `web/package-lock.json`. Only people who change the front end need Node; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **oxlint, Prettier, Vitest**: checks for the front end. oxlint finds likely mistakes, Prettier fixes the layout of the code, and Vitest runs the tests.
 - The tests drive the FastAPI test client through httpx.
 
 ## Runtime environment

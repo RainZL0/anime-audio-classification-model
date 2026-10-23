@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "typescript/no-explicit-any": "error",
+    // These three are written for the React Compiler, which this page does not use. The page reads refs while
+    // drawing on purpose (the newest focus, the fixed order of the bottom bar), see App.tsx.
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/immutability": "off"
+  }
+}

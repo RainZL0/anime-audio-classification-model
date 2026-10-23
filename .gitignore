@@ -9,6 +9,10 @@ wheels/
 # Environment
 .venv/
 
+# Web app: dependencies installed by npm
+web/node_modules/
+npm-debug.log*
+
 # Data and outputs: never committed to git
 data/
 runs/

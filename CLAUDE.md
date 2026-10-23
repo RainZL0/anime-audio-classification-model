@@ -20,5 +20,7 @@ uv run ruff check .
 uv run ruff format --check .
 ty check src
 uv run pytest -q
+npm --prefix web run check                       # web app: lint, layout, types, tests
+npm --prefix web run build                       # after changing web/; commit src/avoc/app/static too
 lychee --offline --no-progress CLAUDE.md docs   # after changing docs
 ```

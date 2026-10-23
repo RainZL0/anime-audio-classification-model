@@ -44,7 +44,7 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 - **Clips shorter than 1 second that are at least 0.5 seconds away from the dialogue before and after them are skipped by default.** They are almost never the lines people want. They do not count as work for a person. They are not in the initial grouping or the Characters view, and they are not exported as "confident". In the Scenes view they are hidden by default. Clicking "Show short lines" lists them. If a person has labeled them, the person's label is used.
 - Every episode processed must have both video and subtitles. If either is missing, the run is refused. The subtitles decide how to cut, and the video lets a person identify the speaker.
 - Labels are made in the interface and stored in the workspace's `labels/` folder.
-- **The web app is written in React and TypeScript, and built with Vite** (decided 2026-10-24, not carried out yet; plan in [FRONTEND_MIGRATION.md](FRONTEND_MIGRATION.md)). Preact with htm was enough, but contributors are more willing to work on a stack they already know, and changing it after release is harder.
+- **The web app is written in React and TypeScript, and built with Vite** (since 2026-10-24). Preact with htm was enough, but contributors are more willing to work on a stack they already know, and changing it after release is harder.
 - **The built front-end files are committed to git, and CI checks that they match the source.** Users install with `git clone` and `uv sync`, and must not need Node.
 
 **Export**
