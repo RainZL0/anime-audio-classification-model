@@ -139,14 +139,16 @@ kbd {
 .stranger.early { color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line); }
 .cands { display: flex; flex-direction: column; gap: 6px; }
 .cand {
-  display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 4px 10px;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
   cursor: pointer; text-align: left;
 }
 .cand:hover { border-color: var(--accent-ring); }
 .cand.top { border-color: var(--accent-ring); background: var(--accent-soft); }
 .cand .name { font-weight: 560; }
-.cand .meter { height: 4px; border-radius: 2px; background: var(--line); margin-top: 4px; overflow: hidden; }
+/* 头像占两行；概率条单独一行，从名字下面铺到最右边，不跟按钮抢宽度。 */
+.cand > :first-child { grid-row: span 2; }
+.cand .meter { grid-column: 2 / -1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .cand .meter i { display: block; height: 100%; background: var(--accent); }
 .cand .pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; min-width: 34px; text-align: right; }
 .cand .ref { padding: 3px 8px; font-size: 12px; }

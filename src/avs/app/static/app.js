@@ -238,14 +238,14 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
           ${clip.guess.filter((g) => g.p >= 0.02 || g === clip.guess[0]).map((g, i) => html`
             <div class="cand ${i === 0 ? "top" : ""}" onClick=${() => onAssign(g.name)}>
               <${Avatar} role=${roles[g.name]} name=${g.name} blank=${g.name === OTHER} size="md" />
-              <div><div class="name">${g.name === OTHER ? labelText[OTHER] : html`<${RoleName} role=${roles[g.name]} name=${g.name} />`}</div>
-                <div class="meter"><i style="width:${pct(g.p)}"></i></div></div>
+              <div class="name">${g.name === OTHER ? labelText[OTHER] : html`<${RoleName} role=${roles[g.name]} name=${g.name} />`}</div>
               <span class="pct">${pct(g.p)}</span>
               ${g.name !== OTHER && html`<button class="ref" title="听这个角色确认过的一句" onClick=${(e) => { e.stopPropagation(); onPlayRef(g.name); }}>
                 参考音${i === 0 ? html` <kbd>R</kbd>` : ""}</button>`}
               ${g.name !== OTHER && html`<button class="low" title=${`标成 ${g.name}·质量低：${LOW_TIP}`}
                 onClick=${(e) => { e.stopPropagation(); onAssign(g.name, true); }}>质量低${
                   slot(g.name) ? html` <span class="k">⇧${slot(g.name)}</span>` : ""}</button>`}
+              <div class="meter"><i style="width:${pct(g.p)}"></i></div>
             </div>`)}
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
