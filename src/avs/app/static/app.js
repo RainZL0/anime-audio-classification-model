@@ -360,7 +360,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
 
 /* ───────────── 起步分组：给声音相近的一组起名字 ───────────── */
 
-function GroupsView({ groups, loading, roles, onName, onNew, focus, setFocus, firstRun }) {
+function GroupsView({ groups, loading, roles, special, onName, onNew, focus, setFocus, firstRun }) {
   const [out, setOut] = useState({});
   const [names, setNames] = useState({});
   if (loading) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>正在把声音相近的台词分组…</p></div>`;
@@ -376,7 +376,9 @@ function GroupsView({ groups, loading, roles, onName, onNew, focus, setFocus, fi
     <div class="groups">
       ${groups.map((g, gi) => {
         const excluded = out[g.key] || new Set();
-        const keep = g.clips.filter((c) => !excluded.has(c.id));
+        /* 已经标了的句子留在组里给人看，但组按钮只管还没标的。 */
+        const keep = g.clips.filter((c) => !excluded.has(c.id) && !c.label);
+        const done = g.clips.every((c) => c.label);
         /* 机器的猜测只放在提示里，不直接填进框：先听再认，回车才采用。 */
         const value = names[g.key] ?? "";
         const chosen = value.trim() || g.hint?.name || "";
@@ -388,17 +390,20 @@ function GroupsView({ groups, loading, roles, onName, onNew, focus, setFocus, fi
           if (chosen) onName(ids, chosen); else onNew(ids);
         };
         const known = Object.values(roles).filter((r) => r.target && r.name !== g.hint?.name).slice(0, 8);
-        return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""}">
-          <h3>第 ${gi + 1} 组 <span class="meta">${g.size} 句 · ${g.seconds} 秒</span>
+        return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""} ${done ? "done" : ""}">
+          <h3>第 ${gi + 1} 组 <span class="meta">${g.size} 句 · ${g.seconds} 秒${done ? " · 都标好了" : ""}</span>
             ${g.hint && html`<span class="pill auto hint" title="机器的分类器在这组里最常猜的角色">
               <${Avatar} role=${roles[g.hint.name]} name=${g.hint.name} size="xs" />可能是 ${g.hint.name}</span>`}</h3>
           <div class="members">
-            ${g.clips.map((c) => html`<div class="member ${excluded.has(c.id) ? "out" : ""} ${c.id === focus ? "playing" : ""}"
+            ${g.clips.map((c) => html`<div class="member ${excluded.has(c.id) ? "out" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
-              <span>${c.text || "（没有字幕文字）"}</span><span class="t">${c.episode} ${stamp(c.start)}</span>
-              <button class="x" title=${excluded.has(c.id) ? "放回这一组" : "这句不是这组的人"}
+              <span>${c.text || "（没有字幕文字）"}</span>
+              ${c.label && html`<span class="pill special" title="已经标了；按 Z 撤销，或在左边改">
+                ${special[c.label] || c.label}${c.unusable ? "·质量低" : ""}</span>`}
+              <span class="t">${c.episode} ${stamp(c.start)}</span>
+              ${!c.label && html`<button class="x" title=${excluded.has(c.id) ? "放回这一组" : "这句不是这组的人"}
                 onClick=${(e) => { e.stopPropagation(); const next = new Set(excluded); next.has(c.id) ? next.delete(c.id) : next.add(c.id); setOut({ ...out, [g.key]: next }); }}>
-                ${excluded.has(c.id) ? "↺" : "×"}</button>
+                ${excluded.has(c.id) ? "↺" : "×"}</button>`}
             </div>`)}
           </div>
           ${known.length > 0 && html`<div class="pick-row">
@@ -791,7 +796,7 @@ function App() {
     if (view === "roles") {
       return [...pendingOf(clips), ...maybeListOf(clips), ...clips.filter((c) => c.label === role)].map((c) => c.id);
     }
-    if (view === "groups") return groups.flatMap((g) => g.clips.map((c) => c.id));
+    if (view === "groups") return groups.flatMap((g) => g.clips.filter((c) => !c.label).map((c) => c.id));
     return [];
   }, [view, clips, onlyWork, role, groups]);
   useEffect(() => { stableOrder.current = null; }, [onlyWork, episode]);
@@ -827,6 +832,13 @@ function App() {
     if (list[at + 1]) setFocus(list[at + 1]);
   };
 
+  /* 起步分组里标完一批往下走：这批后面第一句没标的，后面没有了再从头找。 */
+  const nextUnlabeled = (ids) => {
+    const rest = (id) => !ids.includes(id);
+    const at = Math.max(0, ...ids.map((id) => order.indexOf(id)));
+    return order.slice(at + 1).find(rest) ?? order.find(rest);
+  };
+
   const applyResult = (result, label) => {
     setState(result.state);
     const updated = Object.fromEntries(result.updated.map((c) => [c.id, c]));
@@ -837,9 +849,10 @@ function App() {
       if (!next) return c;
       return c.maybe && next.label !== role ? { ...next, maybe: true } : next;
     }));
+    /* 起步分组里标完的句子留在原处、标成已标，不从组里拿掉：同组没标的那句不会跟着消失，
+       撤销时也能原样回来。 */
     if (view === "groups") {
-      setGroups((gs) => gs.map((g) => ({ ...g, clips: g.clips.filter((c) => !(updated[c.id]?.label)) }))
-        .filter((g) => g.clips.length > 1));
+      setGroups((gs) => gs.map((g) => ({ ...g, clips: g.clips.map((c) => updated[c.id] ?? c) })));
     }
     const flashing = new Set(result.updated.map((c) => c.id));
     setFlashes(flashing);
@@ -882,7 +895,7 @@ function App() {
     const label = special[name] ? `已标为「${special[name]}」` : `已标为 ${name}${low ? "·质量低，导出时跳过" : ""}`;
     send("/api/label", { clips: ids, label: name, unusable: low }, ids.length > 1 ? `${ids.length} 句${label}` : label,
       () => setFocus(from));
-    if (view === "groups") setFocus(order.find((id) => !ids.includes(id)));
+    if (view === "groups") setFocus(nextUnlabeled(ids));
     else if (ids.length === 1) advance(from);
   };
   const accept = () => {
@@ -968,7 +981,7 @@ function App() {
     if (!ids.length) return;
     const from = focus;
     const onward = () => {
-      if (view === "groups") setFocus(order.find((id) => !ids.includes(id)));
+      if (view === "groups") setFocus(nextUnlabeled(ids));
       else if (ids.length === 1) advance(from);
     };
     const result = await send("/api/label", { clips: ids, new_role: true },
@@ -1087,7 +1100,7 @@ function App() {
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
-        ${view === "groups" && html`<${GroupsView} groups=${groups} loading=${groupsLoading} roles=${roles}
+        ${view === "groups" && html`<${GroupsView} groups=${groups} loading=${groupsLoading} roles=${roles} special=${special}
           focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}

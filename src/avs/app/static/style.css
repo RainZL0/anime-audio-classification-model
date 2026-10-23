@@ -262,6 +262,8 @@ kbd {
 .member:hover { background: var(--panel-2); }
 .member.out { color: var(--text-3); text-decoration: line-through; }
 .member.playing { background: var(--accent-soft); }
+.member.labeled > span:first-child { color: var(--text-3); }
+.group.done { opacity: .6; }
 .member .t { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .member .x { padding: 0 6px; font-size: 12px; border: 0; background: transparent; color: var(--text-3); }
 .pick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
