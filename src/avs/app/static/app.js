@@ -185,8 +185,8 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
         title="看不出是谁时，临时前后各多放一些；再按切到 15 秒、再按回到平常。换一句自动回到平常">
         ${context ? `前后多放 ${context} 秒` : "多放前后文"} <kbd>L</kbd></button>
       ${hasVideo && html`<span class="sound seg">
-        <button class=${sound === "original" ? "on" : ""} onClick=${() => setSound("original")}>画面原声</button>
         <button class=${sound === "vocals" ? "on" : ""} onClick=${() => setSound("vocals")}>只听人声</button>
+        <button class=${sound === "original" ? "on" : ""} onClick=${() => setSound("original")}>画面原声</button>
       </span>`}
     </div>
 
@@ -730,7 +730,7 @@ function App() {
   const [help, setHelp] = useState(false);
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [sound, setSound] = useState("original");
+  const [sound, setSound] = useState(() => localStorage.getItem("avs-sound") || "vocals");
   /* 这一句临时多放的前后秒数，见 CONTEXTS。换一句就回到平常。 */
   const [context, setContext] = useState(0);
   const nextContext = () => setContext((c) => CONTEXTS[(CONTEXTS.indexOf(c) + 1) % CONTEXTS.length]);
@@ -767,6 +767,7 @@ function App() {
     localStorage.setItem("avs-theme", theme);
   }, [theme]);
   useEffect(() => { localStorage.setItem("avs-show-short", showShort ? "1" : "0"); }, [showShort]);
+  useEffect(() => { localStorage.setItem("avs-sound", sound); }, [sound]);
   /* 当前在哪写进网址的 # 后面，刷新后回到同一个视图、同一集、同一个角色、同一句。 */
   useEffect(() => {
     if (!state) return;
