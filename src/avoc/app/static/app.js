@@ -995,7 +995,8 @@ function Cropper({ source, name, role, naming, taken, onSave, onClose }) {
   });
 
   const left = (v, total) => `${v / total * 100}%`;
-  return html`<div class="overlay" onClick=${onClose}><div class="cropper" onClick=${(e) => e.stopPropagation()}>
+  /* For a new character, a click beside the dialog does nothing: closing it there would cancel the new character. */
+  return html`<div class="overlay" onClick=${naming ? null : onClose}><div class="cropper" onClick=${(e) => e.stopPropagation()}>
     <h2>${naming ? tr("新角色", "New character")
       : tr(html`给 <${RoleName} role=${role} name=${name} /> 截一张头像`, html`Crop an avatar for <${RoleName} role=${role} name=${name} />`)}</h2>
     ${naming && html`<div class="crop-name">
@@ -1018,7 +1019,7 @@ function Cropper({ source, name, role, naming, taken, onSave, onClose }) {
     <p class="note">${tr("拖动方框挪位置，拖右下角或滚轮缩放，在框外按下可以重新画。",
       "Drag the box to move it, drag its bottom-right corner or use the wheel to resize, press outside it to draw a new one.")}</p>`}
     <div class="crop-actions">
-      <button class="ghost" onClick=${onClose}>${naming ? tr("跳过", "Skip") : tr("放弃", "Cancel")} <kbd>Esc</kbd></button>
+      <button class="ghost" onClick=${onClose}>${naming ? tr("取消", "Cancel") : tr("放弃", "Cancel")} <kbd>Esc</kbd></button>
       ${naming && source && html`<button onClick=${() => save(false)}>${tr("不要头像", "No avatar")}</button>`}
       <button class="primary" onClick=${() => save()}>${naming ? tr("保存", "Save") : tr("用这张", "Use this")} <kbd>Enter</kbd></button>
     </div>
@@ -1470,6 +1471,8 @@ function App() {
     : roles[typed] ? tr(`已经有叫「${typed}」的角色了。换一个名字；是同一个人的话，以后在「角色」里合并`,
       `There is already a character called "${typed}". Pick another name; if it is the same person, merge them later in Characters`)
     : "";
+  /* Cancel in the New character dialog takes the new character back: the lines return to how they were. */
+  const cancelNew = () => { setCrop(null); undo(); };
   const saveCrop = async (image, typed) => {
     let name = crop.name;
     closeCrop();
@@ -1695,7 +1698,7 @@ function App() {
 
     <audio ref=${refAudio} hidden></audio>
    ${crop && html`<${Cropper} source=${!crop.naming || crop.frame ? playerRef.current : null} name=${crop.name} role=${roles[crop.name]}
-      naming=${crop.naming} taken=${nameTaken} onSave=${saveCrop} onClose=${closeCrop} />`}
+      naming=${crop.naming} taken=${nameTaken} onSave=${saveCrop} onClose=${crop.naming ? cancelNew : closeCrop} />`}
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
     ${addOpen && html`<${AddDialog} onClose=${() => setAddOpen(false)} ...${addProps} />`}
     ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span>
