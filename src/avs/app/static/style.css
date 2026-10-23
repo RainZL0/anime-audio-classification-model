@@ -130,6 +130,8 @@ kbd {
   font-variant-numeric: tabular-nums; }
 .line-meta .sound { margin-left: auto; }
 .line-meta .sound button { padding: 1px 8px; font-size: 12px; }
+.line-meta .context { padding: 1px 8px; font-size: 12px; }
+.line-meta .context.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ask { margin: 18px 0 8px; font-size: 12px; color: var(--text-3); letter-spacing: 0.3px; }
 .stranger { font-size: 12px; color: var(--warn); background: var(--warn-soft); border-radius: 8px;
   padding: 7px 10px; margin-bottom: 8px; line-height: 1.7; }

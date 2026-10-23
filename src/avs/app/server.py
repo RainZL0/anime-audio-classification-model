@@ -32,6 +32,8 @@ UNUSABLE = "人标了质量低"
 """导出时跳过人标了「质量低」的片段，在 rejected.tsv 里写的原因。"""
 MAYBE_LIMIT = 100
 """「可能漏掉的」最多列这么多条，从最像的往下排。"""
+CONTEXT_SECONDS = (5, 15)
+"""看不出是谁时，可以临时前后各多放这么多秒（按 L 依次切换），只在人要的时候切。"""
 PREFETCH_SECONDS = 60.0
 """看到一句时，在后台把前后这么多秒内的台词片段先切好，往附近跳就不用等。"""
 PREFETCH_WORKERS = 2
@@ -293,28 +295,33 @@ class AppState:
 
     # 媒体
 
-    def media(self, kind: str, clip_id: str) -> Path:
+    def media(self, kind: str, clip_id: str, context: int = 0) -> Path:
+        """切好并返回一句的画面或人声。`context` 不为 0 时前后各多放这么多秒（只能是
+        `CONTEXT_SECONDS` 里的值），画面和人声从同一时刻开始，另存一份，不碰平时那份。"""
         clip = self.workspace.by_id.get(clip_id)
-        if clip is None or not SAFE_ID.fullmatch(clip_id):
+        if clip is None or not SAFE_ID.fullmatch(clip_id) or context not in (0, *CONTEXT_SECONDS):
             raise KeyError(clip_id)
         episode = self.workspace.episodes[clip.episode]
         folder = Path(episode["directory"]) / "app_media" / kind
-        target = folder / f"{clip_id}.{'wav' if kind == 'audio' else 'mp4'}"
+        suffix = f".ctx{context}" if context else ""
+        target = folder / f"{clip_id}{suffix}.{'wav' if kind == 'audio' else 'mp4'}"
         if target.exists():
             return target
         with self.lock:
-            lock = self._cutting.setdefault(clip_id + kind, threading.Lock())
+            lock = self._cutting.setdefault(clip_id + kind + suffix, threading.Lock())
         with lock:
             if target.exists():
                 return target
             folder.mkdir(parents=True, exist_ok=True)
             if kind == "audio":
-                _cut_audio(Path(episode["vocals"]), clip.start, clip.end, target)
+                start = max(0.0, clip.start - context)
+                _cut_audio(Path(episode["vocals"]), start, clip.end + context, target)
             else:
                 video = episode.get("video")
                 if not video:
                     raise FileNotFoundError("这一集没有视频")
-                cut_video(Path(video), clip.start - VIDEO_PAD, clip.end + VIDEO_PAD, target)
+                pad = context or VIDEO_PAD
+                cut_video(Path(video), clip.start - pad, clip.end + pad, target)
         return target
 
     def prefetch(self, clip_id: str, seconds: float = PREFETCH_SECONDS) -> int:
@@ -692,12 +699,12 @@ def create_app(state: AppState) -> Any:
         return FileResponse(path)
 
     @app.get("/media/{kind}/{clip_id}")
-    def read_media(kind: str, clip_id: str) -> Any:
+    def read_media(kind: str, clip_id: str, context: int = 0) -> Any:
         clip_id = clip_id.rsplit(".", 1)[0]
         if kind not in ("audio", "video"):
             raise HTTPException(404)
         try:
-            return FileResponse(state.media(kind, clip_id))
+            return FileResponse(state.media(kind, clip_id, context))
         except KeyError as exc:
             raise HTTPException(404) from exc
         except (FileNotFoundError, ValueError) as exc:

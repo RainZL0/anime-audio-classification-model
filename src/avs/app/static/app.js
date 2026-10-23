@@ -16,7 +16,10 @@ async function call(url, body) {
   return response.json();
 }
 
-const media = (kind, id) => `/media/${kind}/${id}.${kind === "audio" ? "wav" : "mp4"}`;
+const media = (kind, id, context = 0) =>
+  `/media/${kind}/${id}.${kind === "audio" ? "wav" : "mp4"}${context ? `?context=${context}` : ""}`;
+/* 按 L 依次切换：平常、前后各多放 5 秒、15 秒。跟服务端 CONTEXT_SECONDS 一致。 */
+const CONTEXTS = [0, 5, 15];
 const stamp = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const pct = (p) => `${Math.round(p * 100)}%`;
 const STATUS_TEXT = {
@@ -128,23 +131,24 @@ function Pill({ clip }) {
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
 function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPlayRef, hasVideo, videoRef, onAvatar,
-  onNewRole }) {
+  onNewRole, context, onContext }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   const startVoice = useRef(0);
-  useEffect(() => { setLoading(true); return () => clearTimeout(startVoice.current); }, [clip?.id, sound]);
+  useEffect(() => { setLoading(true); return () => clearTimeout(startVoice.current); }, [clip?.id, sound, context]);
 
   if (!clip) {
     return html`<aside class="stage"><div class="screen"><div class="wait">在右边选一句台词</div></div></aside>`;
   }
   const vocals = hasVideo && sound === "vocals";
   /* 只听人声时画面照放、静音，声音换成分离出的人声，跟着画面播放、暂停、跳转。视频片段比台词
-     早开始 VIDEO_PAD 秒（一集开头不够就少留），人声要等画面走到台词开始才出声。 */
+     早开始 VIDEO_PAD 秒（一集开头不够就少留），人声要等画面走到台词开始才出声。多放前后文时
+     人声也多切了同样的秒数，两边从同一时刻开始。 */
   const follow = (e) => {
     const voice = audioRef.current;
     if (!vocals || !voice) return;
     clearTimeout(startVoice.current);
-    const at = e.target.currentTime - Math.min(VIDEO_PAD, clip.start);
+    const at = e.target.currentTime - (context ? 0 : Math.min(VIDEO_PAD, clip.start));
     voice.currentTime = Math.max(0, at);
     if (e.target.paused) voice.pause();
     else if (at >= 0) voice.play().catch(() => {});
@@ -158,18 +162,23 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
   return html`<aside class="stage">
     <div class="screen">
       ${hasVideo
-        ? html`<video ref=${videoRef} key=${`${clip.id}-${sound}`} src=${media("video", clip.id)} autoplay playsinline muted=${vocals}
+        ? html`<video ref=${videoRef} key=${`${clip.id}-${sound}-${context}`} src=${media("video", clip.id, context)}
+            autoplay playsinline muted=${vocals}
             onCanPlay=${() => setLoading(false)} onClick=${(e) => { e.target.currentTime = 0; e.target.play(); }}
             onPlay=${follow} onPause=${follow} onSeeked=${follow}></video>
-          ${vocals && html`<audio ref=${audioRef} key=${`v-${clip.id}`} src=${media("audio", clip.id)} preload="auto"></audio>`}`
+          ${vocals && html`<audio ref=${audioRef} key=${`v-${clip.id}-${context}`} src=${media("audio", clip.id, context)}
+            preload="auto"></audio>`}`
         : html`<div class="wait">这一集没有视频，只有人声</div>
-          <audio ref=${(el) => { audioRef.current = el; if (videoRef) videoRef.current = el; }} key=${clip.id}
-            src=${media("audio", clip.id)} autoplay onCanPlay=${() => setLoading(false)}></audio>`}
+          <audio ref=${(el) => { audioRef.current = el; if (videoRef) videoRef.current = el; }} key=${`${clip.id}-${context}`}
+            src=${media("audio", clip.id, context)} autoplay onCanPlay=${() => setLoading(false)}></audio>`}
       <div class="wait ${!hasVideo || !loading ? "hide" : ""}"><div class="spinner"></div></div>
     </div>
     <div class="line-text">${clip.text || html`<span style="color:var(--text-3)">（字幕里没有这句的文字）</span>`}</div>
     <div class="line-meta">
       <span>${clip.episode}</span><span>${stamp(clip.start)}</span><span>${clip.duration} 秒</span>
+      <button class="context ${context ? "on" : ""}" onClick=${onContext}
+        title="看不出是谁时，临时前后各多放一些；再按切到 15 秒、再按回到平常。换一句自动回到平常">
+        ${context ? `前后多放 ${context} 秒` : "多放前后文"} <kbd>L</kbd></button>
       ${hasVideo && html`<span class="sound seg">
         <button class=${sound === "original" ? "on" : ""} onClick=${() => setSound("original")}>画面原声</button>
         <button class=${sound === "vocals" ? "on" : ""} onClick=${() => setSound("vocals")}>只听人声</button>
@@ -574,7 +583,8 @@ function Help({ onClose }) {
     ["Q", "其他：不是任何一个目标角色"],
     ["N", "标成一个新的目标角色，名字以后再起；有画面时接着截头像"],
     ["/", "搜索角色，或者敲名字新建"],
-    ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"], ["Z", "撤销上一步（可以一直往回撤）"],
+    ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"],
+    ["L", "看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常"], ["Z", "撤销上一步（可以一直往回撤）"],
     ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["「可能漏掉的」里 Enter", "这句是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
     ["截头像时 Enter / Esc", "保存 / 放弃"],
@@ -712,6 +722,9 @@ function App() {
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState("original");
+  /* 这一句临时多放的前后秒数，见 CONTEXTS。换一句就回到平常。 */
+  const [context, setContext] = useState(0);
+  const nextContext = () => setContext((c) => CONTEXTS[(CONTEXTS.indexOf(c) + 1) % CONTEXTS.length]);
   const [flashes, setFlashes] = useState(() => new Set());
   const [playing, setPlaying] = useState(false);
   const [crop, setCrop] = useState(null);
@@ -815,6 +828,8 @@ function App() {
     const wait = setTimeout(() => call("/api/prefetch", { clip: focus }).catch(() => {}), 300);
     return () => clearTimeout(wait);
   }, [focus, order]);
+
+  useEffect(() => { setContext(0); }, [focus]);
 
   const move = (step) => {
     const at = order.indexOf(focus);
@@ -1035,6 +1050,7 @@ function App() {
       else if (k === "x" && view === "roles" && current && !current.label) { handled(); toggleMark(current.id); move(1); }
       else if (e.key === "Backspace") { handled(); clear(); }
       else if (k === "r" && current?.guess.length) { handled(); playRef(current.guess[0].name); }
+      else if (k === "l" && current) { handled(); nextContext(); }
       else if (k === "f" && view === "scene") { handled(); setOnlyWork(!onlyWork); }
       else if (k === "p" && view === "roles") { handled(); setPlaying(!playing); }
       else if (k === "g") { handled(); setView("groups"); }
@@ -1091,7 +1107,8 @@ function App() {
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
       ${showStage && html`<${Stage} clip=${current} roles=${roles} special=${special} sound=${sound} setSound=${setSound}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
-        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} />`}
+        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()}
+        context=${context} onContext=${nextContext} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
           roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork} flashes=${flashes} episode=${episode} />`}

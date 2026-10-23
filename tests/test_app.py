@@ -374,6 +374,24 @@ def test_prefetch_cuts_nearby_clips_in_the_background(tmp_path: Path) -> None:
     assert client.post("/api/prefetch", json={"clip": "nope"}).status_code == 404
 
 
+def test_longer_context_is_cut_separately_on_request(tmp_path: Path) -> None:
+    import soundfile as sf
+
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clip = state.workspace.clips[0]
+    plain = client.get(f"/media/audio/{clip.id}.wav")
+    wide = client.get(f"/media/audio/{clip.id}.wav?context=5")
+    assert plain.status_code == wide.status_code == 200
+    plain_path, wide_path = state.media("audio", clip.id), state.media("audio", clip.id, 5)
+    assert plain_path != wide_path
+    total = sf.info(str(state.workspace.episodes[clip.episode]["vocals"])).duration
+    expected = min(clip.end + 5, total) - max(0, clip.start - 5)
+    assert sf.info(str(wide_path)).duration == pytest.approx(expected, abs=0.01)
+    assert client.get(f"/media/audio/{clip.id}.wav?context=7").status_code == 404
+
+
 def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
     """以前单独的「多人」开关已并进「质量低」，旧记录回放、撤销都按「质量低」算。"""
     folder = tmp_path / "labels"
