@@ -1,4 +1,4 @@
 def test_import() -> None:
-    import avs
+    import avoc
 
-    assert avs.__version__
+    assert avoc.__version__

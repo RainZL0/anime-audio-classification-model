@@ -11,7 +11,7 @@ Updated: 2026-10-23, evening. This page covers the goals, the direction and the 
 ## Repo
 
 - The first release is developed locally in this repo. Nothing more is pushed before release. An early `feat/voice-sorter-v1` branch from 2026-10-18 is already on GitHub. Delete it at release.
-- At release, force-push this repo's history onto the `main` branch of the old GitHub repo `RainZL0/anime-audio-classification-model`, replacing it. The old repo is kept so that its existing stars and links are kept. The old `main` is kept as the tag `archive/old-main`, which is already pushed. Whether to rename the repo is decided before release.
+- At release, force-push this repo's history onto the `main` branch of the old GitHub repo `RainZL0/anime-audio-classification-model`, replacing it. The old repo is kept so that its existing stars and links are kept. The old `main` is kept as the tag `archive/old-main`, which is already pushed. At the same time, rename the repo to `anime-voice-collector` (decided 2026-10-24); GitHub redirects the old address to the new one. The command is `avoc`, short for anime voice collector. `avc` was not used because it is also the name of the H.264 video format, which shows up in anime file names.
 
 ## Direction
 
@@ -43,7 +43,7 @@ The first item used to be "prove with numbers that classification is clearly bet
 
 1. **Labeling interface**: naming whole groups, two views of the same clips (Scenes and Characters), keyboard use, undo, and immediate retraining after each edit. The first version is done and is still being polished.
 2. **Export**: at least the GPT-SoVITS list format, with the dialogue text. GPT-SoVITS, Style-Bert-VITS2 and one folder per character are already supported, with the text taken from the subtitles (format in [COMPETITORS.md](COMPETITORS.md#2-dataset-format-expected-by-training)). When the subtitles used for cutting are translations, each episode can have a separate Japanese subtitle file for the text. No speech-to-text is needed.
-3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avs add`. Windows and Linux both install the CUDA build of torch, and the CPU is used automatically when there is no graphics card. Linux and macOS have not been run in practice yet. A one-click Windows package can come after the first release.
+3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avoc add`. Windows and Linux both install the CUDA build of torch, and the CPU is used automatically when there is no graphics card. Linux and macOS have not been run in practice yet. A one-click Windows package can come after the first release.
 4. **README**: a demo GIF at the top, and one sentence saying what the tool is for. The README is English only, so the pushed repo has no Chinese README. The English version is written. The GIF is still missing. The license is settled: MIT for the code. The scope of use for the extracted material is written in the "Usage rules" section of the README. The MIT license itself allows commercial use, so the "no commercial use" rule applies to the extracted material, not to the code.
 
 ## Release

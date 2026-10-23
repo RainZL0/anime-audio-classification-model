@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from avs.language import Words
-from avs.pipeline import load_embeddings
-from avs.project import load_episode
+from avoc.language import Words
+from avoc.pipeline import load_embeddings
+from avoc.project import load_episode
 
 SCENE_GAP = 3.0
 """If the pause between two lines of dialogue is longer than this many seconds, a new scene starts.
@@ -110,7 +110,7 @@ so their edges do not line up with subtitle lines."""
 def subtitle_lines(episode: dict[str, Any]) -> list[tuple[float, float, str]]:
     """The subtitle lines for this episode, with the offset already added and converted to
     audio-track time."""
-    from avs.stages.subtitle import load_dialogue
+    from avoc.stages.subtitle import load_dialogue
 
     path = Path(episode.get("subtitles") or "")
     if not path.is_file():
@@ -183,17 +183,18 @@ def load_workspace(
         try:
             ids, parts = _aligned_vectors(directory, (*models, grouping))
         except (FileNotFoundError, ValueError) as exc:
-            # Usually avs add was interrupted partway. Skip this episode so the whole interface
+            # Usually avoc add was interrupted partway. Skip this episode so the whole interface
             # does not fail to open.
             skipped[episode["name"]] = (
                 Words(
-                    "声纹没算全，再运行一遍加这一集的 avs add 命令会接着算",
-                    "voiceprints are incomplete; run the same avs add command again to finish them",
+                    "声纹没算全，再运行一遍加这一集的 avoc add 命令会接着算",
+                    "voiceprints are incomplete; "
+                    "run the same avoc add command again to finish them",
                 )
                 if isinstance(exc, FileNotFoundError)
                 else Words(
-                    f"各声纹模型覆盖的片段不同，重跑 avs embed（{exc}）",
-                    f"the voiceprint models cover different clips; rerun avs embed ({exc})",
+                    f"各声纹模型覆盖的片段不同，重跑 avoc embed（{exc}）",
+                    f"the voiceprint models cover different clips; rerun avoc embed ({exc})",
                 )
             )
             continue

@@ -1,6 +1,6 @@
 """Adding an episode from the interface: checks before starting, progress, and stopping.
 
-A small script stands in for `avs add`, so no audio is processed."""
+A small script stands in for `avoc add`, so no audio is processed."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from avs.app.adding import Adding, clean_path
+from avoc.app.adding import Adding, clean_path
 
 FAKE_ADD = """
 import json, sys, time
@@ -34,7 +34,7 @@ print("done", flush=True)
 
 @pytest.fixture
 def files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setattr("avs.app.adding.shutil.which", lambda _: "found")
+    monkeypatch.setattr("avoc.app.adding.shutil.which", lambda _: "found")
     (tmp_path / "fake_add.py").write_text(FAKE_ADD, encoding="utf-8")
     for name in ("good.mkv", "slow.mkv", "bad.mkv", "notes.ass"):
         (tmp_path / name).write_text("x", encoding="utf-8")
@@ -101,7 +101,7 @@ def test_bad_input_is_refused_before_starting(files: Path, monkeypatch: pytest.M
         job.start(files / "good.mkv", files / "ep.ass", files / "missing.srt", offset=0)
     with pytest.raises(ValueError, match="cannot read this subtitle file"):
         job.start(files / "good.mkv", files / "notes.ass", offset=0)
-    monkeypatch.setattr("avs.pipeline.has_hf_token", lambda: False)
+    monkeypatch.setattr("avoc.pipeline.has_hf_token", lambda: False)
     with pytest.raises(ValueError, match="no Hugging Face token"):
         job.start(files / "good.mkv", files / "ep.ass")
     assert job.status()["state"] == "idle"

@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from avs.stages.export import PEAK_CEILING, export, summarize
+from avoc.stages.export import PEAK_CEILING, export, summarize
 
 
 @dataclass(frozen=True)

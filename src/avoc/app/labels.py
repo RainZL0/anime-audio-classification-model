@@ -27,8 +27,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from avs.language import Words, say
-from avs.project import read_json, write_json
+from avoc.language import Words, say
+from avoc.project import read_json, write_json
 
 PALETTE = (
     "#7F77DD",
@@ -418,4 +418,4 @@ class LabelStore:
                 self._save_cast()
 
     def _save_cast(self) -> None:
-        write_json(self.cast_path, {"schema": "avs.cast.v1", "roles": self.roles})
+        write_json(self.cast_path, {"schema": "cast.v1", "roles": self.roles})

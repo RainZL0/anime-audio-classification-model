@@ -7,9 +7,9 @@ import pysubs2
 import soundfile as sf
 from fastapi.testclient import TestClient
 
-from avs.app.server import AppState, create_app
-from avs.project import read_json, write_json
-from avs.stages.text_subtitle import TextLine, load_text_lines, match, measure_offset, own_tag
+from avoc.app.server import AppState, create_app
+from avoc.project import read_json, write_json
+from avoc.stages.text_subtitle import TextLine, load_text_lines, match, measure_offset, own_tag
 from tests.fixtures import episode
 
 

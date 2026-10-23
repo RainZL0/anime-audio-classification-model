@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from avs.language import say
+from avoc.language import say
 
 MAX_LINE = 20.0
 DIALOGUE_STYLE = "Default"

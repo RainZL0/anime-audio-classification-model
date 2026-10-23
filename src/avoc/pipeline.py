@@ -11,9 +11,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from avs.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
-from avs.language import Words, say
-from avs.project import (
+from avoc.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
+from avoc.language import Words, say
+from avoc.project import (
     cache_dir,
     cache_signature,
     load_episode,
@@ -72,8 +72,8 @@ def prepare(
     same source and subtitle group (measured on episodes 1 to 3: -0.95, -0.96, -0.96), so simply
     give the value measured for the previous episode.
     """
-    from avs.audio import audio_info, diarize, extract_audio, make_analysis_copy, separate_vocals
-    from avs.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
+    from avoc.audio import audio_info, diarize, extract_audio, make_analysis_copy, separate_vocals
+    from avoc.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
 
     validate_name(name)
     if out.exists():
@@ -151,7 +151,7 @@ def prepare(
     if not rows:
         raise ValueError(say("字幕全都落在音轨外面", "All subtitles fall outside the audio track"))
     episode = {
-        "schema": "avs.episode.v1",
+        "schema": "episode.v1",
         "name": name,
         "source": str(audio.resolve()),
         "video": str(video.resolve()),
@@ -195,7 +195,7 @@ def video_seconds(video: Path) -> float:
 def attach_video(directory: Path, video: Path) -> dict[str, Any]:
     """Record the video for an episode. Pictures are the main evidence for identifying speakers
     during labeling, so the duration must match the audio track."""
-    from avs.audio import audio_info
+    from avoc.audio import audio_info
 
     episode, _ = load_episode(directory)
     if not video.is_file():
@@ -230,8 +230,8 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     speech detection did not have subtitle-line boundaries, so finding their dialogue uses time
     overlap. See app/workspace.py.
     """
-    from avs.app.workspace import text_for
-    from avs.stages.subtitle import load_dialogue
+    from avoc.app.workspace import text_for
+    from avoc.stages.subtitle import load_dialogue
 
     episode, rows = load_episode(directory)
     dialogue = load_dialogue(subtitles)
@@ -268,8 +268,8 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     either fails, the file is refused and not written to episode.json: after lining up, the overlap
     is below `MIN_AGREEMENT`, or fewer than `MIN_MATCHED` of the clips touch a line.
     """
-    from avs.app.workspace import subtitle_lines
-    from avs.stages.text_subtitle import (
+    from avoc.app.workspace import subtitle_lines
+    from avoc.stages.text_subtitle import (
         MIN_AGREEMENT,
         MIN_MATCHED,
         load_text_lines,
@@ -285,9 +285,9 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     if not cut:
         raise ValueError(
             say(
-                f"{episode['name']} 还没记切片段用的字幕，先用 avs set-subtitles 补上",
+                f"{episode['name']} 还没记切片段用的字幕，先用 avoc set-subtitles 补上",
                 f"{episode['name']} has no subtitles recorded for cutting; "
-                "add them with avs set-subtitles",
+                "add them with avoc set-subtitles",
             )
         )
     lines = load_text_lines(subtitles)
@@ -332,7 +332,7 @@ def next_episode_name(workspace: Path) -> str:
 def find_episode_by_video(workspace: Path, video: Path) -> str | None:
     """The episode in the workspace that was already processed with this video; None if there is
     none."""
-    from avs.app.workspace import episode_dirs
+    from avoc.app.workspace import episode_dirs
 
     wanted = str(video.resolve())
     for directory in episode_dirs(workspace):
@@ -363,7 +363,7 @@ def add_episode(
     "output folder already exists". If no episode name is given, first look for an episode already
     processed with the same video. If none is found, take the next `epNN`.
     """
-    from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL
+    from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL
 
     if name is None:
         name = find_episode_by_video(workspace, video) or next_episode_name(workspace)

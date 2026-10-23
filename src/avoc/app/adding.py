@@ -1,5 +1,5 @@
 """Add an episode from the interface. The page fills in the video and subtitle paths, and the server
-runs `avs add` in a separate process, the same command as on the command line.
+runs `avoc add` in a separate process, the same command as on the command line.
 
 A separate process keeps the GPU memory of voice separation out of the server, lets the person stop
 it, and a crash there does not take the interface down. Only one episode is added at a time. Each
@@ -20,7 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from avs.language import LANGUAGE, say
+from avoc.language import LANGUAGE, say
 
 KEEP_LINES = 200
 """How many of the latest output lines are kept for the page."""
@@ -58,8 +58,8 @@ class Adding:
         self.started = 0.0
         self.finished = 0.0
         self.ended = threading.Event()
-        self.program = [sys.executable, "-m", "avs"]
-        """How to run avs. Tests swap in a small script."""
+        self.program = [sys.executable, "-m", "avoc"]
+        """How to run avoc. Tests swap in a small script."""
 
     def status(self) -> dict[str, Any]:
         with self.lock:
@@ -81,11 +81,11 @@ class Adding:
         offset: float | None = None,
         name: str | None = None,
     ) -> dict[str, Any]:
-        """Check what can be checked at once, then start `avs add` in the background. Raises
+        """Check what can be checked at once, then start `avoc add` in the background. Raises
         ValueError with a reason the person can act on."""
-        from avs.pipeline import NO_TOKEN_HINT, find_episode_by_video, has_hf_token
-        from avs.pipeline import next_episode_name as next_name
-        from avs.project import validate_name
+        from avoc.pipeline import NO_TOKEN_HINT, find_episode_by_video, has_hf_token
+        from avoc.pipeline import next_episode_name as next_name
+        from avoc.project import validate_name
 
         with self.lock:
             if self.state == "running":
@@ -107,7 +107,7 @@ class Adding:
                     f"cannot find the text subtitles: {text_subtitles}",
                 )
             )
-        from avs.stages.subtitle import load_dialogue
+        from avoc.stages.subtitle import load_dialogue
 
         if not load_dialogue(subtitles):
             raise ValueError(say("字幕里没有台词", "there are no dialogue lines in the subtitles"))
@@ -118,8 +118,9 @@ class Adding:
         if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
             raise ValueError(
                 say(
-                    "没找到 FFmpeg。装上它，把 bin 文件夹加进 PATH，再重启 avs",
-                    "FFmpeg was not found. Install it, add its bin folder to PATH, and restart avs",
+                    "没找到 FFmpeg。装上它，把 bin 文件夹加进 PATH，再重启 avoc",
+                    "FFmpeg was not found. Install it, add its bin folder to PATH, "
+                    "and restart avoc",
                 )
             )
         name = name or find_episode_by_video(self.workspace, video) or next_name(self.workspace)
@@ -133,7 +134,7 @@ class Adding:
             command += ["--offset", str(offset)]
         environment = {
             **os.environ,
-            "AVS_LANGUAGE": LANGUAGE.get(),
+            "AVOC_LANGUAGE": LANGUAGE.get(),
             "PYTHONIOENCODING": "utf-8",
             "PYTHONUNBUFFERED": "1",
             # A plain traceback instead of typer's boxed one: its last line is the reason, and

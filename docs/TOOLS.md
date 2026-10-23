@@ -24,8 +24,8 @@ The actual versions are in `pyproject.toml` and `uv.lock`. Which model was chose
 
 ## Interface
 
-- **FastAPI + uvicorn**: the web server for `avs app`. It listens only on 127.0.0.1.
-- **Preact + htm**: the front end. It uses the single-file build of htm 3.1.1 (`src/avs/app/static/vendor/preact-htm.js`, Apache-2.0; the license is in the same folder). No Node and no build tool are needed.
+- **FastAPI + uvicorn**: the web server for `avoc app`. It listens only on 127.0.0.1.
+- **Preact + htm**: the front end. It uses the single-file build of htm 3.1.1 (`src/avoc/app/static/vendor/preact-htm.js`, Apache-2.0; the license is in the same folder). No Node and no build tool are needed.
 - The tests drive the FastAPI test client through httpx.
 
 ## Runtime environment

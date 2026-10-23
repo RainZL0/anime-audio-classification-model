@@ -1,6 +1,6 @@
 """Automatic subtitle alignment check."""
 
-from avs.stages.subtitle import find_offset
+from avoc.stages.subtitle import find_offset
 
 
 def test_offset_is_measured_not_assumed() -> None:

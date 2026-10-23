@@ -1,6 +1,6 @@
 # Commands
 
-All the commands are listed only here. For how each step works inside, see [HOW_IT_WORKS.md](HOW_IT_WORKS.md). `uv run avs --help` lists all the commands, and `uv run avs <command> --help` lists the options of one command.
+All the commands are listed only here. For how each step works inside, see [HOW_IT_WORKS.md](HOW_IT_WORKS.md). `uv run avoc --help` lists all the commands, and `uv run avoc <command> --help` lists the options of one command.
 
 | Section | What it does |
 | --- | --- |
@@ -15,7 +15,7 @@ You need FFmpeg on your `PATH`. For the GPU setup and notes on each model, see [
 
 ```powershell
 uv sync --locked
-uv run avs doctor
+uv run avoc doctor
 ```
 
 `doctor` lists each item in turn: the graphics card, FFmpeg, the voice separation model, the Hugging Face token, and the free disk space. Items marked "missing" must be fixed first. Items marked "optional" can be left alone and the tool still works.
@@ -23,7 +23,7 @@ uv run avs doctor
 ## Processing a new episode
 
 ```powershell
-uv run avs add runs "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
+uv run avoc add runs "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
 ```
 
 The interface can also add an episode, with the same steps ([how](#labeling-and-correction-interface)). `add` does everything in one command: it extracts the audio track, separates the voices, cuts clips along the subtitle lines, and then computes the three voiceprints that the interface needs. If the episode name is left out, it uses the next unused `epNN` in the workspace. You can also name it with `--name`. If you give `--text-subs <Japanese subtitle file>`, the dialogue text used for export is attached in the same step (the same as `set-text-subtitles` below). If the run stops halfway (for example, because there is not enough GPU memory), fix the problem and run the same command again. It picks up where it stopped: clips that are already cut and voiceprints that are already computed are not recomputed. If the clip-cutting step itself fails, the half-built folder is deleted.
@@ -35,10 +35,10 @@ Both the video and the subtitles are required. The audio track is extracted from
 If you prefer to run the steps one at a time, `add` is equal to the following:
 
 ```powershell
-uv run avs prepare "video" --subs "subtitles" --name ep08 --out runs/episodes/ep08 --offset -0.95
-uv run avs embed runs/episodes/ep08 --model anime-va
-uv run avs embed runs/episodes/ep08 --model anime-char
-uv run avs embed runs/episodes/ep08 --model redimnet2-b6
+uv run avoc prepare "video" --subs "subtitles" --name ep08 --out runs/episodes/ep08 --offset -0.95
+uv run avoc embed runs/episodes/ep08 --model anime-va
+uv run avoc embed runs/episodes/ep08 --model anime-char
+uv run avoc embed runs/episodes/ep08 --model redimnet2-b6
 ```
 
 ## Labeling and correction interface
@@ -46,12 +46,12 @@ uv run avs embed runs/episodes/ep08 --model redimnet2-b6
 The workspace is a folder. Its `episodes/` subfolder holds the episodes (the output of `add` or `prepare`), and labels are saved automatically in `labels/`. This repo uses `runs/` as the workspace.
 
 ```powershell
-uv run avs app runs
+uv run avoc app runs
 ```
 
 Open `http://127.0.0.1:8765` in your browser. `--port` changes the port. `--no-open` stops the browser from opening by itself. `--model` can be repeated, to use only the named voiceprint models. The part of the address after `#` records the current view, episode, character and selected line, so after a refresh you return to the same spot. Episodes whose voiceprints are not all computed (usually because `add` was interrupted) are not loaded. They are listed on the command line at startup, and the other episodes work as usual. When the workspace has no episodes at all, the page opens on a welcome page: what the tool does in four steps, the same machine checks as `doctor`, and a form to add the first episode.
 
-Adding an episode from the interface: on the welcome page, or with "+ Add an episode…" at the bottom of the episode menu. Paste the paths of the video, the dialogue subtitles and, if you want, the Japanese text subtitles. The offset box is filled in with the last episode's offset. Start runs the same `avs add` as on the command line, in a separate process. The progress lines show as it goes, and library warnings show only if it fails. You can close the dialog and keep labeling; a button at the top shows that it is still running, and the new episode appears in the menu when it is done. Stop ends it. If it stops before the clips are cut, the half-built folder is deleted. Otherwise the episode is listed under "Unfinished episodes" with a "Carry on" button, which reruns it with the files it recorded. Only one episode is added at a time.
+Adding an episode from the interface: on the welcome page, or with "+ Add an episode…" at the bottom of the episode menu. Paste the paths of the video, the dialogue subtitles and, if you want, the Japanese text subtitles. The offset box is filled in with the last episode's offset. Start runs the same `avoc add` as on the command line, in a separate process. The progress lines show as it goes, and library warnings show only if it fails. You can close the dialog and keep labeling; a button at the top shows that it is still running, and the new episode appears in the menu when it is done. Stop ends it. If it stops before the clips are cut, the half-built folder is deleted. Otherwise the episode is listed under "Unfinished episodes" with a "Carry on" button, which reruns it with the files it recorded. Only one episode is added at a time.
 
 Give names only to the people you want to collect (the target characters). Label everyone else "Other" with the Q key, including anyone you are not sure is a target. Clips where several people speak and none of them is a target are also labeled "Other", and so are clips that are not speech, such as cheers and sound effects. The target character's own laughs and sighs count as the target's voice, so label them as the target. Each target character has two options, chosen in one go. The number key gives the clean target. Shift plus the same number gives "target, low quality". Use the low-quality option for clips with heavy background sound or with several people talking at once. Those clips are not used to recognize the character. They are skipped on export and written to `rejected.tsv`. With two target characters, the bottom bar has 5 options in all: four for the two targets (clean and low quality for each), plus "Other". Next to each target character's guess on the left there is also a "Low quality" button. When you change a clip to the clean target or to "Other", "Low quality" is removed automatically. There can be several target characters. You can add or remove them at any time in the Characters view. For how existing labels are handled when you add or remove a target, see [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface).
 
@@ -71,9 +71,9 @@ Each label is saved to disk and the model is retrained right away. Backspace (or
 Commands for filling in information for older episodes:
 
 ```powershell
-uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
-uv run avs set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
-uv run avs set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
+uv run avoc set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
+uv run avoc set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
+uv run avoc set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
 ```
 
 - `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.

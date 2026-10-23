@@ -1,4 +1,4 @@
-# anime-voice-sorter
+# anime-voice-collector
 
 Collects an anime character's lines, one character at a time. For the project overview, see `README.md`.
 

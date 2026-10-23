@@ -1,5 +1,5 @@
 """Check the machine before the first episode: GPU, FFmpeg, the voice separation model, the
-Hugging Face token and free disk space. `avs doctor` prints these, and the interface's welcome page
+Hugging Face token and free disk space. `avoc doctor` prints these, and the interface's welcome page
 shows the same list."""
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from avs.language import say
+from avoc.language import say
 
 FREE_GB = 5
 """Warn below this much free disk space. One processed episode takes about 0.5 GB."""
@@ -28,8 +28,8 @@ def checks(where: Path) -> list[Check]:
     """`where` is the folder whose disk is checked for free space."""
     import torch
 
-    from avs.audio import SEPARATION_MODEL
-    from avs.pipeline import TOKEN_HOWTO, has_hf_token
+    from avoc.audio import SEPARATION_MODEL
+    from avoc.pipeline import TOKEN_HOWTO, has_hf_token
 
     cuda = torch.cuda.is_available()
     gpu = f", {torch.cuda.get_device_name(0)}" if cuda else ""
@@ -55,8 +55,8 @@ def checks(where: Path) -> list[Check]:
                 bool(path),
                 f"{tool}: {path or say('没找到', 'not found')}",
                 say(
-                    "装上 FFmpeg，把它的 bin 文件夹加进 PATH，再重启 avs",
-                    "Install FFmpeg, add its bin folder to PATH, and restart avs",
+                    "装上 FFmpeg，把它的 bin 文件夹加进 PATH，再重启 avoc",
+                    "Install FFmpeg, add its bin folder to PATH, and restart avoc",
                 ),
             )
         )

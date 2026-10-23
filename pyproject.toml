@@ -1,5 +1,5 @@
 [project]
-name = "avs"
+name = "anime-voice-collector"
 version = "0.1.0"
 description = "Collect an anime character's lines: label a few, the model sorts the rest, export for voice training"
 readme = "README.md"
@@ -22,11 +22,14 @@ dependencies = [
 ]
 
 [project.scripts]
-avs = "avs.cli:app"
+avoc = "avoc.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "avoc"
 
 # On Windows and Linux, torch and torchaudio are installed as CUDA 12.8 wheels from the
 # official PyTorch index. Without an NVIDIA GPU, the same wheels still run on the CPU

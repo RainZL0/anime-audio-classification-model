@@ -23,7 +23,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from avs.language import say
+from avoc.language import say
 
 MIN_AGREEMENT = 0.6
 """After matching, the two subtitle files must agree on display times (overlap divided by union) by
@@ -76,7 +76,7 @@ class TextLine:
 def load_text_lines(path: Path) -> list[TextLine]:
     """Read an ASS or SRT file, split it into lines, remove speaker tags and sound notes, and sort
     by time. The times are the subtitle file's own."""
-    from avs.stages.subtitle import read_subtitles
+    from avoc.stages.subtitle import read_subtitles
 
     lines: list[TextLine] = []
     for event in read_subtitles(path):
@@ -115,7 +115,7 @@ def measure_offset(
     are compared with each other, using the same method that `find_offset` uses to compare
     subtitles with speech detection.
     """
-    from avs.stages.subtitle import find_offset
+    from avoc.stages.subtitle import find_offset
 
     if not lines or not cut_lines:
         return 0.0, 0.0

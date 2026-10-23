@@ -77,7 +77,7 @@ def segment_rows(episode: str, spans: list[dict[str, Any]]) -> list[dict[str, An
 
 def load_episode(directory: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     episode = read_json(directory / "episode.json")
-    if episode.get("schema") != "avs.episode.v1":
+    if episode.get("schema") != "episode.v1":
         raise ValueError(f"Not a current episode directory: {directory}")
     validate_name(episode["name"])
     rows = read_json(directory / "segments.json")
@@ -94,7 +94,7 @@ def cache_signature(directory: Path, model: str) -> dict[str, str]:
     Without this item, after raising the minimum, the old cache would still pass the check, grouping
     would keep using short clips that should have been dropped, and there would be no error.
     """
-    from avs.embeddings.extract import MIN_SECONDS
+    from avoc.embeddings.extract import MIN_SECONDS
 
     episode, _ = load_episode(directory)
     signature = {

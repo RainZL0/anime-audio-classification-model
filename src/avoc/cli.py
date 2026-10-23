@@ -9,11 +9,11 @@ from typing import Annotated
 
 import typer
 
-from avs import pipeline
-from avs.language import say
+from avoc import pipeline
+from avoc.language import say
 
 app = typer.Typer(
-    name="avs",
+    name="avoc",
     help="Cut clips by subtitles, then label and export one character's lines.",
     no_args_is_help=True,
 )
@@ -32,7 +32,7 @@ DEVICE_HELP = "cuda, cpu, or auto (uses cuda if there is an NVIDIA GPU)"
 @app.command()
 def doctor() -> None:
     """Check the runtime environment: GPU, FFmpeg, model files, and the Hugging Face token."""
-    from avs.doctor import checks
+    from avoc.doctor import checks
 
     problems = 0
     for check in checks(Path.cwd()):
@@ -95,7 +95,7 @@ def add(
             f"{result['episode']} added, {result['segments']} clips. To open the interface:",
         )
     )
-    typer.echo(f"  uv run avs app {workspace}")
+    typer.echo(f"  uv run avoc app {workspace}")
 
 
 @app.command()
@@ -206,8 +206,8 @@ def run_app(
 
     import uvicorn
 
-    from avs.app.server import AppState, create_app
-    from avs.app.workspace import DEFAULT_MODELS
+    from avoc.app.server import AppState, create_app
+    from avoc.app.workspace import DEFAULT_MODELS
 
     state = AppState(workspace, tuple(model) if model else DEFAULT_MODELS)
     typer.echo(
@@ -219,7 +219,7 @@ def run_app(
     if not state.workspace.episodes:
         typer.echo(
             f"No episode in the workspace can be used yet. "
-            f"Add one first: uv run avs add {workspace} VIDEO --subs SUBTITLES"
+            f"Add one first: uv run avoc add {workspace} VIDEO --subs SUBTITLES"
         )
     url = f"http://127.0.0.1:{port}/"
     typer.echo(f"Open {url}")

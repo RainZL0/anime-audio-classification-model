@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from avs.app.labels import OTHER
+from avoc.app.labels import OTHER
 
 STRENGTH = 100.0
 """Regularization strength of the logistic regression. The value picked when episodes 1 and 2 were

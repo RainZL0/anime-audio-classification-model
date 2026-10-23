@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from avs.project import cache_signature, segment_rows, write_json
+from avoc.project import cache_signature, segment_rows, write_json
 
 
 def _unit(matrix: np.ndarray) -> np.ndarray:
@@ -25,7 +25,7 @@ def episode(root: Path, name: str, vectors: np.ndarray) -> Path:
     write_json(
         directory / "episode.json",
         {
-            "schema": "avs.episode.v1",
+            "schema": "episode.v1",
             "name": name,
             "vocals": str(vocals),
             "analysis": str(analysis),

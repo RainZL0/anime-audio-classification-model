@@ -1,4 +1,4 @@
-# anime-voice-sorter
+# anime-voice-collector
 
 Collect every line a chosen anime character speaks, as clean single-speaker audio clips with their text, ready for training GPT-SoVITS, Style-Bert-VITS2 or RVC.
 
@@ -16,10 +16,10 @@ Tested on Windows 11 with an RTX 4060 Laptop GPU. Linux should work but has not 
 ## Quick start
 
 ```bash
-git clone https://github.com/RainZL0/anime-audio-classification-model.git
-cd anime-audio-classification-model
+git clone https://github.com/RainZL0/anime-voice-collector.git
+cd anime-voice-collector
 uv sync --locked
-uv run avs doctor
+uv run avoc doctor
 ```
 
 `doctor` checks the GPU, FFmpeg, the voice separation model, your Hugging Face token and free disk space. Fix anything it marks as missing.
@@ -27,7 +27,7 @@ uv run avs doctor
 Add an episode to a workspace folder (here `work`). One command separates the voices, cuts the clips and computes everything the labeling app needs:
 
 ```bash
-uv run avs add work "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
+uv run avoc add work "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
 ```
 
 - `--offset` is how many seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and the same subtitle group almost always share one offset. Find it once, then reuse it.
@@ -38,7 +38,7 @@ uv run avs add work "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
 Open the labeling app:
 
 ```bash
-uv run avs app work
+uv run avoc app work
 ```
 
 It opens `http://127.0.0.1:8765` in your browser. Everything stays on your machine.
@@ -52,7 +52,7 @@ You only name the characters you want (the targets). Everyone else gets a single
 - **Characters (O):** everything the model assigned to one character, least confident first. Fix the wrong ones, then confirm the rest with Shift+Enter. Below that is a list of clips the model may have missed.
 - **Export (E):** GPT-SoVITS list files, Style-Bert-VITS2, or one folder per character. Clips are cut from the separated vocals at the original sample rate.
 
-Z undoes the last step. Run `uv run avs --help` to list all commands.
+Z undoes the last step. Run `uv run avoc --help` to list all commands.
 
 ## Usage rules
 

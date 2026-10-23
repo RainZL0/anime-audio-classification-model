@@ -42,7 +42,7 @@ Labeling and export then happen in the [interface](#labeling-and-correction-inte
 
 ## Labeling and correction interface
 
-`avs app` starts a web server that only listens on this machine. The front end has no build step. Its static files sit directly in `src/avs/app/static/`.
+`avoc app` starts a web server that only listens on this machine. The front end has no build step. Its static files sit directly in `src/avoc/app/static/`.
 
 **Target characters and "Other".** The user names only the characters they want to collect. These are the target characters. Everyone else is labeled "Other", using the Q key. A workspace can have several target characters, and you can add or remove them while labeling:
 - Each "Other" label records which target characters existed at that moment. It counts as "not this target" only for those characters.
@@ -100,9 +100,9 @@ The interface's labels are stored in the workspace folder `labels/`:
 ## Code layout
 
 ```text
-src/avs/
-  cli.py                   command entry point (also run by `python -m avs`)
-  doctor.py                machine checks, shown by `avs doctor` and the welcome page
+src/avoc/
+  cli.py                   command entry point (also run by `python -m avoc`)
+  doctor.py                machine checks, shown by `avoc doctor` and the welcome page
   project.py               data format for an episode and its clips, content fingerprints, cache folders
   pipeline.py              prepare and add episodes, attach video and subtitles, voiceprint cache
   audio.py                 voice separation, making the analysis copy, the speech timeline used to measure subtitle offset
@@ -115,7 +115,7 @@ src/avs/
   app/labels.py            label records in the interface, undo, cast table
   app/model.py             small classifier and similarity check
   app/video.py             cut the short video pieces shown next to each line
-  app/adding.py            add an episode from the interface: runs `avs add` in a separate process
+  app/adding.py            add an episode from the interface: runs `avoc add` in a separate process
   app/server.py            web server endpoints, starting groups, picture cutting, export
   app/static/              front-end pages
 ```

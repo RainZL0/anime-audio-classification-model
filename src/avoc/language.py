@@ -6,11 +6,11 @@ import os
 from contextvars import ContextVar
 
 LANGUAGE: ContextVar[str] = ContextVar(
-    "language", default="zh" if os.environ.get("AVS_LANGUAGE") == "zh" else "en"
+    "language", default="zh" if os.environ.get("AVOC_LANGUAGE") == "zh" else "en"
 )
 """The language this request wants, `zh` or `en`. Outside a request (the command line, tests calling
-directly) it is English, unless the environment variable `AVS_LANGUAGE` is `zh`. The interface sets
-it when it runs `avs add` for the page, so the progress lines follow the page language."""
+directly) it is English, unless the environment variable `AVOC_LANGUAGE` is `zh`. The interface sets
+it when it runs `avoc add` for the page, so the progress lines follow the page language."""
 
 
 def say(zh: str, en: str) -> str:

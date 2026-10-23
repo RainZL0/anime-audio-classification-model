@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from avs.app.labels import OTHER, LabelStore
-from avs.app.model import train_and_predict
-from avs.app.server import AppState, create_app
-from avs.app.workspace import Clip, neighbor_gap, text_for
+from avoc.app.labels import OTHER, LabelStore
+from avoc.app.model import train_and_predict
+from avoc.app.server import AppState, create_app
+from avoc.app.workspace import Clip, neighbor_gap, text_for
 from tests.fixtures import episode
 
 
@@ -131,7 +131,7 @@ def test_an_old_cast_without_patterns_gets_them_in_order(tmp_path: Path) -> None
     folder = tmp_path / "labels"
     folder.mkdir()
     (folder / "cast.json").write_text(
-        '{"schema": "avs.cast.v1", "roles": [{"name": "A", "color": "#000", "trainable": true,'
+        '{"schema": "cast.v1", "roles": [{"name": "A", "color": "#000", "trainable": true,'
         ' "avatar": null}, {"name": "B", "color": "#111", "trainable": true, "avatar": null}]}',
         encoding="utf-8",
     )
@@ -243,7 +243,7 @@ def test_an_episode_without_voiceprints_is_skipped_not_fatal(tmp_path: Path) -> 
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
     summary = TestClient(create_app(state)).get("/api/state").json()
     assert [e["name"] for e in summary["episodes"]] == ["ep1"]
-    assert "avs add" in summary["skipped"]["ep2"]
+    assert "avoc add" in summary["skipped"]["ep2"]
     assert {c.episode for c in state.workspace.clips} == {"ep1"}
 
 
@@ -251,7 +251,7 @@ FINISH_VOICEPRINTS = """
 import sys
 from pathlib import Path
 import numpy as np
-from avs.project import cache_signature, read_json, write_json
+from avoc.project import cache_signature, read_json, write_json
 args = sys.argv[1:]
 folder = Path(args[1]) / "episodes" / args[args.index("--name") + 1]
 rows = read_json(folder / "segments.json")
@@ -266,12 +266,12 @@ write_json(cache / "cache.json", cache_signature(folder, "redimnet2-b6"))
 def test_an_unfinished_episode_can_be_carried_on_from_the_page(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The page's "carry on" button reruns avs add with the files the episode recorded, and the
-    workspace is reloaded once it is done. A small script stands in for avs add."""
+    """The page's "carry on" button reruns avoc add with the files the episode recorded, and the
+    workspace is reloaded once it is done. A small script stands in for avoc add."""
     import shutil
     import sys
 
-    monkeypatch.setattr("avs.app.adding.shutil.which", lambda _: "found")
+    monkeypatch.setattr("avoc.app.adding.shutil.which", lambda _: "found")
     root = _workspace(tmp_path)
     half = episode(root / "episodes", "ep2", np.array([[1.0, 0.0, 0.0]] * 6, dtype=float))
     shutil.rmtree(half / "embeddings")

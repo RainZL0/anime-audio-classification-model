@@ -19,12 +19,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from avs.app.adding import Adding, clean_path
-from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
-from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
-from avs.app.video import VIDEO_PAD, cut_video
-from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
-from avs.language import LANGUAGE, Words, say
+from avoc.app.adding import Adding, clean_path
+from avoc.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
+from avoc.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
+from avoc.app.video import VIDEO_PAD, cut_video
+from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
+from avoc.language import LANGUAGE, Words, say
 
 STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
@@ -436,7 +436,7 @@ class AppState:
     # Export
 
     def set_text_subtitles(self, episode: str, path: Path) -> dict[str, Any]:
-        from avs.pipeline import attach_text_subtitles
+        from avoc.pipeline import attach_text_subtitles
 
         meta = self.workspace.episodes.get(episode)
         if meta is None:
@@ -450,7 +450,7 @@ class AppState:
     ) -> tuple[dict[str, str], list[dict[str, Any]]]:
         """Swap the exported dialogue for the text from the separately supplied subtitles. Returns
         (clip ID to text, clips not accepted)."""
-        from avs.stages.text_subtitle import load_text_lines, match, own_tag, shifted, touching
+        from avoc.stages.text_subtitle import load_text_lines, match, own_tag, shifted, touching
 
         needed = sorted({c.episode for clips in assigned.values() for c in clips})
         missing = [e for e in needed if not self.workspace.episodes[e].get("text_subtitles")]
@@ -491,7 +491,7 @@ class AppState:
 
     def export(self, roles: list[str], include_auto: bool, form: str, language: str,
                out: Path, text_subtitles: bool = False) -> dict[str, Any]:  # fmt: skip
-        from avs.stages.export import export, summarize
+        from avoc.stages.export import export, summarize
 
         if form not in ("gpt-sovits", "style-bert-vits2", "folder"):
             raise ValueError(say("不认识的导出格式", "unknown export format"))
@@ -634,7 +634,7 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
 
 def _recorded_files(root: Path, name: str) -> tuple[Path, Path, Path | None, float | None, str]:
     """The files an unfinished episode was started with, read from its episode.json, to carry on."""
-    from avs.project import read_json, validate_name
+    from avoc.project import read_json, validate_name
 
     validate_name(name)
     path = root / "episodes" / name / "episode.json"
@@ -683,11 +683,11 @@ def create_app(state: AppState) -> Any:
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
 
-    app = FastAPI(title="avs", docs_url=None, redoc_url=None)
+    app = FastAPI(title="avoc", docs_url=None, redoc_url=None)
 
     @app.middleware("http")
     async def always_check_page_files(request: Any, call_next: Any) -> Any:
-        """Answer in the page's language (see avs.language), and make the browser check the page,
+        """Answer in the page's language (see avoc.language), and make the browser check the page,
         styles and script with the server every time (an unchanged file only gets a 304). Without
         that header the browser caches by modification time for a while, so a refresh after a UI
         change may still use the old styles or script."""
@@ -824,7 +824,7 @@ def create_app(state: AppState) -> Any:
     def read_doctor() -> list[dict[str, Any]]:
         from dataclasses import asdict
 
-        from avs.doctor import checks
+        from avoc.doctor import checks
 
         return [asdict(c) for c in checks(state.workspace.root.resolve())]
 

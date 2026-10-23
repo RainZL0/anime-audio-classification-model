@@ -13,9 +13,9 @@ import pytest
 import soundfile as sf
 from typer.testing import CliRunner
 
-from avs import pipeline
-from avs.cli import app
-from avs.project import cache_signature, read_json, segment_rows, write_json
+from avoc import pipeline
+from avoc.cli import app
+from avoc.project import cache_signature, read_json, segment_rows, write_json
 
 
 def episode(root: Path, name: str) -> Path:
@@ -28,7 +28,7 @@ def episode(root: Path, name: str) -> Path:
     write_json(
         directory / "episode.json",
         {
-            "schema": "avs.episode.v1",
+            "schema": "episode.v1",
             "name": name,
             "vocals": str(vocals),
             "analysis": str(analysis),
@@ -77,7 +77,7 @@ def test_cache_drift_is_detected(tmp_path: Path, changed: str) -> None:
 def test_prepare_uses_subtitle_boundaries_keeps_short_lines(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
-    from avs import audio
+    from avoc import audio
 
     directory = episode(tmp_path, "ep1")
     source = directory / "ep1.wav"
