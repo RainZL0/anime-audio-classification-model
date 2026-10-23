@@ -10,7 +10,13 @@ import pytest
 from typer.testing import CliRunner
 
 from avoc.cli import app
-from avoc.stages.subtitle import describe_styles, load_dialogue, pick_styles, read_subtitles
+from avoc.stages.subtitle import (
+    describe_styles,
+    load_dialogue,
+    pick_styles,
+    read_subtitles,
+    styles_note,
+)
 
 HEAD = """[Script Info]
 ScriptType: v4.00+
@@ -93,6 +99,17 @@ def test_common_encodings_are_read(tmp_path: Path, text: str, encoding: str) -> 
     ]
 
 
+def test_a_long_gbk_file_with_many_styles_is_read(tmp_path: Path) -> None:
+    """With charset-normalizer's default settings, no encoding was found for this file."""
+    lines = (
+        spread("Dial", 300, "我们一定要赢下这场比赛")
+        + [("OP-kara", 30 + i * 0.3, 30.25 + i * 0.3, "歌词") for i in range(400)]
+        + spread("Sign", 30, "招牌")
+    )
+    found = describe_styles(write(tmp_path, ass(lines), "gbk"))
+    assert (found["encoding"], found["picked"]) == ("GBK", ["Dial"])
+
+
 def test_broken_text_gives_a_reason_to_act_on(tmp_path: Path) -> None:
     """A file marked as UTF-8 that is not UTF-8 is not guessed at."""
     path = tmp_path / "ep.srt"
@@ -153,9 +170,13 @@ def test_chosen_styles_win_and_wrong_names_are_refused(tmp_path: Path) -> None:
 def test_styles_are_described_for_checking(tmp_path: Path) -> None:
     lines = spread("Default", 50, "我们一定要赢下这场比赛") + spread("Sign", 10, "招牌")
     found = describe_styles(write(tmp_path, ass(lines), "gb18030"))
-    assert (found["format"], found["encoding"], found["picked"]) == ("ass", "gb18030", ["Default"])
+    assert (found["format"], found["encoding"], found["picked"]) == ("ass", "GBK", ["Default"])
     assert [(s["name"], s["lines"]) for s in found["styles"]] == [("Default", 50), ("Sign", 10)]
     assert found["styles"][1]["samples"] == ["招牌 0", "招牌 5", "招牌 9"]
+    # How to change the styles is said only when they were picked automatically.
+    path = write(tmp_path, ass(lines))
+    assert styles_note(path).endswith("To change this, use --styles")
+    assert styles_note(path, ["Sign"]) == "Dialogue taken from Sign (10); left out: Default (50)"
 
     path = write(tmp_path, ass(lines), name="other.ass")
     result = CliRunner().invoke(app, ["styles", str(path)])

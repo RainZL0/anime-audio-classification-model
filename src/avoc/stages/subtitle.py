@@ -33,6 +33,20 @@ HALF_WIDTH_KANA = re.compile("[｡-ﾟ]")
 it, and with only a few Chinese lines charset-normalizer can rate that reading as good as the
 right one."""
 
+ENCODING_NAMES = {
+    "utf-8": "UTF-8",
+    "utf-8-sig": "UTF-8",
+    "utf-16": "UTF-16",
+    "utf-32": "UTF-32",
+    "gb18030": "GBK",  # GB18030 extends GBK, and GBK is the name people know.
+    "big5": "Big5",
+    "cp932": "Shift-JIS",
+    "euc_jp": "EUC-JP",
+    "euc_kr": "EUC-KR",
+    "cp1252": "Windows-1252",
+}
+"""The names people know the encodings by, as text editors show them."""
+
 BYTE_ORDER_MARKS = [
     (codecs.BOM_UTF32_LE, "utf-32"),  # Checked before UTF-16, whose mark it starts with.
     (codecs.BOM_UTF32_BE, "utf-32"),
@@ -65,7 +79,14 @@ def decode_subtitles(data: bytes) -> tuple[str, str]:
         pass
     from charset_normalizer import from_bytes
 
-    found = list(from_bytes(data, cp_isolation=OTHER_ENCODINGS))  # Best first.
+    # Best first. charset-normalizer reads sampled pieces of the file and drops an encoding when the
+    # pieces read as too messy. Its default pieces of 512 bytes dropped the right encoding for 2 of
+    # our 29 test files (real subtitles saved as GBK, Big5, Shift-JIS and EUC-JP); pieces of 64
+    # bytes got all 29 right. If every encoding is still dropped, the least messy one is better
+    # than giving up.
+    found = list(from_bytes(data, cp_isolation=OTHER_ENCODINGS, steps=200, chunk_size=64))
+    if not found:
+        found = list(from_bytes(data, cp_isolation=OTHER_ENCODINGS, threshold=1.0))
     plausible = [m for m in found if not HALF_WIDTH_KANA.search(str(m))]
     if not found:
         raise UnicodeError("unknown text encoding")
@@ -176,20 +197,26 @@ def describe_styles(path: Path) -> dict[str, Any]:
         )
     return {
         "format": subs.format,
-        "encoding": encoding,
+        "encoding": ENCODING_NAMES.get(encoding, encoding),
         "styles": styles,
         "picked": pick_styles(subs),
     }
 
 
 def styles_note(path: Path, styles: list[str] | None = None) -> str:
-    """One line for the person: which styles the dialogue is taken from, and which are left out."""
+    """One line for the person: which styles the dialogue is taken from, and which are left out.
+    When the styles were picked automatically, it also says how to change them."""
     found = describe_styles(path)
     chosen = found["picked"] if styles is None else styles
     named = [f"{s['name']} ({s['lines']})" for s in found["styles"] if s["name"] in chosen]
     rest = [f"{s['name']} ({s['lines']})" for s in found["styles"] if s["name"] not in chosen]
     if not rest:
         return say(f"台词取自样式 {', '.join(named)}", f"Dialogue taken from {', '.join(named)}")
+    if styles is not None:
+        return say(
+            f"台词取自样式 {', '.join(named)}；没用：{', '.join(rest)}",
+            f"Dialogue taken from {', '.join(named)}; left out: {', '.join(rest)}",
+        )
     return say(
         f"台词取自样式 {', '.join(named)}；没用：{', '.join(rest)}。要改就用 --styles",
         f"Dialogue taken from {', '.join(named)}; left out: {', '.join(rest)}. "

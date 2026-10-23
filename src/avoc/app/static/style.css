@@ -324,6 +324,12 @@ kbd {
 .add-form { display: flex; flex-direction: column; gap: 12px; }
 .add-form input { width: 100%; }
 .add-form input.offset { width: 120px; margin-bottom: 4px; }
+.add-form input + .note { margin-top: 4px; }
+.style-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.style-row { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.add-form .style-row input { width: auto; margin-top: 3px; }
+.style-row .samples { display: block; color: var(--text-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 560px; }
 .add-run { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex;
   flex-direction: column; gap: 8px; }
 .add-run.done { background: var(--ok-soft); }

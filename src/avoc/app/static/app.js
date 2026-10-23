@@ -716,6 +716,44 @@ function Checks() {
     <span>${c.text}${!c.ok && c.fix ? html`<br /><span class="note">${c.fix}</span>` : ""}</span></li>`)}</ul>`;
 }
 
+const minutes = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s) % 60).padStart(2, "0")}`;
+
+/* What the server read from the dialogue subtitles: the text encoding, and the styles (the named looks an ASS file
+   gives its lines, such as "Default" or "OP"). The ticked styles are cut into clips; they start as the ones picked
+   automatically. With a single style there is nothing to choose, so only the line count is shown. */
+function SubtitleStyles({ found, chosen, setChosen }) {
+  /* Subtitle groups often give each sign its own style with a line or two, so only the ticked styles and the next
+     few biggest are shown at first. */
+  const [all, setAll] = useState(false);
+  if (found.error) return html`<div class="note warn">${found.error}</div>`;
+  if (!found.styles) return html`<div class="note">${tr("正在读字幕…", "Reading the subtitles…")}</div>`;
+  const read = tr(`${found.format.toUpperCase()}，${found.encoding}`, `${found.format.toUpperCase()}, ${found.encoding}`);
+  if (found.styles.length === 0) return html`<div class="note warn">${tr(`字幕里没有台词（${read}）`, `There are no dialogue lines in the subtitles (${read})`)}</div>`;
+  if (found.styles.length === 1) return html`<div class="note">${tr(`读到 ${found.styles[0].lines} 句台词（${read}）`, `Read ${lines(found.styles[0].lines)} of dialogue (${read})`)}</div>`;
+  const toggle = (name) => {
+    const next = new Set(chosen);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setChosen(next);
+  };
+  /* Ordered by the automatic choice, not the ticks, so a row stays put when it is clicked. */
+  const picked = (s) => found.picked.includes(s.name);
+  const ordered = [...found.styles].sort((a, b) => picked(b) - picked(a) || b.lines - a.lines);
+  const shown = all ? ordered : ordered.filter((s, i) => chosen.has(s.name) || i < found.picked.length + 3);
+  const hidden = ordered.filter((s) => !shown.includes(s));
+  return html`<div class="style-list">
+    <div class="note">${tr(`字幕（${read}）里的台词分几种样式。勾上的切成片段；歌词、招牌字之类的不用勾。已经自动选好，一般不用改，看看例句对不对就行。`,
+      `The lines in these subtitles (${read}) come in several styles. Ticked styles are cut into clips; leave out song lyrics, signs and such. They are already picked automatically and rarely need changing; just check the sample lines.`)}</div>
+    ${shown.map((s) => html`<label class="style-row" key=${s.name}>
+      <input type="checkbox" checked=${chosen.has(s.name)} onChange=${() => toggle(s.name)} />
+      <span><b>${s.name}</b> <span class="note">${lines(s.lines)} · ${minutes(s.first)}–${minutes(s.last)}</span>
+        <span class="samples">${s.samples.join(" ／ ")}</span></span></label>`)}
+    ${hidden.length > 0 && html`<div><button type="button" class="ghost" onClick=${() => setAll(true)}>${tr(
+      `还有 ${hidden.length} 种样式，共 ${hidden.reduce((n, s) => n + s.lines, 0)} 句`,
+      `${many(hidden.length, "more style")}, ${lines(hidden.reduce((n, s) => n + s.lines, 0))} in all`)}</button></div>`}
+    ${chosen.size === 0 && html`<div class="note warn">${tr("至少勾一种", "Tick at least one")}</div>`}
+  </div>`;
+}
+
 /* The form for one episode, and the progress of the `avoc add` the server runs for it. `adding` is the server's job
    status, polled by App. */
 function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
@@ -725,8 +763,22 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
   const [textSubtitles, setTextSubtitles] = useState("");
   const [offset, setOffset] = useState(last ? String(last.offset) : "");
   const [busy, setBusy] = useState(false);
+  /* null: no subtitle path yet. {}: reading. Otherwise the server's description, or {error}. */
+  const [found, setFound] = useState(null);
+  const [chosen, setChosen] = useState(new Set());
   const log = useRef(null);
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [adding?.lines.length]);
+  /* Read the subtitles shortly after the path stops changing. An answer for an older path is dropped. */
+  useEffect(() => {
+    const path = subtitles.trim();
+    setFound(path ? {} : null);
+    if (!path) return;
+    let current = true;
+    const timer = setTimeout(() => call("/api/subtitle-styles", { path })
+      .then((f) => { if (current) { setFound(f); setChosen(new Set(f.picked)); } })
+      .catch((e) => { if (current) setFound({ error: e.message }); }), 300);
+    return () => { current = false; clearTimeout(timer); };
+  }, [subtitles]);
   const run = async (body) => {
     setBusy(true);
     try { setAdding(await call("/api/add", body)); } catch (e) { toast(e.message, true); }
@@ -736,7 +788,9 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
     e.preventDefault();
     const seconds = offset.trim() === "" ? null : Number(offset);
     if (seconds !== null && !Number.isFinite(seconds)) { toast(tr("字幕偏移要填一个数，比如 -0.95", "The subtitle offset must be a number, such as -0.95"), true); return; }
-    run({ video, subtitles, text_subtitles: textSubtitles, offset: seconds });
+    /* While the subtitles are still being read, or could not be read, the server picks the styles itself. */
+    const styles = found?.styles ? found.styles.map((s) => s.name).filter((n) => chosen.has(n)) : null;
+    run({ video, subtitles, text_subtitles: textSubtitles, offset: seconds, styles });
   };
   const stop = async () => {
     setBusy(true);
@@ -744,7 +798,6 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
     setBusy(false);
   };
   const running = adding?.state === "running";
-  const minutes = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const unfinished = Object.entries(state.skipped || {});
   return html`<div class="add-episode">
     ${adding && adding.state !== "idle" && html`<div class="add-run ${adding.state}">
@@ -774,7 +827,8 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
       <div class="field"><label class="title">${tr("视频文件", "Video file")}</label>
         <input value=${video} onInput=${(e) => setVideo(e.target.value)} placeholder="D:\\anime\\Episode 01.mkv" /></div>
       <div class="field"><label class="title">${tr("对白字幕（ASS 或 SRT，按它切台词）", "Dialogue subtitles (ASS or SRT; lines are cut from it)")}</label>
-        <input value=${subtitles} onInput=${(e) => setSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ass" /></div>
+        <input value=${subtitles} onInput=${(e) => setSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ass" />
+        ${found && html`<${SubtitleStyles} key=${subtitles} found=${found} chosen=${chosen} setChosen=${setChosen} />`}</div>
       <div class="field"><label class="title">${tr("日文台词字幕（可以不填，导出日文文字时用）", "Japanese text subtitles (optional; used for Japanese export text)")}</label>
         <input value=${textSubtitles} onInput=${(e) => setTextSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ja.srt" /></div>
       <div class="field"><label class="title">${tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>
@@ -783,7 +837,7 @@ function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
           "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. If you don't know, try 0, or leave it empty to measure it (needs a Hugging Face token).")}</div></div>
       <div class="note">${tr("路径整段粘贴进来就行。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
         "Paste the full paths. On Windows, hold Shift, right-click the file, and choose \"Copy as path\".")}</div>
-      <div><button class="primary" type="submit" disabled=${busy || running || !video.trim() || !subtitles.trim()}>${tr("开始", "Start")}</button></div>
+      <div><button class="primary" type="submit" disabled=${busy || running || !video.trim() || !subtitles.trim() || (found?.styles && chosen.size === 0)}>${tr("开始", "Start")}</button></div>
     </form>
   </div>`;
 }
