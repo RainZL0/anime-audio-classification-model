@@ -360,8 +360,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
           selected=${clip.id === focus} marked=${marks.has(clip.id)} flash=${flashes.has(clip.id)}
           onSelect=${() => setFocus(clip.id)} />`)}
         ${maybe.length > 0 && html`<div class="section-title">可能漏掉的 ${maybe.length} 句</div>
-          <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。是 TA 就按底部 TA 的数字键，不是就按 <kbd>X</kbd>；<kbd>Enter</kbd> 和别处一样，是接受机器猜的第一个。
-            刚设成目标角色时，以前标成「其他」的台词也会列在这里。</p>
+          <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。</p>
           ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special} maybeOf=${role}
             selected=${clip.id === focus} marked=${clip.rejects.includes(role)} flash=${flashes.has(clip.id)}
             onSelect=${() => setFocus(clip.id)} />`)}`}
@@ -952,13 +951,6 @@ function App() {
     } catch (e) { showToast(e.message, true); }
   };
 
-  /* 「可能漏掉的」里按 X：马上记下「不是这个角色」，不等一键确认。 */
-  const rejectMaybe = () => {
-    const from = focus;
-    send("/api/changes", { changes: [{ clip: current.id, reject: role, on: true }] }, `记下了：这句不是 ${role}`,
-      () => setFocus(from));
-    move(1);
-  };
   const confirmRest = async () => {
     const pending = pendingOf(clips);
     const changes = pending.map((c) => (marks.has(c.id)
@@ -1063,8 +1055,7 @@ function App() {
       else if (k === "n" && current && view !== "export") { handled(); newRole(); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
-      else if (k === "x" && view === "roles" && current?.maybe) { handled(); rejectMaybe(); }
-      else if (k === "x" && view === "roles" && current && !current.label) { handled(); toggleMark(current.id); move(1); }
+      else if (k === "x" && view === "roles" && current && !current.label && !current.maybe) { handled(); toggleMark(current.id); move(1); }
       else if (e.key === "Backspace") { handled(); clear(); }
       else if (k === "r" && current?.guess.length) { handled(); playRef(current.guess[0].name); }
       else if (k === "l" && current) { handled(); nextContext(); }
