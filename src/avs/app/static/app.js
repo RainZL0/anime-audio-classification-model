@@ -146,7 +146,7 @@ function Pill({ clip }) {
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
 function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAssign, onAccept, onPlayRef, hasVideo, videoRef,
-  onAvatar, onNewRole, context, onContext }) {
+  onAvatar, onNewRole, onClear, context, onContext }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   const startVoice = useRef(0);
@@ -219,8 +219,11 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
           <div><div class="who">${isOther ? labelText[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
             ${clip.unusable && !labelText[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
-          ${!isOther && hasVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
-            title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
+          <span style="margin-left:auto;display:flex;gap:6px">
+            ${!isOther && hasVideo && html`<button class="ghost" style="font-size:12px"
+              title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
+            <button class="ghost" style="font-size:12px" title="清掉这句的标签，回到机器的猜测"
+              onClick=${onClear}>清掉标签 <kbd>Backspace</kbd></button></span>
         </div>`
       : html`<div class="ask">${clip.guess.length ? "这是谁？机器的猜测" : clip.voiced ? "这是谁？" : "这句太短，机器听不出来，请直接选人"}</div>
         ${clip.familiar === false && html`<div class="stranger">
@@ -245,7 +248,6 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
             新角色 <kbd style="margin-left:4px">N</kbd></button>
           <span style="font-size:12px;color:var(--text-3)">已有的人按数字键，或按 <kbd>/</kbd> 搜索</span></div>`}
 
-    ${clip.rejects.length > 0 && html`<div class="note" style="margin-top:8px">你说过这句不是：${clip.rejects.join("、")}</div>`}
     <div class="hint">
       <kbd>J</kbd> <kbd>K</kbd> 上下一句 · <kbd>空格</kbd> 重播 · <kbd>1</kbd>–<kbd>9</kbd> 选下面的角色 ·
       <kbd>N</kbd> 新角色 · <kbd>/</kbd> 搜索角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键
@@ -255,7 +257,7 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
 
 /* ───────────── 一句台词 ───────────── */
 
-function Row({ clip, roles, labelText, selected, marked, onSelect, flash, maybeOf, showTarget }) {
+function Row({ clip, roles, labelText, selected, onSelect, flash, maybeOf, showTarget }) {
   const ref = useRef(null);
   useEffect(() => {
     if (selected && ref.current) ref.current.scrollIntoView({ block: "nearest" });
@@ -263,7 +265,7 @@ function Row({ clip, roles, labelText, selected, marked, onSelect, flash, maybeO
   const who = whoOf(clip);
   const isOther = who && labelText[who.name];
   const stranger = !clip.label && clip.familiar === false;
-  return html`<div ref=${ref} class="row ${selected ? "sel" : ""} ${marked ? "marked" : ""} ${flash ? "done-flash" : ""}"
+  return html`<div ref=${ref} class="row ${selected ? "sel" : ""} ${flash ? "done-flash" : ""}"
       onClick=${onSelect}>
     <${Avatar} role=${who && !stranger && roles[who.name]} name=${stranger ? null : who?.name} blank=${isOther} />
     <div>
@@ -272,7 +274,6 @@ function Row({ clip, roles, labelText, selected, marked, onSelect, flash, maybeO
           ${stranger ? `最像 ${labelText[who.name] || who.name}` : isOther ? labelText[who.name]
             : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : "未知"}</span>
         <${Pill} clip=${clip} />
-        ${marked && html`<span class="pill reject">不是这个角色</span>`}
         ${clip.unusable && !labelText[clip.label] && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
         ${clip.maybe && html`<span class="pill maybe" title="机器没归给这个角色，但听起来有可能是">可能漏掉 ${pct(chanceOf(clip, maybeOf))}</span>`}
         ${showTarget && bestTarget(clip) && html`<span class="pill maybe" title="机器觉得这句是这个目标角色的概率">
@@ -339,7 +340,7 @@ function Counts({ info }) {
     ${info.seconds > 0 && html`<br /><span title="确认过的台词累计时长">${howLong(info.seconds)}</span>`}</span>`;
 }
 
-function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFocus, marks, toggleMark, onConfirmRest,
+function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFocus, onConfirmRest,
   onRename, onToggleTarget, onAvatar, canCrop, flashes, playing, setPlaying }) {
   const list = state.roles;
   const other = role === OTHER;
@@ -349,7 +350,6 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
   const pending = pendingOf(clips);
   const maybe = maybeListOf(clips);
   const confirmed = confirmedOf(clips, role);
-  const rest = pending.filter((c) => !marks.has(c.id)).length;
   return html`<div class="roles-grid">
     <div class="role-list">
       ${list.map((r) => html`<div class="role-item ${r.name === role ? "on" : ""} ${r.target ? "" : "off"}"
@@ -387,17 +387,17 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
         </div>
         ${pending.length > 0 && html`<div class="welcome" style="align-items:center">
           <div style="flex:1"><h3>机器把这 ${pending.length} 句归给了${other ? "「其他」" : ` ${role}`}</h3>
-            <p>从最没把握的开始排。听到不是 TA 的，按 <kbd>X</kbd> 标出来；听完一键确认其余的，标出来的会回到待确认。</p></div>
-          <button class="primary" disabled=${rest === 0} onClick=${onConfirmRest}>
-            确认其余 ${rest} 句${marks.size ? `，剔除 ${marks.size} 句` : ""} <kbd style="margin-left:4px">Shift+Enter</kbd></button>
+            <p>从最没把握的开始排。听到不对的，直接标成对的人或「其他」<kbd>Q</kbd>，它就离开这里；听完一键确认其余的。</p></div>
+          <button class="primary" onClick=${onConfirmRest}>
+            确认其余 ${pending.length} 句 <kbd style="margin-left:4px">Shift+Enter</kbd></button>
         </div>`}
         ${pending.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText}
-          selected=${clip.id === focus} marked=${marks.has(clip.id)} flash=${flashes.has(clip.id)} showTarget=${other}
+          selected=${clip.id === focus} flash=${flashes.has(clip.id)} showTarget=${other}
           onSelect=${() => setFocus(clip.id)} />`)}
         ${maybe.length > 0 && html`<div class="section-title">可能漏掉的 ${maybe.length} 句</div>
           <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。</p>
           ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText} maybeOf=${role}
-            selected=${clip.id === focus} marked=${clip.rejects.includes(role)} flash=${flashes.has(clip.id)}
+            selected=${clip.id === focus} flash=${flashes.has(clip.id)}
             onSelect=${() => setFocus(clip.id)} />`)}`}
         ${confirmed.length > 0 && html`<div class="section-title">确认过的 ${confirmed.length} 句${other ? "，最像某个目标角色的排在前面" : ""}</div>
           ${confirmed.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText} showTarget=${other}
@@ -623,9 +623,9 @@ function Help({ onClose }) {
     ["Q", "其他：不是任何一个目标角色"],
     ["N", "标成一个新的目标角色，名字以后再起；有画面时接着截头像"],
     ["/", "搜索角色，或者敲名字新建"],
-    ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"],
+    ["Backspace", "清掉这句的标签，回到机器的猜测（Z 是撤回上一步，不一定是清掉）"], ["R", "听机器最像的那个角色的参考音"],
     ["L", "看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常"], ["Z", "撤销上一步（可以一直往回撤）"],
-    ["F", "场景视图里只看要处理的"], ["角色视图里机器归给 TA 的句子按 X", "标出不是 TA 的，Shift+Enter 时记成不是 TA"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
+    ["F", "场景视图里只看要处理的"], ["角色视图里 Shift+Enter", "确认机器归给这个角色、还没人确认的全部句子"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
     ["截头像时 Enter / Esc", "保存 / 放弃"],
   ];
@@ -756,7 +756,6 @@ function App() {
   /* 「整集」里是否列出默认跳过的短句（status 为 skipped）；标过的短句总是列出。 */
   const [showShort, setShowShort] = useState(() => localStorage.getItem("avs-show-short") === "1");
   const [role, setRole] = useState(null);
-  const [marks, setMarks] = useState(() => new Set());
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -849,7 +848,7 @@ function App() {
       setFocus((f) => (list.some((c) => c.id === f) ? f : (list.find((c) => NEEDS_WORK.has(c.status)) || list[0])?.id));
     } else if (view === "roles" && role) {
       const list = await get(`/api/clips?role=${encodeURIComponent(role)}`);
-      setClips(list); setMarks(new Set());
+      setClips(list);
       setFocus((f) => (list.some((c) => c.id === f) ? f : (pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id));
     } else if (view === "groups" && episode) {
       setGroupsLoading(true);
@@ -1024,19 +1023,11 @@ function App() {
 
   const confirmRest = async () => {
     const pending = pendingOf(clips);
-    /* 「其他」不是模型里的一个角色，记「不是其他」没有用，标出来的就只是留着不确认。 */
-    const changes = pending.flatMap((c) => (marks.has(c.id)
-      ? role === OTHER ? [] : [{ clip: c.id, reject: role, on: true }]
-      : [{ clip: c.id, label: role }]));
-    if (!changes.length) return;
+    if (!pending.length) return;
+    const changes = pending.map((c) => ({ clip: c.id, label: role }));
     const result = await send("/api/changes", { changes },
-      `确认了 ${pending.length - marks.size} 句是${role === OTHER ? "「其他」" : ` ${role}`}${marks.size ? `，${marks.size} 句退回待确认` : ""}`);
-    if (result) { setMarks(new Set()); setPlaying(false); reload(); }
-  };
-  const toggleMark = (id) => {
-    const next = new Set(marks);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setMarks(next);
+      `确认了 ${pending.length} 句是${role === OTHER ? "「其他」" : ` ${role}`}`);
+    if (result) { setPlaying(false); reload(); }
   };
   const renameRole = async () => {
     const unnamed = roles[role]?.named === false;
@@ -1131,8 +1122,7 @@ function App() {
       else if (k === "n" && current && view !== "export") { handled(); newRole(); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
-      else if (k === "x" && view === "roles" && current && !current.label && !current.maybe) { handled(); toggleMark(current.id); move(1); }
-      else if (e.key === "Backspace") { handled(); clear(); }
+      else if (e.key === "Backspace" || e.key === "Delete") { handled(); clear(); }
       else if (k === "r" && current?.guess.length && current.guess[0].name !== OTHER) { handled(); playRef(current.guess[0].name); }
       else if (k === "l" && current) { handled(); nextContext(); }
       else if (k === "f" && view === "scene") { handled(); toggleOnlyWork(!onlyWork); }
@@ -1192,14 +1182,14 @@ function App() {
       ${showStage && html`<${Stage} clip=${current} roles=${roles} labelText=${labelText} sound=${sound} setSound=${setSound}
         speed=${speed} setSpeed=${setSpeed}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
-        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()}
+        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} onClear=${clear}
         context=${context} onContext=${nextContext} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
           roles=${roles} labelText=${labelText} onlyWork=${onlyWork} setOnlyWork=${toggleOnlyWork}
           showShort=${showShort} setShowShort=${setShowShort} flashes=${flashes} episode=${episode} />`}
         ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} labelText=${labelText} role=${role} setRole=${setRole}
-          clips=${clips} focus=${focus} setFocus=${pick} marks=${marks} toggleMark=${toggleMark}
+          clips=${clips} focus=${focus} setFocus=${pick}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}

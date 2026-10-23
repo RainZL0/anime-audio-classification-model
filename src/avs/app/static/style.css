@@ -191,8 +191,6 @@ kbd {
 .row .t { color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .row.done-flash { animation: flash 0.9s ease-out; }
 @keyframes flash { from { background: var(--ok-soft); } to { background: transparent; } }
-.row.marked .say { text-decoration: line-through; color: var(--text-3); }
-.row.marked { background: var(--bad-soft); }
 
 .pill { font-size: 11px; padding: 0 7px; border-radius: 99px; line-height: 18px; white-space: nowrap;
   font-variant-numeric: tabular-nums; }
@@ -203,7 +201,6 @@ kbd {
 .pill.novoice, .pill.unlabeled { color: var(--text-2); background: var(--line); }
 .pill.skipped { color: var(--text-3); background: transparent; border: 1px solid var(--line); line-height: 16px; }
 .pill.done { color: var(--text-2); background: var(--line); }
-.pill.reject { color: var(--bad); background: var(--bad-soft); }
 .pill.unusable { color: var(--bad); background: transparent; border: 1px solid var(--bad); line-height: 16px; }
 .pill.maybe { color: var(--warn); background: transparent; border: 1px dashed var(--warn); line-height: 16px; }
 

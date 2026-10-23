@@ -644,8 +644,8 @@ def create_app(state: AppState) -> Any:
 
     @app.post("/api/changes")
     def post_changes(body: ChangesBody) -> dict[str, Any]:
-        """一批混合的改动，整批记一次、整批撤销。角色视图「确认其余、剔除标出的」、
-        「不是这个角色」和「质量低」都走这里。"""
+        """一批混合的改动，整批记一次、整批撤销。角色视图「确认其余」和「质量低」
+        都走这里。"""
         clean = []
         for change in body.changes:
             if change.get("clip") not in state.workspace.by_id:
