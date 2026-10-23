@@ -4,6 +4,7 @@ A small script stands in for `avoc add`, so no audio is processed."""
 
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -27,7 +28,7 @@ if "slow" in video:
 if "bad" in video:
     print("\x1b[33mError: no luck\x1b[0m", file=sys.stderr, flush=True)
     sys.exit(1)
-meta = {"name": name, "video": str(Path(video).resolve())}
+meta = {"name": name, "video": str(Path(video).resolve()), "args": args}
 (folder / "episode.json").write_text(json.dumps(meta))
 print("\\x1fdone", flush=True)
 """
@@ -109,6 +110,16 @@ def test_bad_input_is_refused_before_starting(files: Path, monkeypatch: pytest.M
     with pytest.raises(ValueError, match="no Hugging Face token"):
         job.start(files / "good.mkv", files / "ep.ass")
     assert job.status()["state"] == "idle"
+
+
+def test_chosen_styles_are_passed_on_and_checked(files: Path) -> None:
+    job = adding(files, [])
+    with pytest.raises(ValueError, match="no style Dial"):
+        job.start(files / "good.mkv", files / "ep.ass", offset=0, styles=["Dial"])
+    job.start(files / "good.mkv", files / "ep.ass", offset=0, styles=["Default"])
+    assert finished(job)["state"] == "done"
+    meta = json.loads((files / "work" / "episodes" / "ep01" / "episode.json").read_text())
+    assert meta["args"][-2:] == ["--styles", "Default"]
 
 
 def test_pasted_paths_lose_their_quotes() -> None:

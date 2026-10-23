@@ -27,6 +27,18 @@ def main() -> None:
 
 
 DEVICE_HELP = "cuda, cpu, or auto (uses cuda if there is an NVIDIA GPU)"
+STYLES_HELP = (
+    "Subtitle styles that hold the dialogue, separated by commas, for example "
+    '"Default,Default - Top"; if omitted, they are picked automatically. '
+    "See them with: avoc styles SUBTITLES"
+)
+
+
+def style_list(text: str | None) -> list[str] | None:
+    """`--styles` as a list. ASS style names cannot contain commas, so commas separate them."""
+    if text is None:
+        return None
+    return [name.strip() for name in text.split(",") if name.strip()]
 
 
 @app.command()
@@ -79,6 +91,7 @@ def add(
         ),
     ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
+    styles: Annotated[str | None, typer.Option(help=STYLES_HELP)] = None,
 ) -> None:
     """Add one episode: cut clips, compute the voiceprints the interface needs, and attach text
     subtitles if given. If it stops partway, run the same command again to continue."""
@@ -93,7 +106,16 @@ def add(
 
     try:
         result = pipeline.add_episode(
-            workspace, video, subs, name, text_subs, audio, offset, device, report=report
+            workspace,
+            video,
+            subs,
+            name,
+            text_subs,
+            audio,
+            offset,
+            device,
+            report=report,
+            styles=style_list(styles),
         )
     except ValueError as exc:
         typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
@@ -127,10 +149,42 @@ def prepare(
         typer.Option(help="Seconds to add to the subtitles; if omitted, aligned automatically"),
     ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
+    styles: Annotated[str | None, typer.Option(help=STYLES_HELP)] = None,
 ) -> None:
     """Prepare an episode: extract the audio, separate the vocals, align the subtitles, and make one
     clip per dialogue line."""
-    typer.echo(pipeline.prepare(video, subs, out, name, vocals, offset, device, audio))
+    typer.echo(
+        pipeline.prepare(video, subs, out, name, vocals, offset, device, audio, style_list(styles))
+    )
+
+
+@app.command("styles")
+def show_styles(
+    subtitles: Annotated[Path, typer.Argument(help="A subtitle file (ASS, SRT and so on)")],
+) -> None:
+    """Show the styles in a subtitle file: how many lines each has, when they appear, and a few
+    sample lines. Styles marked * are the ones picked as dialogue when --styles is not given."""
+    from avoc.stages.subtitle import describe_styles
+
+    try:
+        found = describe_styles(subtitles)
+    except ValueError as exc:
+        typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"{found['format']}, {found['encoding']}")
+
+    def clock(seconds: float) -> str:
+        return f"{int(seconds // 60)}:{int(seconds % 60):02d}"
+
+    for style in found["styles"]:
+        mark = "*" if style["name"] in found["picked"] else " "
+        typer.echo(
+            f"{mark} {style['name']}: {style['lines']} "
+            + say("行", "lines")
+            + f", {clock(style['first'])}-{clock(style['last'])}"
+        )
+        for sample in style["samples"]:
+            typer.echo(f"      {sample[:60]}")
 
 
 @app.command()

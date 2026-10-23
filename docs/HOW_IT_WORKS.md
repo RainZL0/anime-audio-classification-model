@@ -16,6 +16,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | --- | --- |
 | Clip | The short piece of audio for one subtitle line. It is the smallest unit for labeling. |
 | Offset | How many seconds the subtitle times differ from the audio track. For the same source and the same subtitle group, it stays almost the same. |
+| Style | In an ASS subtitle file, every line belongs to a named style, such as "Default" or "OP", which sets its font and place on screen. Subtitle groups often put dialogue, song lyrics and on-screen text in different styles. SRT files have no styles, so all their lines count as one style, "Default". |
 | Voiceprint | A set of numbers that describes a voice. It is used to check whether two clips may come from the same person. |
 | Distance | The cosine distance between two voiceprints. 0 means the same direction exactly. A larger number means less alike. It is not "the chance that these are the same person". |
 | Distance threshold | In the Groups view, two groups merge only if their distance is smaller than this value. |
@@ -33,8 +34,9 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 
 `add` does the first steps in one command:
 
-1. **`prepare`**: Takes the audio from the video (or from a separate audio file given with `--audio` on the same timeline). Separates the voices for the whole episode and keeps the original sample rate. Also makes a 16 kHz copy for analysis. Then adds this episode's offset to the subtitles, so **each subtitle line becomes one clip**. If `--offset` is not given, the offset is measured with speech detection. If the alignment is too weak, it stops with an error and does not quietly switch to another method.
-2. **`embed`**: Computes a unit-length voiceprint for every clip that is at least 0.5 seconds long, once for each of the three models the interface uses. Shorter clips stay in the clip table, but they have no voiceprint.
+1. **Reading the subtitles**: The file is read whatever its text encoding: UTF-8 and UTF-16 directly, and older Chinese, Japanese, Korean and Western encodings by trying each and keeping the reading that looks most like real text. ASS, SRT, WebVTT and a few rarer formats are told apart by their content, not by the file extension. Then the dialogue [styles](#glossary) are picked: the main one is the style with the most lines among those whose lines appear across the whole episode (an opening song has many lines, but all at the start). Styles named after it, such as "Default - Top", and other spread-out styles with at least a quarter as many lines (the second language of bilingual subtitles) are dialogue too. Comment lines, vector drawings and lines over 20 seconds are dropped. `add` prints which styles it used and which it left out, `avoc styles <file>` shows each style with sample lines, and `--styles` overrides the choice.
+2. **`prepare`**: Takes the audio from the video (or from a separate audio file given with `--audio` on the same timeline). Separates the voices for the whole episode and keeps the original sample rate. Also makes a 16 kHz copy for analysis. Then adds this episode's offset to the subtitles, so **each subtitle line becomes one clip**. If `--offset` is not given, the offset is measured with speech detection. If the alignment is too weak, it stops with an error and does not quietly switch to another method.
+3. **`embed`**: Computes a unit-length voiceprint for every clip that is at least 0.5 seconds long, once for each of the three models the interface uses. Shorter clips stay in the clip table, but they have no voiceprint.
 
 Labeling and export then happen in the [interface](#labeling-and-correction-interface).
 
@@ -86,7 +88,7 @@ The small classifier only picks among the characters it already knows, so the se
 
 Each episode has a folder `runs/episodes/<episode>/`:
 
-- `episode.json` records the paths of the source and the audio tracks. `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds) and `text_subtitle_agreement` (the overlap).
+- `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds) and `text_subtitle_agreement` (the overlap).
 - Voiceprints are stored in `embeddings/<model name>/`. The matrix and its metadata line up row by row. The cache is tied to the content of the clip files, the content of the analysis audio, the model name and the minimum length. If any of these changes, the cache must be recomputed. An old cache raises an error. It is never used silently.
 - `app_media/` holds the picture and sound pieces the interface cuts.
 

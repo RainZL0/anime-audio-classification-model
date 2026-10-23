@@ -80,7 +80,7 @@ def load_text_lines(path: Path) -> list[TextLine]:
 
     lines: list[TextLine] = []
     for event in read_subtitles(path):
-        if event.end <= event.start:
+        if event.end <= event.start or not event.is_text:  # Comments and drawings have no lines.
             continue
         parts = []
         for raw in event.plaintext.split("\n"):

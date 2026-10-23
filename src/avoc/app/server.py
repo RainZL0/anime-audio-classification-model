@@ -612,8 +612,14 @@ class AddBody(BaseModel):
     subtitles: str = ""
     text_subtitles: str = ""
     offset: float | None = None
+    styles: list[str] | None = None
+    """The subtitle styles that hold the dialogue. None picks them automatically."""
     resume: str | None = None
     """Carry on with an episode that was not finished, using the files recorded for it."""
+
+
+class SubtitleStylesBody(BaseModel):
+    path: str
 
 
 class TextSubtitlesBody(BaseModel):
@@ -843,8 +849,28 @@ def create_app(state: AppState) -> Any:
                 )
             text = clean_path(body.text_subtitles) if body.text_subtitles.strip() else None
             return state.adding.start(
-                clean_path(body.video), clean_path(body.subtitles), text, body.offset
+                clean_path(body.video),
+                clean_path(body.subtitles),
+                text,
+                body.offset,
+                styles=body.styles,
             )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/subtitle-styles")
+    def post_subtitle_styles(body: SubtitleStylesBody) -> dict[str, Any]:
+        """The styles in a subtitle file and the ones picked as dialogue, so the person can check
+        and change them before adding the episode."""
+        from avoc.stages.subtitle import describe_styles
+
+        path = clean_path(body.path)
+        try:
+            if not path.is_file():
+                raise ValueError(
+                    say(f"找不到字幕文件：{path}", f"cannot find the subtitles: {path}")
+                )
+            return describe_styles(path)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 

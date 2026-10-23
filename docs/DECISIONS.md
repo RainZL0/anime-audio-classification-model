@@ -17,6 +17,7 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 - **Voice detection is used only to measure how many seconds the subtitles differ from the audio track.** When `--offset` is given, it does not run at all. No model is used to judge "is someone speaking in this clip" or "is this the character or background voices".
 - TV narration and crowd cheers in the subtitles are still put into the clip table. A person labels them "Other". Such clips go into training as "Other", which teaches the machine that cheers and sound effects are not the target.
 - Subtitle lines are not filtered by positioning tags such as `\pos`. Most lines with positioning tags are real dialogue.
+- **Subtitle files are read by fixed rules, with no AI model and no editing by hand.** The format is fixed; what varies by subtitle group is the text encoding and the style names, and both are worked out from the file itself. The dialogue styles are picked by how widely their lines are spread through the episode and how many there are. Names are not matched against a list of words such as "OP" or "sign", which would differ from group to group and language to language. The person can see the choice and override it.
 - Clip IDs depend only on the episode name and the time range, so labels stay valid as long as the clips are not re-cut.
 
 **Audio**

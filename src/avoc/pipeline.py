@@ -61,9 +61,12 @@ def prepare(
     offset: float | None = None,
     device: str = "auto",
     audio: Path | None = None,
+    styles: list[str] | None = None,
 ) -> dict[str, Any]:
     """Each subtitle line is a clip. The offset can be given directly, or measured automatically if
-    it is not given.
+    it is not given. `styles` are the subtitle styles that hold the dialogue; if None, they are
+    picked automatically (see `stages/subtitle.py`). The styles used are kept in episode.json, so
+    the interface reads the same lines later.
 
     **The video and the subtitles are both required.** The subtitles decide how clips are cut. The
     video is the main evidence for identifying speakers while labeling. The audio is taken from the
@@ -78,7 +81,13 @@ def prepare(
     give the value measured for the previous episode.
     """
     from avoc.audio import audio_info, diarize, extract_audio, make_analysis_copy, separate_vocals
-    from avoc.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
+    from avoc.stages.subtitle import (
+        MIN_OVERLAP_RATIO,
+        find_offset,
+        load_lines,
+        pick_styles,
+        read_subtitles,
+    )
 
     validate_name(name)
     if out.exists():
@@ -91,7 +100,9 @@ def prepare(
         raise ValueError(say(f"视频不存在：{video}", f"Video does not exist: {video}"))
     if not subtitles.is_file():
         raise ValueError(say(f"字幕不存在：{subtitles}", f"Subtitles do not exist: {subtitles}"))
-    lines = load_lines(subtitles)
+    if styles is None:
+        styles = pick_styles(read_subtitles(subtitles))
+    lines = load_lines(subtitles, styles)
     if not lines:
         raise ValueError(say("字幕里没有台词", "There are no dialogue lines in the subtitles"))
     if offset is None and not has_hf_token():
@@ -163,6 +174,7 @@ def prepare(
         "vocals": str(vocals.resolve()),
         "analysis": str(analysis.resolve()),
         "subtitles": str(subtitles.resolve()),
+        "subtitle_styles": styles,
         "subtitle_offset": offset,
         "alignment_overlap": overlap,
         "sample_rate": source.sample_rate,
@@ -236,10 +248,11 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     overlap. See app/workspace.py.
     """
     from avoc.app.workspace import text_for
-    from avoc.stages.subtitle import load_dialogue
+    from avoc.stages.subtitle import load_dialogue, pick_styles, read_subtitles
 
     episode, rows = load_episode(directory)
-    dialogue = load_dialogue(subtitles)
+    styles = pick_styles(read_subtitles(subtitles))
+    dialogue = load_dialogue(subtitles, styles)
     if not dialogue:
         raise ValueError(say("字幕里没有台词", "There are no dialogue lines in the subtitles"))
     starts = {round(r["start"], 2) for r in rows}
@@ -260,7 +273,12 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
         )
     write_json(
         directory / "episode.json",
-        {**episode, "subtitles": str(subtitles.resolve()), "subtitle_offset": offset},
+        {
+            **episode,
+            "subtitles": str(subtitles.resolve()),
+            "subtitle_styles": styles,
+            "subtitle_offset": offset,
+        },
     )
     return {"episode": episode["name"], "offset": offset, "matched": round(matched, 4)}
 
@@ -357,9 +375,11 @@ def add_episode(
     offset: float | None = None,
     device: str = "auto",
     report: Callable[[str], None] = lambda _: None,
+    styles: list[str] | None = None,
 ) -> dict[str, Any]:
     """One command adds one episode: `prepare`, the few voiceprints the interface needs, and, if
     there are Japanese subtitles, attaches them too. `report` gets one line for each step.
+    `styles` are the subtitle styles that hold the dialogue; None picks them automatically.
 
     If it fails partway, the steps already done are kept, and running the same command again
     continues from where it stopped: `prepare` counts as done once it writes episode.json, and
@@ -406,6 +426,10 @@ def add_episode(
                     "Make sure it is not in use, delete it, and try again",
                 )
             )
+        if subtitles.is_file():  # A missing file is reported by `prepare`.
+            from avoc.stages.subtitle import styles_note
+
+            report(styles_note(subtitles, styles))
         report(
             say(
                 "提取音轨、分离人声、按字幕切片段（这一步最慢）",
@@ -414,7 +438,7 @@ def add_episode(
             )
         )
         try:
-            result = prepare(video, subtitles, out, name, None, offset, device, audio)
+            result = prepare(video, subtitles, out, name, None, offset, device, audio, styles)
         except BaseException:
             if out.exists():
                 shutil.rmtree(out)

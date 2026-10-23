@@ -109,16 +109,16 @@ so their edges do not line up with subtitle lines."""
 
 def subtitle_lines(episode: dict[str, Any]) -> list[tuple[float, float, str]]:
     """The subtitle lines for this episode, with the offset already added and converted to
-    audio-track time."""
+    audio-track time. They come from the styles recorded when the episode was cut. Episodes cut
+    before styles were recorded pick them again, which gives the same lines."""
     from avoc.stages.subtitle import load_dialogue
 
     path = Path(episode.get("subtitles") or "")
     if not path.is_file():
         return []
     offset = float(episode.get("subtitle_offset") or 0.0)
-    return [
-        (line["start"] + offset, line["end"] + offset, line["text"]) for line in load_dialogue(path)
-    ]
+    lines = load_dialogue(path, episode.get("subtitle_styles"))
+    return [(line["start"] + offset, line["end"] + offset, line["text"]) for line in lines]
 
 
 def text_for(

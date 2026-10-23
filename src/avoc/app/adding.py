@@ -81,9 +81,11 @@ class Adding:
         text_subtitles: Path | None = None,
         offset: float | None = None,
         name: str | None = None,
+        styles: list[str] | None = None,
     ) -> dict[str, Any]:
         """Check what can be checked at once, then start `avoc add` in the background. Raises
-        ValueError with a reason the person can act on."""
+        ValueError with a reason the person can act on. `styles` are the subtitle styles that hold
+        the dialogue; None lets `avoc add` pick them."""
         from avoc.pipeline import NO_TOKEN_HINT, find_episode_by_video, has_hf_token
         from avoc.pipeline import next_episode_name as next_name
         from avoc.project import validate_name
@@ -110,7 +112,7 @@ class Adding:
             )
         from avoc.stages.subtitle import load_dialogue
 
-        if not load_dialogue(subtitles):
+        if not load_dialogue(subtitles, styles):
             raise ValueError(say("字幕里没有台词", "there are no dialogue lines in the subtitles"))
         if offset is not None and not math.isfinite(offset):
             raise ValueError(say("字幕偏移必须是一个数", "the subtitle offset must be a number"))
@@ -133,6 +135,8 @@ class Adding:
             command += ["--text-subs", str(text_subtitles)]
         if offset is not None:
             command += ["--offset", str(offset)]
+        if styles is not None:
+            command += ["--styles", ",".join(styles)]
         environment = {
             **os.environ,
             "AVOC_LANGUAGE": LANGUAGE.get(),
