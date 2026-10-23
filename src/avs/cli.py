@@ -102,6 +102,20 @@ def set_subtitles(
     )
 
 
+@app.command("set-text-subtitles")
+def set_text_subtitles(
+    episode: Path,
+    subtitles: Annotated[Path, typer.Argument(help="给导出提供台词文字的字幕，通常是日文原文")],
+) -> None:
+    """给一集另配一份字幕，导出时台词文字从它取。偏移自动量，对不上就拒绝。"""
+    result = pipeline.attach_text_subtitles(episode, subtitles)
+    typer.echo(
+        f"{result['episode']}：偏移 {result['text_subtitle_offset']} 秒，"
+        f"和切片段的字幕重合 {result['text_subtitle_agreement']:.0%}，"
+        f"{result['matched']:.1%} 的片段碰得到台词"
+    )
+
+
 @app.command("import-labels")
 def import_labels(
     workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],

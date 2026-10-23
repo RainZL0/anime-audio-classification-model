@@ -185,6 +185,50 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     return {"episode": episode["name"], "offset": offset, "matched": round(matched, 4)}
 
 
+def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
+    """给一集另配一份字幕，导出时台词文字从它取，见 stages/text_subtitle.py。
+
+    偏移拿它和切片段的那份字幕比出来。两道检查，过不了就拒绝、不写进 episode.json：
+    对上之后的重合度不到 `MIN_AGREEMENT`；或者不到 `MIN_MATCHED` 的片段碰得到台词。
+    """
+    from avs.app.workspace import subtitle_lines
+    from avs.stages.text_subtitle import (
+        MIN_AGREEMENT,
+        MIN_MATCHED,
+        load_text_lines,
+        measure_offset,
+        shifted,
+        touching,
+    )
+
+    episode, rows = load_episode(directory)
+    if not subtitles.is_file():
+        raise ValueError(f"字幕不存在：{subtitles}")
+    cut = [(start, end) for start, end, _ in subtitle_lines(episode)]
+    if not cut:
+        raise ValueError(f"{episode['name']} 还没记切片段用的字幕，先用 avs set-subtitles 补上")
+    lines = load_text_lines(subtitles)
+    if not lines:
+        raise ValueError(f"{subtitles.name} 里没有台词")
+    offset, agreement = measure_offset(lines, cut)
+    if agreement < MIN_AGREEMENT:
+        raise ValueError(
+            f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
+            f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕"
+        )
+    moved = shifted(lines, offset)
+    matched = sum(bool(touching(moved, r["start"], r["end"])) for r in rows) / len(rows)
+    if matched < MIN_MATCHED:
+        raise ValueError(f"只有 {matched:.0%} 的片段碰得到 {subtitles.name} 的台词")
+    result = {
+        "text_subtitles": str(subtitles.resolve()),
+        "text_subtitle_offset": offset,
+        "text_subtitle_agreement": agreement,
+    }
+    write_json(directory / "episode.json", {**episode, **result})
+    return {"episode": episode["name"], **result, "matched": round(matched, 4)}
+
+
 def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS) -> dict[str, Any]:
     """把字幕里没有对应片段的对白行补进这一集的片段表，已有片段一个不动。
 
