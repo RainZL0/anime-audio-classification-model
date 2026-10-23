@@ -15,7 +15,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          # 默认会删掉从网上下载的轮子再存缓存，那样 CUDA 版 torch 每次都要重下几个 GB。
+          # By default, the action deletes the wheels downloaded from the internet before saving the cache. That would make the CUDA build of torch download several GB again every time.
           prune-cache: false
 
       - name: Sync
@@ -26,7 +26,7 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
-      # ty 不在项目依赖里，固定版本临时跑；它会自己找到上一步建的 .venv。
+      # ty is not in the project dependencies, so run a pinned version on the fly. It finds the .venv made in the previous step by itself.
       - name: Type check
         run: uvx ty@0.0.91 check src
 

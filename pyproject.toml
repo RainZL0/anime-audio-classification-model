@@ -30,9 +30,11 @@ avs = "avs.cli:app"
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
 
-# Windows 和 Linux 的 torch / torchaudio 从 PyTorch 官方 index 装 CUDA 12.8 轮子，
-# 没有 NVIDIA 显卡时同一份轮子照样用 CPU 跑（开发机：Windows，RTX 4060 Laptop 8 GB）。
-# macOS 没有 CUDA，走 PyPI 默认轮子。CI 在 Linux 上也装 CUDA 轮子，靠缓存免得每次重下。
+# On Windows and Linux, torch and torchaudio are installed as CUDA 12.8 wheels from the
+# official PyTorch index. Without an NVIDIA GPU, the same wheels still run on the CPU
+# (development machine: Windows, RTX 4060 Laptop 8 GB).
+# macOS has no CUDA, so it uses the default wheels from PyPI. CI also installs the CUDA
+# wheels on Linux, and relies on the cache so they are not downloaded again every time.
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
@@ -57,7 +59,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# 文档里的代码块是说明用的片段，不参与格式化
+# Code blocks in the docs are illustrative snippets and are not formatted
 exclude = ["docs"]
 
 [tool.ruff.lint]
@@ -72,7 +74,7 @@ select = [
     "PTH",      # use pathlib
     "RUF",
 ]
-# 本项目的注释与文档字符串是中文，全角标点是有意的，不是同形字攻击
+# Comments and docstrings in this project are still written in Chinese, and their full-width punctuation is intentional, not a lookalike-character attack
 ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ty.environment]

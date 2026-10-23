@@ -1,162 +1,162 @@
-# 流程、数据和名词
+# Flow, data and terms
 
-这里讲东西是怎么运转的。命令怎么敲见 [USAGE.md](USAGE.md)，为什么这样选见 [DECISIONS.md](DECISIONS.md)，打分的规矩见 [HISTORY.md](HISTORY.md#打分)。
+This page explains how things work. For how to type the commands, see [USAGE.md](USAGE.md). For why we chose this way, see [DECISIONS.md](DECISIONS.md). For the scoring rules, see [HISTORY.md](HISTORY.md#scoring).
 
-| 小节 | 内容 |
+| Section | What it covers |
 | --- | --- |
-| [名词表](#名词表) | 文档里每个说法的意思 |
-| [五步流程](#五步流程) | 从一集音轨到按角色分好的音频 |
-| [标注与修正界面](#标注与修正界面) | 机器怎么猜、什么时候算有把握、标签存在哪 |
-| [打分怎么算](#打分怎么算) | 连上、错误合并、该合没合各怎么数 |
-| [数据文件](#数据文件) | 每一步写出什么、片段 ID 怎么来 |
-| [代码目录](#代码目录) | 哪个文件管哪一段 |
+| [Glossary](#glossary) | What each term in the docs means |
+| [Five-step flow](#five-step-flow) | From one episode's audio track to audio sorted by character |
+| [Labeling and correction interface](#labeling-and-correction-interface) | How the machine guesses, when it counts as confident, where labels are stored |
+| [How scoring works](#how-scoring-works) | How linked pairs, wrong merges and missed merges are counted |
+| [Data files](#data-files) | What each step writes, and where clip IDs come from |
+| [Code layout](#code-layout) | Which file handles which part |
 
-## 名词表
+## Glossary
 
-项目以前用过一批省字的简称（错合、漏合、干扰项、找回率之类），现在一律不用。读旧提交信息碰到时，对照这张表。
+Some older notes used short words for these ideas. Those short words are retired. Use the terms below. If you meet one of them in an old commit message, check this table.
 
-| 说法 | 意思 |
+| Term | Meaning |
 | --- | --- |
-| 片段 | 一条字幕行对应的那一小段音频，是标注、分组和打分的最小单位 |
-| 偏移 | 字幕时间相对音轨差多少秒。同一片源同一字幕组基本不变 |
-| 声纹 | 把一段声音变成一组数，用来比较是不是同一个人的声音 |
-| 距离 | 两条声纹之间的余弦距离。0 表示方向完全一致，越大越不像。它不是「是同一个人的概率」 |
-| 距离分界线 | 距离小于它才允许把两条片段连起来。命令行参数是 `--threshold` |
-| 按整组平均距离合并 | 层次聚类的一种合并规则：两组之间所有片段的平均距离达标才合并。命令行里叫 `average` |
-| 片段池 | 这一次分组把哪些片段放在一起比。三集一起分组时，池子就是这三集的全部片段 |
-| 按池子定分界线 | 分界线不写死，由池子自己的距离算出来：全部配对距离由近到远排开，取第 1% 那个距离，再乘一个固定倍数。命令行是 `avs group --relative` |
-| 没有分到组 | 这条片段太短、没有声纹，因此不参与分组 |
-| 人工归档 | 标注时存下的「片段 → 角色名」记录，放在 `annotations/` |
-| 停用的旧标签 | `__multiple__`（不止一个人）、`__unclear__`（无法确认）、`__not_speech__`（不是说话）。只在 `annotations/` 的盲标归档和旧标注页面里还有；界面里一律当没标，2026-10-23 已全部清掉 |
-| 同一角色的配对 / 不同角色的配对 | 从有人工名字的片段里两两取对，按两条是不是同一个角色分成两类 |
-| 连上 | 同一角色的配对被放进了同一组 |
-| 错误合并 | 不同角色的配对被放进了同一组 |
-| 该合没合 | 同一角色的配对落在不同组。音频没丢，只是没归到一起 |
-| 连上的比例 | 同一角色的配对中，连上的占多少 |
-| 陪衬片段 | 留在候选池里当背景、但自己不作为提问对象的片段 |
-| 排序正确率 | 随机拿一对同一角色的片段和一对不同角色的片段，同一角色那对距离更近的比例。完全随机是 0.50，完美是 1.00 |
-| 相等错误率 | 把分界线挪到「同一角色被错误分开」和「不同角色被错误合并」两种错误一样多的位置，那时候的错误率。越小越好 |
-| 独立检验 | 在一份完全没参与过调参的数据上重新打分 |
-| 目标角色 | 用户要收集的角色。只有目标角色要起名字，其余的人一律标「其他」 |
-| 小分类器 | 在人工标签上训练的逻辑回归，输入是声纹。每个目标角色一个，输出「是 TA」的概率 |
-| 把握 | 小分类器给第一名角色的概率 |
-| 像不像的检查 | 这句和第一名角色里最像的那条已确认片段，相似度够不够高。不够高就可能是还没标过的人 |
-| 工作区 | 界面打开的目录，下面有 `episodes/`（各集）和 `labels/`（界面的标签） |
+| Clip | The short piece of audio for one subtitle line. It is the smallest unit for labeling, grouping and scoring. |
+| Offset | How many seconds the subtitle times differ from the audio track. For the same source and the same subtitle group, it stays almost the same. |
+| Voiceprint | A set of numbers that describes a voice. It is used to check whether two clips may come from the same person. |
+| Distance | The cosine distance between two voiceprints. 0 means the same direction exactly. A larger number means less alike. It is not "the chance that these are the same person". |
+| Distance threshold | Two clips can be linked only if their distance is smaller than this value. The command-line option is `--threshold`. |
+| Average linkage | A merge rule for hierarchical clustering: two groups merge only if the average distance between all their clips is within the threshold. On the command line it is called `average`. |
+| Clip pool | The set of clips that are compared together in one grouping run. When three episodes are grouped together, the pool is all the clips of those three episodes. |
+| Pool-relative threshold | The threshold is not fixed. It is computed from the pool's own distances: sort all pair distances from smallest to largest, take the distance at the 1% position, then multiply it by a fixed factor. On the command line it is `avs group --relative`. |
+| Unassigned | A clip that is too short to have a voiceprint, so it does not take part in grouping. |
+| Manual archive | The saved record of "clip to character name" that is made while labeling. It is stored in `annotations/`. |
+| Retired old labels | `__multiple__` (more than one person), `__unclear__` (cannot tell), `__not_speech__` (not speech). They remain only in the blind-label archives in `annotations/` and in the old labeling page. The interface treats them as if the clip was never labeled. All of them were removed on 2026-10-23. |
+| Same-character pairs / different-character pairs | Pairs made from clips that have a person's name, split by whether the two clips are the same character or not. |
+| Linked | A same-character pair whose two clips were put in the same group. |
+| Wrong merge | A different-character pair whose two clips were put in the same group. |
+| Missed merge | A same-character pair whose two clips ended up in different groups. The audio is not lost; it just was not gathered together. |
+| Linked share | Among the same-character pairs, the share that were linked. |
+| Background clips | Clips that stay in the candidate pool as background. They are never asked about. |
+| Ranking accuracy | Pick one same-character pair and one different-character pair at random. This is the share of times the same-character pair has the smaller distance. Pure chance gives 0.50. Perfect gives 1.00. |
+| Equal error rate | Move the threshold to the point where the two kinds of error are equal: same-character clips kept apart, and different-character clips merged. This is the error rate at that point. Lower is better. |
+| Held-out test | Scoring on data that took no part in tuning the settings. |
+| Target character | A character the user wants to collect. Only target characters get names. Everyone else is labeled "Other". |
+| Small classifier | A logistic regression trained on the manual labels, with voiceprints as input. There is one per target character. Its output is the probability that a clip is that target. |
+| Confidence | The small classifier's probability for the top-ranked character. |
+| Similarity check | Checks whether a clip is similar enough to the closest confirmed clip of the top-ranked character. If it is not, the speaker may be someone who has not been labeled yet. |
+| Workspace | The folder that the interface opens. Inside it are `episodes/` (one folder per episode) and `labels/` (the labels made in the interface). |
 
-## 五步流程
+## Five-step flow
 
-**视频＋字幕 → 分离人声 → 按字幕行切片段 → 算声纹 → 分组 → 人工标签打分 → 导出。**
+**Video and subtitles → separate voices → cut clips along subtitle lines → compute voiceprints → group → label and score → export.**
 
-日常使用时第 3 至 5 步换成[标注与修正界面](#标注与修正界面)；这里的分组和打分留作对照实验。
+In daily use, steps 3 to 5 are replaced by the [labeling and correction interface](#labeling-and-correction-interface). The grouping and scoring here are kept as a comparison experiment.
 
-1. **`prepare`**（`add` 的第一步）：从视频抽音轨（或用 `--audio` 另给的同一时间线音轨），分离整集人声，保持原采样率，另做一份 16 kHz 分析副本。再把字幕加上这一集的偏移，**每条字幕行就是一个片段**。没给 `--offset` 时才用语音检测量偏移，对齐吻合度太低会直接报错，不会悄悄换成别的做法。
-2. **`embed`**：把不短于 0.5 秒的片段算成单位长度的声纹。更短的片段留在片段表里，但没有声纹，进不了分组。
-3. **`group`**：全部集的片段放进一个池子，直接按声纹分组。默认 `anime-va`、按整组平均距离合并、分界线 0.70。小组保留，不会被并进一个杂物组。
-4. **`evaluate`**：只用人工归档打分，见下一节。
-5. **`export`**：按分组从原采样率人声轨切 WAV，没有分到组的放在 `_unassigned`。响度统一但不削顶。
+1. **`prepare`** (the first part of `add`): Takes the audio from the video (or from a separate audio file given with `--audio` on the same timeline). Separates the voices for the whole episode and keeps the original sample rate. Also makes a 16 kHz copy for analysis. Then adds this episode's offset to the subtitles, so **each subtitle line becomes one clip**. If `--offset` is not given, the offset is measured with speech detection. If the alignment is too weak, it stops with an error and does not quietly switch to another method.
+2. **`embed`**: Computes a unit-length voiceprint for every clip that is at least 0.5 seconds long. Shorter clips stay in the clip table, but they have no voiceprint and cannot take part in grouping.
+3. **`group`**: Puts the clips of all episodes into one pool and groups them directly by voiceprint. The defaults are `anime-va`, average linkage and a threshold of 0.70. Small groups are kept. They are not merged into one leftover group.
+4. **`evaluate`**: Scores using only the manual archive. See the next section.
+5. **`export`**: Cuts WAV files by group from the vocal track at the original sample rate. Clips with no group go to `_unassigned`. Loudness is evened out, but peaks are not clipped.
 
-辅助命令：`coverage` 核对字幕里有没有台词没被切出片段；`extend` 把这类台词补进片段表；`label` 开标注页；`scores` 只比同一角色和不同角色分不分得开，不做分组；`compare` 扫分界线；`drift` 量成绩随片段池变大怎么变；`diagnose` 做近邻检索和距离分布。
+Helper commands: `coverage` checks whether any dialogue line in the subtitles was left out of the clips. `extend` adds such lines to the clip table. `label` opens the labeling page. `scores` only checks whether same-character and different-character pairs can be told apart, without grouping. `compare` sweeps the threshold. `drift` measures how the scores change as the pool gets bigger. `diagnose` runs nearest-neighbor search and looks at the distance spread.
 
-「一条片段里只有一个人说话」是工作假设，不是检测结论。
+"Only one person speaks in a clip" is a working assumption, not a detection result.
 
-## 标注与修正界面
+## Labeling and correction interface
 
-`avs app` 起一个只在本机监听的网页服务，前端不用打包工具，静态文件直接放在 `src/avs/app/static/`。
+`avs app` starts a web server that only listens on this machine. The front end has no build step. Its static files sit directly in `src/avs/app/static/`.
 
-**目标角色和「其他」。** 用户只给自己要收集的角色起名字，这些是目标角色；别的人一律按 Q 标「其他」。目标角色可以有好几个，标到一半也能加减：
-- 每条「其他」记下标它那一刻有哪些目标角色，只对这些角色算「不是 TA」。
-- 新加一个目标角色，以前的「其他」对它不算数。它的角色视图里有一节「可能漏掉的」，列出机器没归给它、但概率不低的片段（包括这些旧「其他」），从最像的排起，和别处一样标。
-- 去掉一个目标角色，它的标签原样留着，机器不再猜它。一条片段是 TA，就一定不是别的目标角色，所以这些标签照样当反例用；再加回来不丢东西。
-- 新建的角色默认是目标角色。
-- 「质量低」：界面上是一层选择，每个目标角色有「TA」和「TA·质量低」两个选项，「其他」没有（本来就不导出）。存的时候「是谁」和「质量低」分开记，名字照常是 TA，每次标注两样一起定下。背景音太重、有人同时出声之类，不能进干净数据集的都选它：不进训练，导出时跳过。它既不当 TA 的例子，也不当反例，因为里面确实有 TA 的声音。以前「多人」是单独的开关，后来并了进来，旧记录按「质量低」算。几个人同时说话、里面没有目标角色的，直接标「其他」。
-- 只问是不是目标角色，拿不准就标「其他」。以前的「无法确认」「不止一个人」已停用，界面里当没标。
+**Target characters and "Other".** The user names only the characters they want to collect. These are the target characters. Everyone else is labeled "Other", using the Q key. A workspace can have several target characters, and you can add or remove them while labeling:
+- Each "Other" label records which target characters existed at that moment. It counts as "not this target" only for those characters.
+- When you add a new target character, old "Other" labels do not count against it. Its Characters view has a section called "Maybe missed". It lists the clips that the machine did not assign to it but that have a fairly high probability of being it (this includes the old "Other" clips). The list starts with the most similar clips. They are labeled like any other clip.
+- When you remove a target character, its labels stay as they are, and the machine stops guessing it. A clip that is the target cannot be any other target, so those labels are still used as negative examples. Adding the character back again loses nothing.
+- New characters are target characters by default.
+- "Low quality": in the interface this is one more choice. Each target character has two options, "target" and "target, low quality". "Other" has no such option, because it is never exported. When saving, "who it is" and "low quality" are stored separately. The name is still the target, and the two are decided together in every label. Choose "low quality" for clips with heavy background sound, overlapping voices, or anything else that does not belong in a clean dataset. These clips are not used for training and are skipped on export. They are not used as examples of the target, and they are not used as negatives either, because the target's voice really is in them. Earlier, "multiple people" was a separate switch. It was later merged into this choice, and old records count as "low quality". When several people speak and none of them is a target, label the clip "Other" directly.
+- Only ask "is this the target?" If you are not sure, label it "Other". The old "unclear" and "multiple" labels are retired. The interface treats them as unlabeled.
 
-**机器怎么猜。** 三个声纹模型（`anime-va`、`anime-char`、`redimnet2-b6`）各自单位化后拼起来，再单位化一次。每个目标角色训练一个逻辑回归，正则强度 100：
-- 正例是标成 TA 的片段。
-- 反例是标成别的名字的，以及标「其他」时 TA 已经是目标的。不对的句子直接标成对的人或「其他」，不单独记「不是 TA」。
-- 标了「质量低」的不进训练。嘈杂片段进训练是帮机器认出嘈杂里的 TA 还是把 TA 学歪，还没有量过，先保守不放。
+**How the machine guesses.** The three voiceprint models (`anime-va`, `anime-char`, `redimnet2-b6`) are each scaled to unit length, joined together, and then scaled to unit length once more. For each target character, one logistic regression is trained with regularization strength 100:
+- Positive examples are clips labeled as the target.
+- Negative examples are clips labeled with another name, plus clips labeled "Other" while that target already existed. A wrong guess is simply corrected to the right person or to "Other". No separate "not the target" label is recorded.
+- Clips labeled "low quality" are not used for training. We have not measured whether noisy clips help the machine find the target inside the noise, or whether they teach it the wrong thing. For now they are kept out.
 
-「其他」的概率记成 1 减去最高的那个目标角色的概率，几个数加起来不一定是 1。训练集只有几百到几千条，所有目标角色加起来一两秒，所以每改一条标签都整个重训。
+The probability of "Other" is recorded as 1 minus the probability of the top target character. So the numbers do not always add up to 1. A training set has a few hundred to a few thousand clips. All target characters together take one or two seconds to train. So every label change retrains everything.
 
-**什么时候算有把握。** 同时满足两条才不要求人逐条看：
+**When a clip counts as confident.** A clip skips the line-by-line check by a person only when both of these hold:
 
-1. 把握不低于 0.6。
-2. 通过像不像的检查。门槛从目标角色的已确认片段里量：每条和同角色其余片段的最高相似度，取第 5% 分位。已确认片段不满 20 条时量不出门槛，这时一律不算有把握，界面也不提示「可能是没见过的人」，只说机器还只会在已知角色里挑。第一名是「其他」的不做这道检查，因为没见过的声音本来就算「其他」。
+1. Its confidence is at least 0.6.
+2. It passes the similarity check. The cutoff is measured from the confirmed clips of the target character. For each confirmed clip, take its highest similarity to the other confirmed clips of the same character. Then take the 5th percentile of those values. If there are fewer than 20 confirmed clips, no cutoff can be measured. In that case no clip counts as confident, and the interface does not show the "may be a voice not seen before" note. It only says that the machine can only pick among the characters it already knows. The similarity check is skipped when the top-ranked choice is "Other", because an unseen voice is labeled "Other" anyway.
 
-小分类器只会在认识的角色里挑，所以第二条是必需的。数字见 [EXPERIMENTS.md](EXPERIMENTS.md#界面里的有把握)。
+The small classifier only picks among the characters it already knows, so the second condition is required. The numbers are in [EXPERIMENTS.md](EXPERIMENTS.md#confidence-in-the-interface).
 
-**起步分组。** 还没标签的片段按 `anime-va`、按整组平均距离合并、分界线 0.70 分组，人给整组起名字。
+**Starting groups.** Clips that have no label yet are grouped with `anime-va`, average linkage and a threshold of 0.70. A person then names each whole group.
 
-**一句台词的文字。** 字幕行和片段的时间重叠不少于两者中较短一段的一半，就算这句的文字。两条片段间隔超过 3 秒就算新的一场。
+**Text of a line.** A subtitle line counts as the text of a clip when their times overlap by at least half of the shorter of the two. Two clips that are more than 3 seconds apart start a new scene.
 
-**画面和声音。** 用 ffmpeg 一条一条切：画面是前后各多 0.5 秒的 360p H.264，声音是人声轨的同一段，都缓存在各集的 `app_media/`。切一条画面要半秒多，所以人看到一句时，服务端在后台先把同一集前后 60 秒内的台词切好，离得近的先切，再按时间往后切到这一集结束，两个线程并行；人换一句就换掉整个队列。实测第 3 集没切过的句子点开要 0.8 到 1.1 秒，切好的约 0.1 秒。按 L 多放前后文时另切一份前后各 5 秒或 15 秒的，画面和人声从同一时刻开始，文件名带 `.ctx5`、`.ctx15`，不预切，第一次分别约 0.6 秒和 1.1 秒。
+**Picture and sound.** ffmpeg cuts one clip at a time. The picture is 360p H.264 with 0.5 seconds of extra padding before and after. The sound is the same span of the vocal track. Both are cached in each episode's `app_media/`. Cutting one picture takes more than half a second. So when a person looks at a line, the server first cuts, in the background, the lines within 60 seconds before and after it in the same episode. Nearer lines go first, and the cutting then continues forward in time to the end of the episode. Two threads run in parallel. When the person moves to another line, the whole queue is replaced. Measured on episode 3: a line that was not cut in advance takes 0.8 to 1.1 seconds to open. A line cut in advance takes about 0.1 seconds. When the person presses L to hear More context, a separate copy with 5 or 15 seconds of extra time on each side is cut. Picture and sound start at the same moment. Their file names carry `.ctx5` or `.ctx15`. These are not cut in advance. The first time, they take about 0.6 and 1.1 seconds.
 
-**导出。** 复用 `export` 的切法（原采样率、响度统一）。格式有 GPT-SoVITS 的 `train.list`（每行 `路径|角色|语言|文字`）、Style-Bert-VITS2 的 `esd.list`，或者只按角色分文件夹。
+**Export.** Uses the same cutting as `export` (original sample rate, evened-out loudness). The formats are GPT-SoVITS `train.list` (each line is `path|character|language|text`), Style-Bert-VITS2 `esd.list`, or just one folder per character.
 
-**另配的台词字幕。** 切片段的字幕是译文时，可以给每集另配一份原文字幕，导出时文字从它取，片段不变：
+**Separate text subtitles.** When the subtitles used for the clips are a translation, you can attach a separate original-language subtitle file to each episode. On export, the text is taken from that file. The clips themselves do not change:
 
-- 配上时量偏移：把两份字幕的显示时间画成 10 毫秒一格的时间线，错开着比，取重合最多的那个错开量。重合度不到 0.6，或者不到 95% 的片段碰得到台词，就拒绝。
-- 读字幕时，一个条目里的几行拆开，条目的时间按字数分给各行；行首的（名字）记成说话人，其余括号里的声音说明去掉。
-- 一条片段碰到（重叠超过 0.1 秒）的行，每一行都要基本落在片段里（七成以上，或两头各伸出不到 0.8 秒），合起来盖住片段一半以上，文字才算配全。
-- 一个角色在字幕里叫什么，取她所有片段碰到的带名字的行里最常见的名字（要占一半以上）。标了别的名字的行和片段重叠超过 0.2 秒，片段就算混着别人的话；认不出她叫什么时，碰到两个以上不同的名字也算。
-- 配不全或混着别人的片段不导出，写进导出目录的 `rejected.tsv`：角色、集、起止时间、原因、原字幕和另配字幕的文字。
+- When attaching, the offset is measured. The display times of both subtitle files are drawn as timelines with 10 ms cells. One is slid against the other, and the shift with the most overlap is taken. If the overlap is below 0.6, or fewer than 95% of the clips touch any dialogue, the attach is refused.
+- When subtitles are read, the lines inside one entry are split apart, and the entry's time is shared among the lines by character count. A name at the start of a line becomes the speaker. Other sound notes in brackets are removed.
+- For a clip, every line that overlaps it by more than 0.1 seconds must mostly fall inside the clip: 70% or more of it, or extending less than 0.8 seconds past each end. Together the lines must cover more than half of the clip. Only then is the text counted as complete.
+- A character's name in the subtitles is the most common name among the named lines that overlap her clips. It must make up more than half of them. A line with a different name that overlaps a clip by more than 0.2 seconds marks that clip as mixed with someone else's speech. When the character's name cannot be found, two or more different names touching a clip also count as mixed.
+- Clips whose text is incomplete, or that are mixed with someone else's speech, are not exported. They are written to `rejected.tsv` in the export folder, with the character, episode, start and end times, the reason, the original text and the attached text.
 
-## 打分怎么算
+## How scoring works
 
-- 只有音轨相同、起止时间毫秒级完全一致的人工标签才参与。
-- 「同一角色的配对」总数：某个角色有 n 条带名字的片段，就有 n(n−1)/2 对，再把所有角色加起来。不是把全部标签不分角色算组合数。
-- 举例：某角色有 A、B、C 三条，A 和 B 同组、C 单独一组。同一角色的配对共 3 对，连上 1 对，该合没合 2 对。
-- 没有分到组的片段各自算独立一组参与打分。没有人工名字的片段不能当成「里面没混进别的角色」。
-- 报告还给没对上的标签、没有分到组的片段，以及每个角色散在几个组里。里面的 `adjusted_rand` 是个综合分，不能替代错误合并和该合没合这两个具体数。
+- Only manual labels whose audio track matches, and whose start and end times match to the millisecond, take part.
+- The total number of **same-character pairs**: if a character has n clips with names, there are n(n−1)/2 pairs for that character. Add up all the characters. It is not the number of combinations of all labels without splitting by character.
+- Example: a character has clips A, B and C. A and B are in the same group, and C is in its own group. There are 3 same-character pairs in total. 1 is linked. 2 are missed merges.
+- Each unassigned clip counts as its own separate group in scoring. A clip without a person's name cannot be treated as "no other character got mixed in".
+- The report also lists the labels that did not match, the unassigned clips, and how many groups each character is spread across. The `adjusted_rand` in it is an overall score. It does not replace the two concrete counts, wrong merges and missed merges.
 
-## 数据文件
+## Data files
 
-每集一个目录 `runs/episodes/<集>/`：
+Each episode has a folder `runs/episodes/<episode>/`:
 
-- `episode.json` 记素材与音轨路径，`segments.json` 记片段 ID、集名、起止时间。另配了台词字幕的集，`episode.json` 里还有 `text_subtitles`（路径）、`text_subtitle_offset`（偏移秒数）和 `text_subtitle_agreement`（重合度）。
-- 声纹放在 `embeddings/<模型名>/`，用别的最小音频长度算出来的放在 `embeddings/<模型名>@w<秒数>/`，矩阵与元信息按行对应。缓存跟片段文件内容、分析音频内容、模型名和时长下限绑在一起，任何一项变了都要重算，旧缓存会报错，不会被悄悄用上。
-- `label_audio/<归档名>/` 是标注页按需切出的音频和视频，`app_media/` 是界面切出的。
+- `episode.json` records the paths of the source and the audio tracks. `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds) and `text_subtitle_agreement` (the overlap).
+- Voiceprints are stored in `embeddings/<model name>/`. Those made with a different minimum clip length are stored in `embeddings/<model name>@w<seconds>/`. The matrix and its metadata line up row by row. The cache is tied to the content of the clip files, the content of the analysis audio, the model name and the minimum length. If any of these changes, the cache must be recomputed. An old cache raises an error. It is never used silently.
+- `label_audio/<archive name>/` holds the audio and video that the labeling page cuts on demand. `app_media/` holds what the interface cuts.
 
-界面的标签放在工作区的 `labels/`：
+The interface's labels are stored in the workspace folder `labels/`:
 
-- `events.jsonl` 只追加，一行是一批改动，记下每条片段改之前和改之后。撤销也是一批，记着它撤的是哪一批；导入的批次不能撤。角色表 `cast.json` 单独存，一批里顺带新建、改名或合并了角色时，批次的 `cast` 里记着，撤销时角色表一起改回去，撤完没有片段的新角色会删掉。回放全部行就得到当前标签。
-- `cast.json` 是角色表：名字、是否是人起的名字（`named`）、颜色、图案编号（`pattern`）、头像文件、是否参与训练。没起名字的角色用「角色 N」当名字，起名字就是改名。图案编号只增不复用，没截头像时按它画默认图。头像图片放在同一目录的 `avatars/`。
+- `events.jsonl` is append-only. Each line is one batch of changes, and it records each clip's value before and after the change. An undo is also a batch, and it records which batch it undoes. Imported batches cannot be undone. The cast table `cast.json` is stored separately. When a batch also creates, renames or merges characters, the batch's `cast` field records it, and an undo restores the cast table as well. A new character that has no clips left after an undo is deleted. Replaying all the lines gives the current labels.
+- `cast.json` is the cast table. It holds the name, whether a person gave the name (`named`), the color, the pattern number (`pattern`), the avatar file, and whether the character takes part in training. A character without a name is shown as "Character N". Giving it a name is a rename. Pattern numbers only grow and are never reused. When no avatar has been cropped, the default picture is drawn from the pattern number. Avatar images are stored in the `avatars/` folder next to it.
 
-这些标签和 `annotations/` 下的人工归档分开放，原因见 [HISTORY.md](HISTORY.md#标注)。
+These labels are kept apart from the manual archives under `annotations/`. The reason is in [HISTORY.md](HISTORY.md#labeling).
 
-**片段 ID 是集名加起止时间的哈希，跟邻居无关。** 所以往片段表里只增不改能保住已有标签；重切就会让标签全部作废。
+**Clip IDs are a hash of the episode name plus the start and end times. They do not depend on neighboring clips.** So adding rows to the clip table without changing existing rows keeps the existing labels. Re-cutting makes all labels invalid.
 
-分组文件 `groups.json` 自带各集音轨位置和每条片段的归属，`speaker=null` 表示没有分到组。路径是绝对路径，搬项目要更新音轨位置；片段 ID 不因目录移动或重新分组而改变。
+The grouping file `groups.json` stores each episode's audio track position and each clip's group. `speaker=null` means the clip is unassigned. The paths are absolute, so moving the project means updating the audio track positions. Clip IDs do not change when folders are moved or when the clips are regrouped.
 
-人工归档的格式见 [annotations/README.md](../annotations/README.md)。
+For the format of the manual archives, see [annotations/README.md](../annotations/README.md).
 
-## 代码目录
+## Code layout
 
 ```text
 src/avs/
-  cli.py                   命令入口
-  project.py               一集与片段的数据格式、内容指纹、缓存目录
-  pipeline.py              准备、补片段、声纹缓存、分组、导出的编排
-  audio.py                 分离人声、做分析副本、量字幕偏移所用的说话时间线
-  embeddings/extract.py    四个声纹模型与时长下限
-  stages/subtitle.py       读字幕、量偏移
-  stages/text_subtitle.py  另配的台词字幕：拆行、量偏移、给片段配文字
-  stages/cluster.py        全局声纹分组与几种合并规则
-  stages/normalize.py      分数归一化（已证明无效，留作依据）
-  stages/export.py         原采样率导出
-  evaluation/identity.py   身份打分
-  evaluation/compare.py    同片段同标签下扫模型与分界线
-  evaluation/drift.py      量成绩随片段池变大怎么变，对比两种定分界线的做法
-  evaluation/coverage.py   对白覆盖核对，切出没被覆盖的台词
-  evaluation/scores.py     排序正确率与相等错误率，按时长和跨集分层
-  evaluation/references.py 少量身份参考实验（已关闭，留作依据）
-  evaluation/diagnose.py   近邻检索、距离分布、错误实例
-  evaluation/classify.py   按集留出，比较把片段分到角色名下的几种做法
-  labeling.py              安排标注范围、切音频和视频、保存人工归档
-  label_page.py            盲标用的旧标注页面
-  app/workspace.py         读工作区：各集、片段、台词文字、场景、拼好的声纹
-  app/labels.py            界面的标签记录、撤销、角色表、导入旧归档
-  app/model.py             小分类器和像不像的检查
-  app/server.py            网页服务的接口、切画面、导出
-  app/static/              前端页面
+  cli.py                   command entry point
+  project.py               data format for an episode and its clips, content fingerprints, cache folders
+  pipeline.py              orchestration of prepare, extending clips, voiceprint cache, grouping, export
+  audio.py                 voice separation, making the analysis copy, the speech timeline used to measure subtitle offset
+  embeddings/extract.py    four voiceprint models and the minimum clip length
+  stages/subtitle.py       read subtitles, measure offset
+  stages/text_subtitle.py  attached text subtitles: split lines, measure offset, give clips their text
+  stages/cluster.py        global voiceprint grouping and several merge rules
+  stages/normalize.py      score normalization (shown to be ineffective, kept as evidence)
+  stages/export.py         export at the original sample rate
+  evaluation/identity.py   identity scoring
+  evaluation/compare.py    sweep models and thresholds on the same clips and labels
+  evaluation/drift.py      measure how scores change as the pool grows, compare two ways of setting the threshold
+  evaluation/coverage.py   dialogue coverage check, cut the lines that were not covered
+  evaluation/scores.py     ranking accuracy and equal error rate, split by length and across episodes
+  evaluation/references.py a few identity reference experiments (closed, kept as evidence)
+  evaluation/diagnose.py   nearest-neighbor search, distance distribution, error cases
+  evaluation/classify.py   hold out by episode, compare several ways of assigning clips to character names
+  labeling.py              plan the labeling range, cut audio and video, save manual archives
+  label_page.py            old labeling page for blind labeling
+  app/workspace.py         read the workspace: episodes, clips, text, scenes, assembled voiceprints
+  app/labels.py            label records in the interface, undo, cast table, importing old archives
+  app/model.py             small classifier and similarity check
+  app/server.py            web server endpoints, picture cutting, export
+  app/static/              front-end pages
 ```

@@ -1,43 +1,43 @@
-# 依赖、模型和运行环境
+# Dependencies, models and runtime environment
 
-实际版本以 `pyproject.toml` 和 `uv.lock` 为准。各模型实测谁好谁坏见 [EXPERIMENTS.md](EXPERIMENTS.md)，这里只说它们是什么、怎么接进来。
+The actual versions are in `pyproject.toml` and `uv.lock`. Which model does well or badly in practice is in [EXPERIMENTS.md](EXPERIMENTS.md). This page only says what each tool is and how it is connected.
 
-## 音频处理
+## Audio processing
 
-- **FFmpeg**：制作 16 kHz 分析副本；标注页按需切视频画面并转成 360p H.264。原采样率人声保留给导出用。
-- **audio-separator / Mel-Band RoFormer**：抽人声，模型文件 `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`。默认 fp16：在 RTX 4060 Laptop 上用同一段 3 分钟音频实测，比 fp32 快约 1.6 倍，与 fp32 输出的信噪比 73.5 dB，远在听感之下；bf16 更慢且差 15.6 dB，不选。换显卡架构要重测；怀疑分离伪影时用 `--precision fp32` 对照。`audioread` 是它没声明但实际需要的依赖，保留。
-- **pyannote community-1**：只在没给 `--offset` 时用来量字幕偏移；WeSpeaker 适配也依赖它。从波形张量读取，避开 Windows torchcodec 的 FFmpeg DLL 问题。
-- soundfile、pyloudnorm、pandas/pyarrow：读原采样率音轨、响度处理、保存来源表。pysubs2、Typer：字幕与命令行。scikit-learn：分组、打分指标和界面里的小分类器。
+- **FFmpeg**: makes the 16 kHz analysis copy. The labeling page cuts video pictures on demand and converts them to 360p H.264. The vocals at the original sample rate are kept for export.
+- **audio-separator / Mel-Band RoFormer**: separates the vocals. Model file `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`. The default is fp16. Measured on the same 3-minute clip on an RTX 4060 Laptop, fp16 is about 1.6 times faster than fp32. Its output differs from fp32's by a signal-to-noise ratio of 73.5 dB, which means the difference is far below what you can hear. bf16 is slower, and its output differs from fp32 by only 15.6 dB, so it is not chosen. Measure again when the GPU architecture changes. If you suspect separation artifacts, use `--precision fp32` to compare. `audioread` is a dependency that the package does not declare but that is actually needed. It is kept.
+- **pyannote community-1**: used only to measure the subtitle offset when `--offset` is not given. The WeSpeaker adapter also depends on it. It reads from the waveform tensor, which avoids a problem with the FFmpeg DLL used by torchcodec on Windows.
+- soundfile, pyloudnorm, pandas/pyarrow: read the tracks at the original sample rate, handle loudness, and save the source table. pysubs2, Typer: subtitles and the command line. scikit-learn: grouping, the scoring metrics, and the small classifier in the interface.
 
-## 声纹模型
+## Voiceprint models
 
-| 命令行名字 | 来源 | 现状 |
+| Command-line name | Source | Status |
 | --- | --- | --- |
-| `anime-va` | [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding) 按声优训练的变体（989 位声优） | 分组的默认；界面里三个拼用 |
-| `anime-char` | 同上，按角色训练的变体（7357 个角色） | 界面里三个拼用 |
-| `redimnet2-b6` | [ReDimNet2](https://github.com/PalabraAI/redimnet2)，只在 VoxCeleb2 上训练的默认变体 | 界面里三个拼用；2026-09-07 前是分组的默认 |
-| `wespeaker-resnet293` | [WeSpeaker ResNet293](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM) | 已排除，Windows 上用 CPU |
+| `anime-va` | [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding) variant trained by voice actor (989 voice actors) | Default for grouping. One of the three joined together in the interface |
+| `anime-char` | Same project, variant trained by character (7357 characters) | One of the three joined together in the interface |
+| `redimnet2-b6` | [ReDimNet2](https://github.com/PalabraAI/redimnet2), the default variant, trained only on VoxCeleb2 | One of the three joined together in the interface. It was the default for grouping before 2026-09-07 |
+| `wespeaker-resnet293` | [WeSpeaker ResNet293](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM) | Ruled out. Runs on the CPU on Windows |
 
-- **anime_speaker_embedding**：ECAPA-TDNN 把 BatchNorm 换成 GroupNorm，约 700 万条视觉小说音频上训练，MIT 许可，192 维，输入 16 kHz 单声道。包里的 `get_embedding` 只收文件路径，我们绕开它直接喂数组，免得每条片段写临时文件。
-- **ReDimNet2**：通过 torch.hub 加载官方代码和模型。官方还有 `vb2+vox2`、`vb2+vox2+cnc2` 两个跨库更好的变体，没试过。torch.hub 的远程代码不在锁文件里；升级模型或远程代码后，旧的分界线和缓存不能未经核验继续比较。
-- 不同模型的相似度刻度不一样，分界线各自扫，见 [DECISIONS.md](DECISIONS.md#已经定下的)。
+- **anime_speaker_embedding**: ECAPA-TDNN with BatchNorm replaced by GroupNorm, trained on about 7 million audio clips from visual novels. MIT license, 192 dimensions, input is 16 kHz mono. The package's `get_embedding` only accepts file paths. We bypass it and feed arrays directly, so that a temporary file does not have to be written for every clip.
+- **ReDimNet2**: loaded through torch.hub, using the official code and model. The official project also has two variants, `vb2+vox2` and `vb2+vox2+cnc2`, which do better across datasets. They have not been tried. The remote code of torch.hub is not in the lock file. After the model or the remote code is upgraded, the old thresholds and caches must not be compared again without checking them first.
+- Similarity scales differ between models, so each model's threshold is swept separately. See [DECISIONS.md](DECISIONS.md#settled).
 
-## 界面
+## Interface
 
-- **FastAPI + uvicorn**：`avs app` 的网页服务，只在 127.0.0.1 上监听。
-- **Preact + htm**：前端，用 htm 3.1.1 的单文件版（`src/avs/app/static/vendor/preact-htm.js`，Apache-2.0，许可放在同目录），不需要 Node 和打包工具。
-- 测试用 httpx 驱动 FastAPI 的测试客户端。
+- **FastAPI + uvicorn**: the web server for `avs app`. It listens only on 127.0.0.1.
+- **Preact + htm**: the front end. It uses the single-file build of htm 3.1.1 (`src/avs/app/static/vendor/preact-htm.js`, Apache-2.0; the license is in the same folder). No Node and no build tool are needed.
+- The tests drive the FastAPI test client through httpx.
 
-## 运行环境
+## Runtime environment
 
-Windows 和 Linux 上 torch/torchaudio 都装 CUDA 12.8 轮子，没有 NVIDIA 显卡时同一份轮子用 CPU 跑；macOS 走 PyPI 的默认轮子，只能用 CPU。由锁文件选择。CI 在 Linux 上也装 CUDA 轮子，下载的轮子存进缓存（`prune-cache: false`），不用每次重下。只在 Windows 加 RTX 4060 上实际跑过，Linux 和 macOS 还没试过。
+On Windows and Linux, torch and torchaudio are both installed as CUDA 12.8 wheels. Without an NVIDIA GPU, the same wheels run on the CPU. macOS uses the default wheels from PyPI and can only run on the CPU. The lock file makes this choice. CI also installs the CUDA wheels on Linux. The downloaded wheels are saved in the cache (`prune-cache: false`), so they do not have to be downloaded again each time. Only Windows with an RTX 4060 has been tested so far. Linux and macOS have not been tried yet.
 
-## 以后可能用的线索
+## Leads for later
 
-只是旧调研留下的入口，不是已验证的选型，也不是当前计划，启用前重新核查。
+These are only entry points left over from older research. They are not verified choices, and they are not the current plan. Check each one again before using it.
 
-- [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)：降噪。
-- [ClearerVoice-Studio](https://github.com/modelscope/ClearerVoice-Studio)：语音增强与分离。
-- [VoiceFilter](https://google.github.io/speaker-id/publications/VoiceFilter/)：只提取指定说话人的声音。
-- 片段内多窗口声纹的离散程度（曾叫 `selfsim_spread`）：检测一条片段里是否混入第二个人。曾在第 1 集 34 条人工标注上做过时长配平对照，有信号但样本太小、无法定论；代码已删，以后处理多人片段时要重新实现并用新标签验证。
-- voxmap-studio（2026，开源）：人工修改分组的现成界面，支持拆分、合并、重新指派和跨文件统一编号。只看过论文，没找到代码也没试用。
+- [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet): noise reduction.
+- [ClearerVoice-Studio](https://github.com/modelscope/ClearerVoice-Studio): speech enhancement and separation.
+- [VoiceFilter](https://google.github.io/speaker-id/publications/VoiceFilter/): extracts only the voice of a given speaker.
+- The spread of voiceprints from several windows within one clip (formerly named `selfsim_spread`): detects whether a second person is mixed into a clip. It was tried once against a control matched for clip length, using 34 manual labels from episode 1. There was a signal, but the sample was too small to conclude anything. The code has been deleted. When multi-person clips are handled later, it must be implemented again and checked with new labels.
+- voxmap-studio (2026, open source): an off-the-shelf interface for manually editing groups. It supports splitting, merging, reassigning, and unifying numbers across files. Only the paper has been read. No code was found, and it has not been tried.

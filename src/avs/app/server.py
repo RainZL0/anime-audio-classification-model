@@ -1,6 +1,8 @@
-"""本地服务：给网页提供片段、预测和媒体，接收标注，每次标注后重训。
+"""Local server: gives the web page clips, predictions and media, takes in labels, and retrains
+after each label.
 
-只监听 127.0.0.1。状态都在内存里，改动先写进标签记录再更新内存，进程崩了重开就能接着用。
+Listens only on 127.0.0.1. State is kept in memory. Each change is written to the label records
+first, then memory is updated. If the process crashes, restarting it picks up where it left off.
 """
 
 from __future__ import annotations
@@ -21,23 +23,29 @@ from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avs.labeling import VIDEO_PAD, cut_video
+from avs.language import LANGUAGE, Words, say
 
 STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
-"""起步分组用 anime-va 的分界线，见 docs/DECISIONS.md。"""
+"""The Groups view uses anime-va's threshold. See docs/DECISIONS.md."""
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]+")
 MAYBE_FLOOR = 0.05
-"""角色视图「可能漏掉的」只列「是 TA」的概率不低于这个数的片段。"""
-UNUSABLE = "人标了质量低"
-"""导出时跳过人标了「质量低」的片段，在 rejected.tsv 里写的原因。"""
+"""The "possibly missed" list in the Characters view only includes clips whose chance of being the
+target is at least this number."""
+UNUSABLE = Words("人标了质量低", "marked low quality")
+"""Why a clip someone marked low quality was skipped on export, as written in rejected.tsv."""
 MAYBE_LIMIT = 100
-"""「可能漏掉的」最多列这么多条，从最像的往下排。"""
+"""The "possibly missed" list shows at most this many clips, most likely first."""
 CONTEXT_SECONDS = (5, 15)
-"""看不出是谁时，可以临时前后各多放这么多秒（按 L 依次切换），只在人要的时候切。"""
+"""When it is hard to tell who is speaking, the clip can be temporarily extended by this many
+seconds before and after. Press L to step through the options. Only cut when the person asks."""
 PREFETCH_SECONDS = 60.0
-"""看到一句时，在后台先把前后这么多秒内的台词片段切好，往附近跳就不用等，再接着切后面的。"""
+"""When one line is shown, first cut the dialogue clips within this many seconds before and after it
+in the background, so jumping nearby does not wait. Then keep cutting the later ones."""
 PREFETCH_WORKERS = 2
-"""后台同时切几段。一段画面要切半秒多，两个并行，前后一分钟三十来句十秒左右切完。"""
+"""How many clips to cut at the same time in the background. Cutting one picture takes half a second
+or more. With two running in parallel, about thirty lines before and after, within one minute, get
+cut in about ten seconds."""
 
 
 class AppState:
@@ -51,16 +59,19 @@ class AppState:
         self.trained: dict[str, Any] = {}
         self._cutting: dict[str, threading.Lock] = {}
         self._prefetch: list[tuple[str, str]] = []
-        """等着在后台切的 (种类, 片段)，最近的在前。人换一句就整个换掉。"""
+        """The (kind, clip) pairs waiting to be cut in the background, nearest first. Each time the
+        person moves to another line, the whole list is replaced."""
         self._prefetch_ready = threading.Condition()
         self._prefetchers: list[threading.Thread] = []
         self.retrain()
 
-    # 模型
+    # Model
 
     def retrain(self) -> None:
-        """每个目标角色的正例是标成 TA 的片段；反例是标成别的名字的、标「其他」时 TA 已经是
-        目标的，以及人说过不是 TA 的。标了「质量低」的不进训练。"""
+        """Positive examples for each target character are clips labeled as them. Negative
+        examples are clips labeled with other names, clips labeled "other" while that character
+        was already a target, and clips the person said are not them. Clips marked "low quality"
+        are not used in training."""
         targets = self.store.targets()
         examples: dict[str, tuple[list[int], list[int]]] = {t: ([], []) for t in targets}
         used: set[int] = set()
@@ -99,7 +110,7 @@ class AppState:
             "familiar_threshold": trained.threshold,
         }
 
-    # 视图
+    # Views
 
     def status(self, clip: Clip) -> str:
         if clip.id in self.store.labels:
@@ -158,7 +169,8 @@ class AppState:
                 predicted[self.guesses[clip.row].names[0]] += 1
 
         def counts(name: str) -> dict[str, Any]:
-            """确认过几句、机器归给几句，确认过的共多少秒、其中标了「质量低」的多少秒。"""
+            """How many lines were confirmed and how many the machine assigned. Also the total
+            seconds of confirmed lines, and the seconds of those marked "low quality"."""
             return {
                 "confirmed": confirmed[name],
                 "predicted": predicted[name],
@@ -166,7 +178,8 @@ class AppState:
                 "low_seconds": round(low_seconds[name], 1),
             }
 
-        # 目标角色一直列着，哪怕还没有一句；不再是目标的角色有标签时也列着，好再加回来。
+        # Target characters are always listed, even with no lines yet. Characters that are no
+        # longer targets are listed too when they have labels, so they can be added back.
         roles = [
             {**role, **counts(role["name"])}
             for role in self.store.roles
@@ -184,14 +197,14 @@ class AppState:
                 for name, meta in self.workspace.episodes.items()
             ],
             "workspace": str(self.workspace.root.resolve()),
-            "skipped": self.workspace.skipped,
+            "skipped": {name: str(why) for name, why in self.workspace.skipped.items()},
             "roles": roles,
             "other": counts(OTHER),
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
         }
 
-    # 改动
+    # Changes
 
     def _snapshot(self) -> dict[str, tuple[str, str | None]]:
         out = {}
@@ -201,7 +214,8 @@ class AppState:
         return out
 
     def change(self, batch_maker: Any) -> dict[str, Any]:
-        """执行一次改动并重训，返回直接改到的片段、连带变了预测的片段，以及新的总览。"""
+        """Make one change and retrain. Returns the clips it changed directly, the clips whose
+        predictions changed as a side effect, and the new overview."""
         with self.lock:
             before = self._snapshot()
             batch = batch_maker()
@@ -220,7 +234,7 @@ class AppState:
                 "state": self.summary(),
             }  # fmt: skip
 
-    # 起步分组
+    # Groups view
 
     def groups(self, episode: str | None) -> list[dict[str, Any]]:
         from sklearn.cluster import AgglomerativeClustering
@@ -269,12 +283,18 @@ class AppState:
         return result
 
     def role_clips(self, role: str) -> list[dict[str, Any]]:
-        """角色视图：确认过的、机器归给 TA 的，再加「可能漏掉的」（`maybe`）。
+        """Characters view: clips confirmed for this character, clips the machine assigned to
+        them, and the "possibly missed" clips (`maybe`).
 
-        可能漏掉的是机器没归给 TA、但「是 TA」的概率不低的片段：还没标的，以及标「其他」时
-        TA 还不是目标角色的。加了新的目标角色以后，从这里把以前的「其他」复查一遍。
-        「其他」没有可能漏掉的：机器没归给其他的，就归给了某个目标角色，在那个角色里核对。
-        「其他」确认过的从最像某个目标角色的排起，标错的先看到；只在取列表时排一次，标完不跳。
+        Possibly missed clips are ones the machine did not assign to them, but whose chance of being
+        them is not low. These are clips not labeled yet, and clips labeled "other" while that
+        character was not yet a target character. After a new target character is added, the
+        earlier "other" labels are checked again from here.
+        "Other" has no possibly-missed list. A clip the machine did not give to "other" was given to
+        some target character, and it is checked within that character.
+        Confirmed "other" clips are sorted starting from the ones closest to a target character,
+        so wrong labels show up first. Sorting happens once when the list is fetched, so a clip
+        does not jump after it is labeled.
         """
         mine, maybe = [], []
         for clip in self.workspace.clips:
@@ -302,7 +322,8 @@ class AppState:
         return mine + [{**self.view(c), "maybe": True} for _, c in maybe[:MAYBE_LIMIT]]
 
     def references(self, name: str) -> list[dict[str, Any]]:
-        """这个角色最适合当参考音的几条：人确认过、长度在 1.5 到 6 秒之间的优先。"""
+        """The few clips that work best as reference audio for this character. Clips confirmed by a
+        person and between 1.5 and 6 seconds long come first."""
         own = [
             c
             for c in self.workspace.clips
@@ -311,11 +332,13 @@ class AppState:
         own.sort(key=lambda c: (not 1.5 <= c.duration <= 6.0, -c.duration))
         return [self.view(c) for c in own[:3]]
 
-    # 媒体
+    # Media
 
     def media(self, kind: str, clip_id: str, context: int = 0) -> Path:
-        """切好并返回一句的画面或人声。`context` 不为 0 时前后各多放这么多秒（只能是
-        `CONTEXT_SECONDS` 里的值），画面和人声从同一时刻开始，另存一份，不碰平时那份。"""
+        """Cut and return the picture or vocals of one line. When `context` is not 0, this many
+        seconds are added before and after (only a value from `CONTEXT_SECONDS`). The picture and
+        vocals start at the same moment. They are saved as a separate copy, and the normal copy is
+        left alone."""
         clip = self.workspace.by_id.get(clip_id)
         if clip is None or not SAFE_ID.fullmatch(clip_id) or context not in (0, *CONTEXT_SECONDS):
             raise KeyError(clip_id)
@@ -337,15 +360,17 @@ class AppState:
             else:
                 video = episode.get("video")
                 if not video:
-                    raise FileNotFoundError("这一集没有视频")
+                    raise FileNotFoundError(say("这一集没有视频", "this episode has no video"))
                 pad = context or VIDEO_PAD
                 cut_video(Path(video), clip.start - pad, clip.end + pad, target)
         return target
 
     def prefetch(self, clip_id: str, seconds: float = PREFETCH_SECONDS) -> int:
-        """把同一集的台词排进后台去切，视频和人声都切：先切这句前后 `seconds` 秒内的，离这句近的
-        先切，再按时间往后切到这一集结束。已经切好的不排。换一句就换掉整个队列，所以快速翻过去的
-        那些句不会白占时间。返回排了几段。"""
+        """Queue the dialogue lines of the same episode for background cutting, both video and
+        vocals. First cut the ones within `seconds` of this line, nearest first. Then keep cutting
+        forward in time to the end of the episode. Lines already cut are not queued. Each time the
+        person moves to another line, the whole queue is replaced, so lines flipped past quickly do
+        not waste time. Returns how many jobs were queued."""
         clip = self.workspace.by_id.get(clip_id)
         if clip is None:
             raise KeyError(clip_id)
@@ -380,31 +405,31 @@ class AppState:
                 while not self._prefetch:
                     self._prefetch_ready.wait()
                 kind, clip_id = self._prefetch.pop(0)
-            # 切不了的等人真点到那句时再报错。
+            # If a clip cannot be cut, report the error only when the person clicks that line.
             with contextlib.suppress(KeyError, FileNotFoundError, ValueError):
                 self.media(kind, clip_id)
 
     def save_avatar(self, name: str, data_url: str) -> dict[str, Any]:
         head, _, body = data_url.partition(",")
         if head not in ("data:image/jpeg;base64", "data:image/png;base64"):
-            raise ValueError("头像只收 JPEG 或 PNG")
+            raise ValueError(say("头像只收 JPEG 或 PNG", "the picture must be JPEG or PNG"))
         raw = base64.b64decode(body, validate=True)
         if len(raw) > 2_000_000:
-            raise ValueError("头像太大")
+            raise ValueError(say("头像太大", "the picture is too large"))
         file = hashlib.sha256(raw).hexdigest()[:16] + (".jpg" if "jpeg" in head else ".png")
         folder = self.workspace.labels_dir / "avatars"
         folder.mkdir(parents=True, exist_ok=True)
         (folder / file).write_bytes(raw)
         return self.store.update_role(name, avatar=file)
 
-    # 导出
+    # Export
 
     def set_text_subtitles(self, episode: str, path: Path) -> dict[str, Any]:
         from avs.pipeline import attach_text_subtitles
 
         meta = self.workspace.episodes.get(episode)
         if meta is None:
-            raise ValueError(f"没有 {episode} 这一集")
+            raise ValueError(say(f"没有 {episode} 这一集", f"there is no episode {episode}"))
         result = attach_text_subtitles(Path(meta["directory"]), path)
         meta.update({k: v for k, v in result.items() if k.startswith("text_subtitle")})
         return result
@@ -412,21 +437,31 @@ class AppState:
     def _retext(
         self, assigned: dict[str, list[Clip]]
     ) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        """导出的台词换成另配字幕的文字。返回（片段 ID 到文字, 不收的片段）。"""
+        """Swap the exported dialogue for the text from the separately supplied subtitles. Returns
+        (clip ID to text, clips not accepted)."""
         from avs.stages.text_subtitle import load_text_lines, match, own_tag, shifted, touching
 
         needed = sorted({c.episode for clips in assigned.values() for c in clips})
         missing = [e for e in needed if not self.workspace.episodes[e].get("text_subtitles")]
         if missing:
             raise ValueError(
-                f"{'、'.join(missing)} 还没配台词字幕，先在下面配上，或者改用原字幕的文字"
+                say(
+                    f"{'、'.join(missing)} 还没配台词字幕，先在下面配上，或者改用原字幕的文字",
+                    f"{', '.join(missing)} has no text subtitles yet. Attach them below, "
+                    "or take the text from the original subtitles",
+                )
             )
         lines = {}
         for name in needed:
             meta = self.workspace.episodes[name]
             path = Path(meta["text_subtitles"])
             if not path.is_file():
-                raise ValueError(f"{name} 配的台词字幕不见了：{path}")
+                raise ValueError(
+                    say(
+                        f"{name} 配的台词字幕不见了：{path}",
+                        f"the text subtitles of {name} are missing: {path}",
+                    )
+                )
             lines[name] = shifted(load_text_lines(path), float(meta["text_subtitle_offset"]))
         texts: dict[str, str] = {}
         rejected: list[dict[str, Any]] = []
@@ -448,9 +483,14 @@ class AppState:
         from avs.stages.export import export, summarize
 
         if form not in ("gpt-sovits", "style-bert-vits2", "folder"):
-            raise ValueError("不认识的导出格式")
+            raise ValueError(say("不认识的导出格式", "unknown export format"))
         if out.exists() and any(out.iterdir()):
-            raise ValueError(f"{out} 已存在且不是空的，换一个目录")
+            raise ValueError(
+                say(
+                    f"{out} 已存在且不是空的，换一个目录",
+                    f"{out} already exists and is not empty. Pick another folder",
+                )
+            )
         assigned: dict[str, list[Clip]] = {name: [] for name in roles}
         rejected: list[dict[str, Any]] = []
         for clip in self.workspace.clips:
@@ -465,21 +505,30 @@ class AppState:
             if role is None:
                 continue
             if clip.id in self.store.unusable:
-                rejected.append({"role": role, "clip": clip, "reason": UNUSABLE, "text": ""})
+                rejected.append({"role": role, "clip": clip, "reason": str(UNUSABLE), "text": ""})
             else:
                 assigned[role].append(clip)
         if not any(assigned.values()):
             raise ValueError(
-                f"没有可导出的片段：{len(rejected)} 条都标了质量低"
+                say(
+                    f"没有可导出的片段：{len(rejected)} 条都标了质量低",
+                    f"nothing to export: all {len(rejected)} clips are marked low quality",
+                )
                 if rejected
-                else "没有可导出的片段"
+                else say("没有可导出的片段", "nothing to export")
             )
         texts = {c.id: c.text for c in self.workspace.clips}
         if text_subtitles and form != "folder":
             texts, unmatched = self._retext(assigned)
             rejected += unmatched
             if not any(assigned.values()):
-                raise ValueError(f"{len(unmatched)} 条片段全都对不上台词字幕，一条也没导出")
+                raise ValueError(
+                    say(
+                        f"{len(unmatched)} 条片段全都对不上台词字幕，一条也没导出",
+                        f"none of the {len(unmatched)} clips match the text subtitles; "
+                        "nothing was exported",
+                    )
+                )
         vocals = {name: Path(meta["vocals"]) for name, meta in self.workspace.episodes.items()}
         written = export({k: v for k, v in assigned.items() if v}, vocals, out)
         by_span = {
@@ -507,11 +556,12 @@ class AppState:
 class LabelBody(BaseModel):
     clips: list[str]
     label: str | None = None
-    """角色名或「其他」；空表示清掉标签。"""
+    """Character name, or "other". Empty means clear the label."""
     new_role: bool = False
-    """标成一个新建的、还没起名字的角色，这时 `label` 不用给。"""
+    """Label as a newly made character that has no name yet. In that case `label` is not needed."""
     unusable: bool = False
-    """同时标「质量低」。只对目标角色有效；标成别的、或清掉标签时一律关掉。"""
+    """Also mark as "low quality". Only works for target characters. When labeling as something
+    else, or clearing the label, this is always turned off."""
 
 
 class PrefetchBody(BaseModel):
@@ -532,7 +582,7 @@ class RoleBody(BaseModel):
 class AvatarBody(BaseModel):
     name: str
     image: str
-    """data URL 形式的 JPEG 或 PNG。"""
+    """JPEG or PNG, as a data URL."""
 
 
 class ExportBody(BaseModel):
@@ -542,7 +592,8 @@ class ExportBody(BaseModel):
     language: str = "ja"
     out: str
     text_subtitles: bool = False
-    """台词文字从每集另配的字幕里取，而不是切片段用的那份。"""
+    """The dialogue text comes from each episode's separately supplied subtitles, not from the
+    subtitles used for cutting."""
 
 
 class TextSubtitlesBody(BaseModel):
@@ -551,7 +602,7 @@ class TextSubtitlesBody(BaseModel):
 
 
 def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
-    """一集另配的台词字幕，给界面显示。"""
+    """An episode's separately supplied dialogue subtitles, shown in the interface."""
     if not meta.get("text_subtitles"):
         return None
     return {
@@ -562,8 +613,14 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:
-    """对不上台词字幕、没导出的片段，一行一条，好回界面里找。"""
-    rows = ["角色\t集\t开始\t结束\t原因\t原字幕\t台词字幕"]
+    """Clips that did not match the text subtitles and were not exported. One per line, so they can
+    be found again in the interface."""
+    rows = [
+        say(
+            "角色\t集\t开始\t结束\t原因\t原字幕\t台词字幕",
+            "character\tepisode\tstart\tend\treason\tsubtitles\ttext subtitles",
+        )
+    ]
     for item in rejected:
         clip = item["clip"]
         cells = [item["role"], clip.episode, f"{clip.start:.2f}", f"{clip.end:.2f}",
@@ -591,8 +648,11 @@ def create_app(state: AppState) -> Any:
 
     @app.middleware("http")
     async def always_check_page_files(request: Any, call_next: Any) -> Any:
-        """网页和样式、脚本每次都向服务端核对一下（没改过只回 304）。不加这个头，浏览器会凭
-        修改时间自己缓存一阵，改了界面以后刷新，可能还在用旧的样式或脚本。"""
+        """Answer in the page's language (see avs.language), and make the browser check the page,
+        styles and script with the server every time (an unchanged file only gets a 304). Without
+        that header the browser caches by modification time for a while, so a refresh after a UI
+        change may still use the old styles or script."""
+        LANGUAGE.set("en" if request.headers.get("x-language") == "en" else "zh")
         response = await call_next(request)
         if request.url.path == "/" or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-cache"
@@ -627,14 +687,16 @@ def create_app(state: AppState) -> Any:
     def post_label(body: LabelBody) -> dict[str, Any]:
         unknown = [c for c in body.clips if c not in state.workspace.by_id]
         if unknown or not body.clips:
-            raise HTTPException(400, "片段不存在")
+            raise HTTPException(400, say("片段不存在", "no such clip"))
         with state.lock:
             label = state.store.new_role() if body.new_role else (body.label or "").strip() or None
             cast = {"unnamed": [label]} if body.new_role else None
-            # 一次选择就定下「是谁」和「质量低」：标成干净的就把以前的「质量低」关掉。
+            # One choice sets both "who it is" and "low quality". Labeling as clean turns off any
+            # earlier "low quality" mark.
             changes: list[dict[str, Any]] = [{"clip": c, "label": label} for c in body.clips]
             role = state.store.role(label) if label else None
-            # 新名字会建成目标角色，所以没在角色表里的也算。
+            # A new name creates a target character, so a name not yet in the character
+            # list counts too.
             unusable = (
                 body.unusable
                 and label is not None
@@ -646,12 +708,12 @@ def create_app(state: AppState) -> Any:
 
     @app.post("/api/changes")
     def post_changes(body: ChangesBody) -> dict[str, Any]:
-        """一批混合的改动，整批记一次、整批撤销。角色视图「确认其余」和「质量低」
-        都走这里。"""
+        """A mixed batch of changes. It is recorded as one batch and undone as one batch. The
+        Characters view's "confirm the rest" and "low quality" both go through here."""
         clean = []
         for change in body.changes:
             if change.get("clip") not in state.workspace.by_id:
-                raise HTTPException(400, "片段不存在")
+                raise HTTPException(400, say("片段不存在", "no such clip"))
             if "reject" in change:
                 clean.append(
                     {
@@ -666,7 +728,7 @@ def create_app(state: AppState) -> Any:
             elif "label" in change:
                 clean.append({"clip": change["clip"], "label": change["label"]})
             else:
-                raise HTTPException(400, "不认识的改动")
+                raise HTTPException(400, say("不认识的改动", "unknown change"))
         return state.change(lambda: state.store.apply(clean))
 
     @app.post("/api/undo")
@@ -719,7 +781,8 @@ def create_app(state: AppState) -> Any:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
-    # 头像的路由要排在 /media/{kind}/{clip_id} 前面，否则 avatar 会被当成 kind 拦下来。
+    # The avatar route must come before /media/{kind}/{clip_id}, or "avatar" would be
+    # taken as a kind.
     @app.get("/media/avatar/{file}")
     def read_avatar(file: str) -> Any:
         path = state.workspace.labels_dir / "avatars" / file
@@ -741,7 +804,8 @@ def create_app(state: AppState) -> Any:
 
     @app.post("/api/prefetch")
     def post_prefetch(body: PrefetchBody) -> dict[str, Any]:
-        """人看到一句时网页调这个，后台先切好前后一分钟的片段。"""
+        """The web page calls this when the person sees a line. In the background, clips from one
+        minute before and after are cut first."""
         try:
             return {"queued": state.prefetch(body.clip)}
         except KeyError as exc:

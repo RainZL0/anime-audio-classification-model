@@ -28,7 +28,7 @@ def test_lines_are_split_by_speaker_and_lose_their_notes(tmp_path: Path) -> None
     )
     lines = load_text_lines(path)
     assert [(x.text, x.speaker) for x in lines] == [("えへへ", ""), ("まあ", "マックイーン")]
-    # 时间按字数分：3 个字对 2 个字
+    # Times are split by character count: 3 characters against 2 characters
     assert lines[0].end == lines[1].start == 1.6
 
 
@@ -51,7 +51,8 @@ def test_lines_of_someone_else_are_rejected_and_repeats_kept_once() -> None:
     assert match(lines, 0.0, 1.4, "テイオー") == ("いや 全然 君のほうこそ", None)
     mixed = [*lines, TextLine(1.0, 1.4, "えっ", "マックイーン")]
     assert match(mixed, 0.0, 1.4, "テイオー")[1] == "台词里有别人的话"
-    # 不知道她在字幕里叫什么时，碰到两个不同的名字也算混了
+    # When the subtitles' name for her is not known, touching two different names also counts
+    # as mixed.
     assert match(mixed, 0.0, 1.4)[1] == "台词里有别人的话"
 
 
@@ -69,7 +70,8 @@ def test_offset_is_measured_against_the_cutting_subtitles() -> None:
     cut = [(1.0, 2.5), (4.0, 4.6), (7.2, 9.0)]
     lines = [TextLine(a + 2.0, b + 2.0, "x", "") for a, b in cut]
     offset, agreement = measure_offset(lines, cut)
-    assert offset == -2.0 and agreement > 0.99  # 画时间线按 10 毫秒取整，边上差一两格
+    # The timeline is rounded to 10 ms, so the edges may differ by a step or two.
+    assert offset == -2.0 and agreement > 0.99
 
 
 JA = [
@@ -84,9 +86,11 @@ JA = [
 
 
 def _workspace(tmp_path: Path) -> Path:
-    """一集 6 条片段（第 i 条从 i 秒到 i+0.9 秒），切片段的字幕和片段一一对上，没有偏移。
+    """One episode with 6 clips (clip i runs from i seconds to i + 0.9 seconds). The subtitles used
+    for cutting match the clips one to one, with no offset.
 
-    片段一秒一条太整齐，错开整一秒也对得很好，所以字幕末尾另有一行长短不同、没切成片段的。
+    Clips exactly one second apart are too neat: a shift of exactly one second also fits well. So
+    the subtitles end with one more line of a different length that was not cut into a clip.
     """
     root = tmp_path / "ws"
     (root / "episodes").mkdir(parents=True)

@@ -6,10 +6,10 @@ dist/
 wheels/
 *.egg-info
 
-# 环境
+# Environment
 .venv/
 
-# 数据与产物：一律不进 git
+# Data and outputs: never committed to git
 data/
 runs/
 out/
@@ -23,7 +23,7 @@ models/
 *.pth
 *.onnx
 
-# 缓存
+# Cache
 .cache/
 .mypy_cache/
 .ruff_cache/
@@ -31,10 +31,10 @@ models/
 .coverage
 htmlcov/
 
-# 例外：CI 用的极小测试样本必须能进 git
+# Exception: the tiny test samples used by CI must be allowed into git
 !tests/fixtures/**/*.wav
 
-# 编辑器 / OS
+# Editors / OS
 .idea/
 .vscode/
 .DS_Store

@@ -1,110 +1,110 @@
-# 竞品调研：从动画剧集中提取「按角色分类」语音片段的开源工具
+# Competitor survey: open-source tools that sort anime voice clips by character
 
-调研日期：2026-10-18。星数与最后活跃时间取自 GitHub API（`pushed_at`，即最后一次推送），其余信息来自各项目 README、issue 列表与相关网页。
+Survey date: 2026-10-18. Star counts and last-active dates come from the GitHub API (`pushed_at`, the date of the last push). Other information comes from each project's README, its issue list, and related web pages.
 
-## 0. 结论先行
+## 0. Bottom line first
 
-1. **这个细分领域几乎是空白。** 专门做「视频 + 字幕 → 按角色分好的音频/文本片段」的项目，星数最高的只有 55，大多数是 0～10 星，没有一个超过 150 星。星数真正高的（GPT-SoVITS 63k、RVC 39k、Fish Speech 33k）都是「训练端」，它们自带的数据准备功能完全没有「说话人是谁」这一维度。
-2. **现有方案要么需要大量手工，要么依赖云端 API，要么在一次聚类后就结束，没有人在「纠错 → 模型变好」这个闭环上做事。** 带标注界面的只有 AnimeSpeech（Gradio，11 星，2024 年后无更新），而且作者自己写明「纠正预测很繁琐」。
-3. **可直接复用的现成组件**：`litagin02/anime_speaker_embedding`（专为动画/视觉小说语音训练的 ECAPA-TDNN，23 星，2025-06 更新，有 `char` 与 `va` 两个版本）和 WeSpeaker（TTSizer、`anime-speaker-extraction` 都在用）。
-4. **覆盖范围的限制（请注意）**：本次调研的搜索工具无法直接访问 Bilibili、知乎、X、note.com、Reddit 的站内搜索，这些平台只通过搜索引擎的间接结果覆盖到，**没有找到** 针对该问题的高热度帖子或视频。因此「用户抱怨」一栏里，来自这些平台的一手证据很少；这一点本身也说明：社区里大家是各自写脚本、没有公认的工具。
+1. **This niche is almost empty.** Projects that do "video + subtitles → audio or text clips sorted by character" specifically have at most 55 stars. Most have 0 to 10 stars, and none has more than 150. The projects with real stars (GPT-SoVITS 63k, RVC 39k, Fish Speech 33k) are all "training-side" tools. Their built-in data preparation has no "who is speaking" dimension at all.
+2. **Existing options either need a lot of manual work, depend on a cloud API, or stop after one clustering pass. Nobody works on the loop of "correct the mistakes → the model improves".** The only one with a labeling interface is AnimeSpeech (built with Gradio, a Python library for web interfaces; 11 stars; no updates since 2024). Its author wrote that "correcting predictions is tedious".
+3. **Ready-made parts that can be reused**: `litagin02/anime_speaker_embedding` (an ECAPA-TDNN voiceprint model, meaning a neural network that turns a voice into a set of numbers, trained for anime and visual-novel voices; 23 stars; updated 2025-06; has `char` and `va` versions) and WeSpeaker (a voiceprint toolkit used by TTSizer and `anime-speaker-extraction`).
+4. **Limits of coverage (please note):** the search tools used for this survey could not reach the on-site search of Bilibili, Zhihu, X, note.com or Reddit directly. These platforms appear only through indirect search-engine results. **No** high-interest posts or videos about this problem were found. So the "user complaints" section has little first-hand evidence from those platforms. That fact itself also shows that people in the community write their own scripts, and there is no tool that everyone agrees on.
 
-## 1. 竞品对比表
+## 1. Competitor comparison
 
-说明：「输入」中的「整集」指视频或整集音轨；「预切片」指已经切好的短音频。
+Note: "Input" with "whole episode" means a whole video, or the audio track of a whole episode. "Pre-cut" means short audio that has already been cut.
 
-### 1.1 直接竞品（按角色切分动画语音）
+### 1.1 Direct competitors (splitting anime voices by character)
 
-| 工具 | 星数 / 最后活跃 | 输入 | 说话人识别方式 | 标注/纠错界面 | 导出格式 | 主要问题与局限 |
+| Tool | Stars / last active | Input | How speakers are identified | Labeling / correction interface | Export format | Main problems and limits |
 |---|---|---|---|---|---|---|
-| [deeplearningcafe/animespeechdataset](https://github.com/deeplearningcafe/animespeechdataset)（AnimeSpeech） | 11 星 / 2024-04 | 视频 + 字幕（无字幕时用 ReazonSpeech 转写） | **半监督**：先人工给部分字幕行标角色，用 SpeechBrain / WavLM / ESPnet 嵌入训练 KNN，距离阈值 0.2 内判定，超过 0.4 存疑 | **有**：Gradio（`webui_finder.py`） | CSV（预测、清洗）；对话数据集（LLM 用）与单角色音频+文本数据集（TTS 用） | README 自述：预测不完美、纠错「相当繁琐」；只能预测已建立表示的角色；依赖老旧（torch 2.0.1、gradio 4.20.1）；ESPnet 要 Docker；ASR 在 Windows 上需 WSL2；仅 1 个 issue，基本无人维护 |
-| [N01N9/AniTTS-Builder-No-UI](https://github.com/N01N9/AniTTS-Builder-No-UI) | 7 星 / 2024-09 | `.mp4` + 同名 `.ass` 字幕，建议至少一季（约 12 集） | **无监督聚类**（Audio-separator 去背景 + SpeechBrain 嵌入） | 无（名字即「无界面版」） | 按说话人分文件夹的音频片段 | 只能靠聚类结果，聚类编号需人工对应角色；仅 Windows + Conda + CUDA 12；0 个 issue（几乎没人用） |
-| [taresh18/TTSizer](https://github.com/taresh18/TTSizer) | 146 星 / 2025-08 | 视频或音频（整集） | 说话人分离（diarization）+ WeSpeaker 嵌入；**分离步骤调用 Google Gemini**；配置项 `target_speaker_labels`（Speaker1/2…） | 无，命令行 + YAML | 「对齐的音频-文本对」，按说话人分目录 | 必须有 Gemini API Key（云端、收费、有隐私顾虑）；需 >4GB 显存 GPU；模型权重要手动下载并改配置；README 无准确率数据；issue 里有「Requirements are wrong」。已被用于构建 [AnimeVox](https://github.com/taresh18/AnimeVox)（19 个英文配音角色、约 11k 条，CC BY-NC 4.0） |
-| [Hecate2/sukasuka-vocal-dataset-builder](https://github.com/Hecate2/sukasuka-vocal-dataset-builder) | 55 星 / 2026-09 | MKV + `.ass` 字幕，可选 demucs 人声轨 | **纯手工**：贡献者在 `meta.csv`（`filename,character,content`）里逐条填角色 | 无（编辑 CSV） | `meta.csv`、按角色分文件夹的片段（`divide_by_character.py`） | 作者自述：标注繁琐费力；`meta.csv` 有已知错误；片段里混有非语音声音；短促无意义的叫声会损害训练 |
-| [baduli5741/anime-speaker-extraction](https://github.com/baduli5741/anime-speaker-extraction) | 0 星 / 2026-07 | SRT 字幕（含部分说话人标记）+ 人声轨 | **半监督**：用带角色标记的字幕行求每个角色的质心（跨集合并），其余片段取最近质心，模糊的放进 `uncertain/`；标记与嵌入不一致则打 QA 标记 | 无 | 片段 + 嵌入 + 元数据 | 依赖「字幕本身带角色名」；README 里讲了许多环境坑（旧 GPU 的 cuDNN、uroman 的 perl 依赖、语言码必须用 `jpn`）；韩语文档，几乎无人知晓。**但其设计要点很值得参考**：字幕时间戳通常被延长 0.5～2 秒，直接切会咬到下一个说话人，所以要用 CTC 强制对齐 + VAD + 邻近字幕边界硬截断；跨集合并后再识别身份 |
-| [dudqls5271/AnimeSpeaker](https://github.com/dudqls5271/AnimeSpeaker) | 0 星 / 2026-03 | 整集 `.mkv`（**不需要字幕**，Whisper 转写） | **无监督聚类**（pyannote，需要 HF token） | **有但很原始**：导出 `review/review.csv` 让用户编辑，再 `--finalize` | 按说话人整理的片段 + 元数据 | 仅 Windows PowerShell 脚本；要 HF token 和 CUDA；纠错靠编辑 CSV |
-| [xiya-like/anime-voice-clip-extractor](https://github.com/xiya-like/anime-voice-clip-extractor) | 0 星 / 2026-10 | 整集音轨（用 yt-dlp 从 B 站下载） | **纯手工**：静音检测切出候选，在生成的 HTML 页面里勾选目标角色 | **有**：HTML 勾选页面 | 每句一个 wav、合并后的连续 wav | 完全手工；面向「某角色出场稀少」的场景；展示了社区的真实做法：下载音轨 → 静音切分 → 人耳挑选 |
-| [blackhole077/pyannote_anime_speaker_diarization](https://github.com/blackhole077/pyannote_anime_speaker_diarization) | 0 星 / 2026-06 | 日语动画 | pyannote 说话人分离 | 未知 | 未知 | README 只有一行描述，无法判断完成度 |
-| [Anime2Real/Chobits-Chii-Voice](https://github.com/Anime2Real/Chobits-Chii-Voice) | 0 星 / 2026-10 | —（这是成品数据集，不是工具） | 人工标注复听 | — | TV 全 24 集提取 487 段约 21.4 分钟 | 说明有人在发布「单角色成品数据集」，但流程是手工的 |
+| [deeplearningcafe/animespeechdataset](https://github.com/deeplearningcafe/animespeechdataset) (AnimeSpeech) | 11 stars / 2024-04 | Video + subtitles (without subtitles, transcribed with ReazonSpeech) | **Semi-supervised**: a person first labels some subtitle lines with characters. Then a KNN (nearest-neighbor search) is trained on SpeechBrain / WavLM / ESPnet embeddings. A match is accepted within a distance threshold of 0.2. Above 0.4 it is marked as doubtful | **Yes**: Gradio (`webui_finder.py`) | CSV (predictions, cleaned); dialogue datasets (for LLMs) and single-character audio + text datasets (for TTS) | The README says predictions are not perfect and correction is "quite tedious". It can only predict characters that already have a representation in the table. Old dependencies (torch 2.0.1, gradio 4.20.1). ESPnet needs Docker. The ASR part needs WSL2 on Windows. Only 1 issue; essentially unmaintained |
+| [N01N9/AniTTS-Builder-No-UI](https://github.com/N01N9/AniTTS-Builder-No-UI) | 7 stars / 2024-09 | `.mp4` + a same-name `.ass` subtitle file. At least one season (about 12 episodes) recommended | **Unsupervised clustering** (Audio-separator removes the background, then SpeechBrain embeddings) | None (the name itself means "no-UI version") | Audio clips in folders by speaker | Only the clustering result. Cluster numbers must be matched to characters by hand. Windows + Conda + CUDA 12 only. 0 issues (almost nobody uses it) |
+| [taresh18/TTSizer](https://github.com/taresh18/TTSizer) | 146 stars / 2025-08 | Video or audio (whole episode) | Speaker diarization (splitting audio by who is speaking) + WeSpeaker embeddings. **The separation step calls Google Gemini**. Config option `target_speaker_labels` (Speaker1/2...) | None. Command line + YAML | "Aligned audio-text pairs", in folders by speaker | Needs a Gemini API key (cloud, paid, privacy concerns). Needs a GPU with more than 4 GB of memory. Model weights must be downloaded by hand and the config changed. The README has no accuracy figures. One issue says "Requirements are wrong". It was used to build [AnimeVox](https://github.com/taresh18/AnimeVox) (19 English-dubbed characters, about 11k lines, CC BY-NC 4.0) |
+| [Hecate2/sukasuka-vocal-dataset-builder](https://github.com/Hecate2/sukasuka-vocal-dataset-builder) | 55 stars / 2026-09 | MKV + `.ass` subtitles, optional vocal track from demucs (a music separation tool) | **Fully manual**: a contributor fills in the character for each line in `meta.csv` (`filename,character,content`) | None (edit the CSV) | `meta.csv`, clips in folders by character (`divide_by_character.py`) | The author says labeling is tedious and laborious. `meta.csv` has known errors. Clips contain non-speech sounds. Short, meaningless cries hurt training |
+| [baduli5741/anime-speaker-extraction](https://github.com/baduli5741/anime-speaker-extraction) | 0 stars / 2026-07 | SRT subtitles (some with speaker tags) + vocal track | **Semi-supervised**: uses subtitle lines with character tags to compute each character's centroid (center point, merged across episodes). The other clips take the nearest centroid, and unclear ones go to `uncertain/`. If a tag and an embedding disagree, a QA flag is set | None | Clips + embeddings + metadata | Relies on the subtitles themselves naming the characters. The README describes many environment pitfalls (cuDNN on old GPUs, the perl dependency of uroman, and the language code must be `jpn`). The docs are in Korean, and almost nobody knows about it. **But its design points are worth learning from**: subtitle timestamps are usually stretched by 0.5 to 2 seconds, so cutting directly bites into the next speaker. So it uses CTC forced alignment (matching known text to audio), VAD (voice activity detection, finding where speech is), and hard cuts at neighboring subtitle boundaries. It identifies identity after merging across episodes |
+| [dudqls5271/AnimeSpeaker](https://github.com/dudqls5271/AnimeSpeaker) | 0 stars / 2026-03 | Whole-episode `.mkv` (**no subtitles needed**; Whisper transcription) | **Unsupervised clustering** (pyannote, needs a Hugging Face token) | **Yes, but very rough**: exports `review/review.csv` for the user to edit, then run `--finalize` | Clips grouped by speaker + metadata | Windows PowerShell scripts only. Needs a Hugging Face token and CUDA. Corrections are made by editing the CSV |
+| [xiya-like/anime-voice-clip-extractor](https://github.com/xiya-like/anime-voice-clip-extractor) | 0 stars / 2026-10 | Whole-episode audio track (downloaded from Bilibili with yt-dlp) | **Fully manual**: silence detection makes candidate clips, and the target character is ticked on a generated HTML page | **Yes**: an HTML page for ticking | One wav per line, and merged continuous wav | Fully manual. Aimed at characters who appear rarely. Shows the community's real practice: download the audio track → split on silence → pick clips by ear |
+| [blackhole077/pyannote_anime_speaker_diarization](https://github.com/blackhole077/pyannote_anime_speaker_diarization) | 0 stars / 2026-06 | Japanese anime | pyannote speaker diarization | Unknown | Unknown | The README is one line long, so it is not possible to judge how complete it is |
+| [Anime2Real/Chobits-Chii-Voice](https://github.com/Anime2Real/Chobits-Chii-Voice) | 0 stars / 2026-10 | — (this is a finished dataset, not a tool) | Manual review by listening | — | 487 segments, about 21.4 minutes, extracted from all 24 TV episodes | Shows that people publish finished single-character datasets, but the process is manual |
 
-### 1.2 周边工具（做了一部分，不是为动画角色设计）
+### 1.2 Related tools (partly done, not designed for anime characters)
 
-| 工具 | 星数 / 最后活跃 | 输入 | 说话人识别 | 标注界面 | 导出 | 主要问题与局限 |
+| Tool | Stars / last active | Input | Speaker identification | Labeling interface | Export | Main problems and limits |
 |---|---|---|---|---|---|---|
-| [RVC-Boss/GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（内置数据工具） | 62,994 星 / 2026-10 | 预切片或长音频 | **无**（它假设你给的音频已经是单一说话人） | 有文本校对界面，**只校对文字，没有说话人维度** | `.list` | 内置：UVR5 人声分离、自动切片、ASR（中文用 FunASR，多语言用 Whisper）、文本标注。开放 issue 899 个。详见 §2 |
-| [litagin02/Style-Bert-VITS2](https://github.com/litagin02/Style-Bert-VITS2) | 1,387 星 / 2025-12 | 预切片 wav（`slice.py` 可切长音频，默认 2～12 秒） | 无 | 有 WebUI 的数据准备页，无说话人纠错 | `esd.list` | 转写默认 faster-whisper large-v3；多说话人需要自己把音频按人放好。详见 §2 |
-| [Plachtaa/VITS-fast-fine-tuning](https://github.com/Plachtaa/VITS-fast-fine-tuning) | 5,001 星 / 2025-01（**已归档**） | 视频链接 / 上传的短音频 | 无（靠用户按说话人分别上传） | 无 | 自有格式 | 当年的「入门级」工具；issue 351 个，多是训练报错、路径问题；已归档，说明这个位置有人流失 |
-| [openvpi/audio-slicer](https://github.com/openvpi/audio-slicer) | 887 星 / 2024-06 | 长音频 | 无（只按静音切） | GUI | wav 片段 | 常见的切片器，不判断说话人，多人对话和背景音乐会被一起切进去 |
-| [pyannote/pyannote-audio](https://github.com/pyannote/pyannote-audio) | 10,661 星 / 2026-10 | 音频 | 说话人分离（无监督） | 无 | RTTM | 是 AnimeSpeaker、AnimeVox 一类流程的基础；用于动画的难点是背景音乐/音效、重叠说话、说话人数量需要预先给出（见知乎、CSDN 的通用教程里反复提到的问题） |
-| [m-bain/whisperX](https://github.com/m-bain/whisperX) | 24,629 星 / 2026-09 | 音频 | 调用 pyannote | 无 | 带词级时间戳的转写 | 通用工具，对日语动画语音的说话人划分没有特殊处理 |
-| [FlorianEagox/WeeaBlind](https://github.com/FlorianEagox/WeeaBlind) | 325 星 / 2024-11 | 视频 | diarization + 声音克隆 | GUI | 配音成品 | 目标是「自动配音」而非数据集；issue：Windows 依赖、不用 GPU、缺 License 文件 |
-| [zacnami/gpt-sovits-character-voice](https://github.com/zacnami/gpt-sovits-character-voice) | 0 星 / 2026-10 | 素材音频 | 无，靠人/智能体检查边界与「其他说话人的声音」 | 无 | GPT-SoVITS 训练全流程 | 面向 AI 智能体的流程文档，反映了「切分后要人工检查混入其他说话人」是公认痛点 |
-| [KagurazakaAsahi/voice-dataset-tool](https://github.com/KagurazakaAsahi/voice-dataset-tool) | 0 星 / 2026-05 | Galgame 已按角色整理好的音频 + 元数据 CSV | 不需要（输入已带角色） | 无 | GPT-SoVITS `.list`、train/val/test 划分 | 说明「导出 GPT-SoVITS 格式」是刚需；Galgame 因为游戏资源本身带角色标签，问题比动画简单得多 |
+| [RVC-Boss/GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) (built-in data tools) | 62,994 stars / 2026-10 | Pre-cut clips or long audio | **None** (it assumes the audio you give it already has one speaker) | Has a text-proofreading interface, but **it proofreads text only, with no speaker dimension** | `.list` | Built in: UVR5 vocal separation, automatic slicing, ASR (FunASR for Chinese, Whisper for multiple languages), and text labeling. 899 open issues. See §2 |
+| [litagin02/Style-Bert-VITS2](https://github.com/litagin02/Style-Bert-VITS2) | 1,387 stars / 2025-12 | Pre-cut wav (`slice.py` can cut long audio; default 2 to 12 seconds) | None | Has a data-preparation page in its WebUI, with no speaker correction | `esd.list` | Transcription defaults to faster-whisper large-v3. For several speakers, you must sort the audio by person yourself. See §2 |
+| [Plachtaa/VITS-fast-fine-tuning](https://github.com/Plachtaa/VITS-fast-fine-tuning) | 5,001 stars / 2025-01 (**archived**) | Video link / uploaded short audio | None (users upload each speaker separately) | None | Its own format | A "beginner-level" tool of its time. 351 issues, mostly training errors and path problems. It is archived, which shows that people have left this space |
+| [openvpi/audio-slicer](https://github.com/openvpi/audio-slicer) | 887 stars / 2024-06 | Long audio | None (cuts only on silence) | GUI | wav clips | A common slicer. It does not judge speakers, so multi-person dialogue and background music get cut in together |
+| [pyannote/pyannote-audio](https://github.com/pyannote/pyannote-audio) | 10,661 stars / 2026-10 | Audio | Speaker diarization (unsupervised) | None | RTTM | The base of flows like AnimeSpeaker and AnimeVox. The hard parts for anime are background music and sound effects, overlapping speech, and the number of speakers, which must be given in advance (this comes up again and again in general tutorials on Zhihu and CSDN) |
+| [m-bain/whisperX](https://github.com/m-bain/whisperX) | 24,629 stars / 2026-09 | Audio | Calls pyannote | None | Transcription with word-level timestamps | A general tool. It has no special handling for speaker separation in Japanese anime speech |
+| [FlorianEagox/WeeaBlind](https://github.com/FlorianEagox/WeeaBlind) | 325 stars / 2024-11 | Video | Diarization + voice cloning | GUI | Finished dubbed audio | Aims at "automatic dubbing", not at datasets. Issues: Windows dependencies, does not use the GPU, missing License file |
+| [zacnami/gpt-sovits-character-voice](https://github.com/zacnami/gpt-sovits-character-voice) | 0 stars / 2026-10 | Source audio | None. A person or an AI agent checks the boundaries and "other speakers' voices" | None | The full GPT-SoVITS training flow | A process document written for AI agents. It reflects that "after cutting, check for mixed-in voices of other speakers" is a known pain point |
+| [KagurazakaAsahi/voice-dataset-tool](https://github.com/KagurazakaAsahi/voice-dataset-tool) | 0 stars / 2026-05 | Galgame audio already sorted by character + a metadata CSV | Not needed (the input already has the characters) | None | GPT-SoVITS `.list`, train/val/test split | Shows that "export in GPT-SoVITS format" is a must-have. A Galgame (visual novel game) has character tags in the game assets, so the problem is much simpler than for anime |
 
-### 1.3 可复用的模型与数据
+### 1.3 Reusable models and data
 
-| 名称 | 星数 / 最后活跃 | 用途 | 备注 |
+| Name | Stars / last active | Use | Notes |
 |---|---|---|---|
-| [litagin02/anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding) | 23 星 / 2025-06 | 在动画与视觉小说语音上训练的 ECAPA-TDNN 说话人嵌入（192 维） | `char` 版区分角色（同一声优的不同角色也分开），`va` 版区分声优；**可直接作为冻结编码器的候选**，与 WeSpeaker 对比即可 |
-| [WeSpeaker](https://github.com/wenet-e2e/wespeaker) | 1,436 星 / 2026-09 | 通用说话人嵌入 | TTSizer、anime-speaker-extraction 都在用（ResNet293） |
-| [litagin/anime-whisper](https://huggingface.co/litagin/anime-whisper) | — | 面向动画/游戏配音的日语 ASR | 见 §3 |
-| [AnimeVox](https://github.com/taresh18/AnimeVox)、Anim-400K（[论文](https://arxiv.org/abs/2401.05314)） | — | 已有的角色标注数据集 | AnimeVox 是英文配音；Anim-400K 约 437k 条日语片段，说话人标签来自 pyannote，可用于评测但不适合直接训练具体角色 |
+| [litagin02/anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding) | 23 stars / 2025-06 | ECAPA-TDNN speaker embeddings (192 dimensions), trained on anime and visual-novel voices | The `char` version separates characters (different characters of the same voice actor are kept apart). The `va` version separates voice actors. **A direct candidate for a frozen encoder** (a pretrained part that is not retrained). Just compare it with WeSpeaker |
+| [WeSpeaker](https://github.com/wenet-e2e/wespeaker) | 1,436 stars / 2026-09 | General speaker embeddings | Used by TTSizer and anime-speaker-extraction (ResNet293) |
+| [litagin/anime-whisper](https://huggingface.co/litagin/anime-whisper) | — | Japanese speech recognition (ASR) for anime and game voices | See §3 |
+| [AnimeVox](https://github.com/taresh18/AnimeVox), Anim-400K ([paper](https://arxiv.org/abs/2401.05314)) | — | Existing datasets with character labels | AnimeVox is English dubbing. Anim-400K has about 437k Japanese clips, with speaker labels from pyannote. It can be used for evaluation, but it is not suitable for directly training a specific character |
 
-## 2. 训练端期望的数据集格式
+## 2. Dataset format expected by training
 
-| 项目 | 音频 | 文本/标注文件 | 说明 |
+| Project | Audio | Text / label file | Notes |
 |---|---|---|---|
-| **GPT-SoVITS** | 单说话人的短片段 wav | `.list` 文件，每行：`vocal_path|speaker_name|language|text`。语言码：`zh` / `ja` / `en` / `ko` / `yue`。示例：`D:\GPT-SoVITS\xxx/xxx.wav|xxx|zh|我爱玩原神.` | 官方文档写「1 分钟数据即可微调」。同一个 `.list` 可以含多个 `speaker_name`，所以**按角色导出多个 `.list`（或一个多角色 `.list`）就能直接接入**。日语训练要求根目录路径不含特殊字符 |
-| **Style-Bert-VITS2** | 放在 `Data/{模型名}/raw/` 下的 wav（`slice.py` 默认切成 2～12 秒） | `Data/{模型名}/esd.list`，每行：`相对raw的wav路径|说话人名|语言|文本`，语言为 `JP` / `EN` / `ZH`（来自 `transcribe.py` 源码里的写法 `f"{wav_rel_path}|{model_name}|{language_id}|{text}\n"`） | 转写默认 faster-whisper `large-v3`；已有 `esd.list` 会被改名为 `esd.list.bak`。多说话人时需要在 `raw` 和 `esd.list` 中同时包含各说话人。文档里没有写「多少分钟够」的官方数字，社区文章多说 5～20 分钟起步 |
-| **RVC** | **只要一个装满 wav 的文件夹**，不需要文本 | 无 | FAQ 建议总时长 10～50 分钟，高质量且音色有辨识度时 5～10 分钟也可；少于 1 分钟没有成功案例；剔除明显更小的（几乎无声）wav；路径中的空格和括号会让 FFmpeg 出错 |
-| **Fish Speech** | 短片段音频 | 与音频同名的 `.lab` 文本文件（本次没有逐字核对其当前文档，**实现前请再查官方文档**） | 星数 33k，同样没有说话人归类能力 |
+| **GPT-SoVITS** | Short single-speaker wav clips | A `.list` file, one line each: `vocal_path\|speaker_name\|language\|text`. Language codes: `zh` / `ja` / `en` / `ko` / `yue`. Example: `D:\GPT-SoVITS\xxx/xxx.wav\|xxx\|en\|I love playing Genshin Impact.` | The official docs say "1 minute of data is enough for fine-tuning". One `.list` can hold several `speaker_name` values, so **exporting one `.list` per character (or one `.list` for several characters) plugs in directly**. Japanese training requires that the root path has no special characters |
+| **Style-Bert-VITS2** | wav under `Data/{model name}/raw/` (`slice.py` defaults to 2 to 12 seconds) | `Data/{model name}/esd.list`, one line each: `wav path relative to raw\|speaker name\|language\|text`. Language is `JP` / `EN` / `ZH` (from how `transcribe.py` writes it in its source: `f"{wav_rel_path}\|{model_name}\|{language_id}\|{text}\n"`) | Transcription defaults to faster-whisper `large-v3`. An existing `esd.list` is renamed to `esd.list.bak`. For several speakers, each speaker must be included in both `raw` and `esd.list`. The docs give no official number for "how many minutes is enough". Community articles say 5 to 20 minutes is a starting point |
+| **RVC** | **Just a folder full of wav files**. No text needed | None | The FAQ suggests a total of 10 to 50 minutes. 5 to 10 minutes can work for high quality and a distinctive timbre. Under 1 minute has no success cases. Remove wav files that are clearly much smaller (almost silent). Spaces and brackets in paths make FFmpeg fail |
+| **Fish Speech** | Short clips | A `.lab` text file with the same name as each audio file. (This survey did not check its current official docs word for word. **Check the official docs again before implementing.**) | 33k stars. Also has no speaker sorting ability |
 
-**对产品的含义**：导出器要支持三种目标——GPT-SoVITS 的 `.list`、SBV2 的 `esd.list`、RVC 的纯文件夹（外加通用的 `metadata.csv`）。因为三者都以「一个角色一份干净数据」为前提，**谁来保证每个文件夹里没有混进别人的声音，就是整个流程里最值钱的一步**。
+**What this means for the product**: the exporter must support three targets: GPT-SoVITS `.list`, SBV2 `esd.list`, and RVC plain folders (plus a general `metadata.csv`). All three assume "one clean dataset per character". So **making sure no other person's voice has been mixed into each folder is the most valuable step in the whole flow.**
 
-## 3. 现在大家怎么获得日语台词文本
+## 3. How people get Japanese dialogue text today
 
-| 方式 | 说明 |
+| Method | Notes |
 |---|---|
-| **直接用字幕文件** | `.ass` / `.srt`，是最准确的台词来源（人工校对过），但时间戳不精确（通常被延长 0.5～2 秒）、常含多人同行和拟声词、有些字幕带角色名有些没有。AnimeSpeech、AniTTS-Builder、sukasuka 数据集构建器、anime-speaker-extraction 都以字幕为锚点 |
-| **Whisper large-v3 / faster-whisper** | SBV2 默认；GPT-SoVITS 的多语言 ASR 也提供 Whisper。通用日语的字符错误率（CER）在动画语音上约 16.5%（见下） |
-| **[litagin/anime-whisper](https://huggingface.co/litagin/anime-whisper)** | 以 kotoba-whisper-v2.0 为基础，在约 5,300 小时的 Galgame 语音上微调。作者报告 5 部未见过的视觉小说上平均 CER 13.0，对比 whisper-large-v3 为 16.5、kotoba-whisper-v2.0 为 18.8、reazonspeech-nemo-v2 为 23.6（均为作者自测）。**不要加 initial prompt**（会降质量）；出现重复幻觉时把 `no_repeat_ngram_size` 调到 5～10 |
-| **kotoba-whisper / ReazonSpeech** | 日语通用的蒸馏模型与 NeMo 模型，速度快，但在动画语音上弱于 anime-whisper |
-| **FunASR（SenseVoice / Paraformer）** | GPT-SoVITS 中文流程的默认选择，在中国社区常见 |
-| **CTC 强制对齐** | 当字幕文本准确但时间不准时，用 CTC 对齐把时间戳修正到词级（`anime-speaker-extraction`、TTSizer 都用了） |
+| **Use the subtitle files directly** | `.ass` / `.srt`. These are the most accurate source of dialogue (checked by people). But the timestamps are not precise (usually stretched by 0.5 to 2 seconds). They often include lines where several people speak together and onomatopoeia. Some have character names and some do not. AnimeSpeech, AniTTS-Builder, the sukasuka dataset builder and anime-speaker-extraction all use the subtitles as anchors |
+| **Whisper large-v3 / faster-whisper** | The SBV2 default. GPT-SoVITS's multilingual ASR also offers Whisper. The character error rate (CER, the share of characters transcribed wrongly) for general Japanese on anime voices is about 16.5% (see below) |
+| **[litagin/anime-whisper](https://huggingface.co/litagin/anime-whisper)** | Built on kotoba-whisper-v2.0 and fine-tuned on about 5,300 hours of visual-novel (Galgame) voices. The author reports an average CER of 13.0 on 5 visual novels it had not seen, compared with 16.5 for whisper-large-v3, 18.8 for kotoba-whisper-v2.0 and 23.6 for reazonspeech-nemo-v2 (all the author's own tests). **Do not add an initial prompt** (it lowers quality). If repeated hallucinations appear (made-up text that repeats), raise `no_repeat_ngram_size` to 5 to 10 |
+| **kotoba-whisper / ReazonSpeech** | General Japanese distilled model and NeMo model. Fast, but weaker than anime-whisper on anime voices |
+| **FunASR (SenseVoice / Paraformer)** | The default choice in GPT-SoVITS's Chinese flow. Common in the Chinese community |
+| **CTC forced alignment** | When the subtitle text is accurate but the timing is not, CTC alignment (matching the known text to the audio) corrects the timestamps down to the word level (`anime-speaker-extraction` and TTSizer both use it) |
 
-**对产品的含义**：因为我们要求「视频 + 字幕」作为必需输入，文本问题基本被字幕解决；真正要解决的是 **时间边界** 与 **说话人是谁**。anime-whisper 可以作为可选项，用来在字幕缺失或与音频不一致时校验。
+**What this means for the product**: since we require "video + subtitles" as the input, the text problem is mostly solved by the subtitles. What really has to be solved is **the time boundaries** and **who is speaking**. anime-whisper can be an optional choice, used to check the text when the subtitles are missing or do not match the audio.
 
-## 4. 用户的主要抱怨（归纳）
+## 4. Main user complaints (summary)
 
-下面这些来自 README 的自述、issue 标题和教程文章，不是对海量评论的统计。
+The items below come from README self-descriptions, issue titles and tutorial articles. They are not a count of large amounts of comments.
 
-1. **标注（谁说的）全靠人**：sukasuka、xiya-like 项目都是手填 CSV 或在 HTML 里勾选；AnimeSpeech 自己说纠错繁琐。
-2. **聚类结果碎片化或编号不对应角色**：无监督方案（AniTTS-Builder、AnimeSpeaker）只给出「说话人 1、2、3…」，每集的编号还会变（`anime-speaker-extraction` 的说明明确指出了这一点）。
-3. **背景音乐、音效、多人重叠** 会污染片段：zacnami 的流程特地要求检查「相邻对白和其他说话人的声音」；sukasuka 自述片段里混有非语音声音。
-4. **字幕时间戳不准**：直接按字幕切会带入下一句。
-5. **环境难装**：旧依赖（AnimeSpeech）、必须 Docker/WSL2、Conda + 特定 CUDA（AniTTS-Builder）、HF token（AnimeSpeaker）、云端 API Key（TTSizer）。VITS-fast-fine-tuning 的 351 个 issue 大多也是环境和路径问题。
-6. **不能增量改进**：没有一个工具让「我纠正的错误」反过来改善下一集的预测。AnimeSpeech 有 KNN 但需要人先建好表示，且重新训练要走另一个 Web 界面。
-7. **日语 ASR 不准**：Whisper 在动画语音（喘息、笑声、拟声词）上容易出现重复幻觉，anime-whisper 的存在本身就是对这一点的回应。
+1. **Labeling (who is speaking) is all done by hand.** sukasuka and xiya-like use hand-filled CSVs or ticks in HTML. AnimeSpeech says its correction is tedious.
+2. **Clustering gives fragmented results, or numbers that do not match characters.** The unsupervised options (AniTTS-Builder, AnimeSpeaker) only give "speaker 1, 2, 3...", and the numbers change from episode to episode. The `anime-speaker-extraction` notes state this clearly.
+3. **Background music, sound effects and overlapping speech pollute the clips.** zacnami's flow specifically asks people to check "neighboring dialogue and other speakers' voices". sukasuka says its clips include non-speech sounds.
+4. **Subtitle timestamps are inaccurate.** Cutting directly from the subtitles brings in the next line.
+5. **Hard to install.** Old dependencies (AnimeSpeech), must have Docker or WSL2, Conda plus a specific CUDA version (AniTTS-Builder), a Hugging Face token (AnimeSpeaker), a cloud API key (TTSizer). Most of the 351 issues of VITS-fast-fine-tuning are also environment and path problems.
+6. **No incremental improvement.** No tool lets the mistakes you correct improve the next episode's predictions. AnimeSpeech has KNN, but a person must build the representation first, and retraining goes through a separate web interface.
+7. **Japanese ASR is inaccurate.** Whisper on anime voices (gasps, laughter, onomatopoeia) easily produces repeated hallucinations. The existence of anime-whisper is itself a response to this.
 
-## 5. 我们能占据的空位（gaps we can own）
+## 5. Gaps we can own
 
-1. **「纠错即训练」的闭环。** 现有工具要么一次性输出（聚类、KNN 之后就结束），要么只能改 CSV。冻结的说话人编码器 + 轻量分类头可以做到「改几条 → 秒级重训 → 剩余预测立刻变好」。这是目前所有竞品都没有的体验，也是 README 里最适合放进 GIF 的画面。
-2. **监督式（有名字的角色）替代无监督聚类。** 聚类给的是「说话人 3」，用户还得自己对应角色；用户先在前几集标几个样本，之后每集直接得到「角色名 + 置信度」。`anime-speaker-extraction` 已证明「字幕里的角色标记 + 质心」可行，但没有界面、没有人在维护、只有 0 星。
-3. **把「视频 + 字幕」作为一等输入，并把字幕时间修正做好。** 字幕延长问题已有成熟方案（CTC 对齐 + VAD + 邻近字幕边界截断），但只存在于一个 0 星的韩语 README 里。做进默认流程就是明显的质量提升。
-4. **本地、无云端 API、Windows 可用、`uv sync` 即可安装。** TTSizer 要 Gemini，AnimeSpeaker 要 HF token，AniTTS-Builder 要 Conda，AnimeSpeech 要 Docker。「一条命令装好、全部本地运行」本身就是卖点。
-5. **一键导出三种训练格式。** GPT-SoVITS `.list`、SBV2 `esd.list`、RVC 文件夹，加上按角色划分的 train/val。目前每个项目只导出自己的一种格式（或自定义 CSV），用户还要自己写转换脚本（`KagurazakaAsahi/voice-dataset-tool` 就是这样一个例子）。
-6. **跨集合并后再确定身份，并给出「不确定」队列。** 只让用户处理低置信度的片段，而不是逐条听完；这直接对应「标注工作量」这个最大的抱怨。
-7. **使用 anime 专用嵌入作为卖点与可比较的基准。** 把 `anime_speaker_embedding`（`char` / `va`）与 WeSpeaker 在同一批动画数据上的准确率放进 README，没有任何竞品公布过这类数字。
+1. **A "correct it and it trains" loop.** Existing tools either give a one-shot result (clustering or KNN, then done), or only let you edit a CSV. A frozen speaker encoder plus a light classification head can do this: correct a few clips → retrain in seconds → the remaining predictions immediately get better. No competitor offers this experience yet, and it is the picture that fits best in the README GIF.
+2. **Supervised (named characters) instead of unsupervised clustering.** Clustering gives "speaker 3", and the user must still match it to a character. If the user labels a few samples in the first episodes, every later episode directly gets "character name + confidence". anime-speaker-extraction has shown that "character tags in subtitles + centroids" works. But it has no interface, nobody maintains it, and it has 0 stars.
+3. **Treat "video + subtitles" as first-class input, and do subtitle time correction well.** The subtitle stretching problem has mature fixes (CTC alignment + VAD + cutting at neighboring subtitle boundaries), but they exist only in a 0-star Korean README. Building them into the default flow is an obvious quality gain.
+4. **Local, no cloud API, works on Windows, installs with `uv sync`.** TTSizer needs Gemini, AnimeSpeaker needs a Hugging Face token, AniTTS-Builder needs Conda, and AnimeSpeech needs Docker. "One command installs it, and everything runs locally" is itself a selling point.
+5. **One-click export of three training formats.** GPT-SoVITS `.list`, SBV2 `esd.list`, and RVC folders, plus per-character train/val splits. Each project today exports only its own format (or a custom CSV), so users have to write their own conversion scripts. `KagurazakaAsahi/voice-dataset-tool` is one example of that.
+6. **Settle identity after merging across episodes, and give an "uncertain" queue.** Only let users handle the low-confidence clips, rather than listening to everything. This directly answers the biggest complaint: the labeling workload.
+7. **Use an anime-specific embedding as a selling point and as a comparable benchmark.** Put the accuracy of `anime_speaker_embedding` (`char` / `va`) and WeSpeaker on the same anime data in the README. No competitor has published numbers like this.
 
-### 需要警惕的点
+### Things to watch out for
 
-- **目标用户并不多**：现有的同类项目星数都很低，说明需求被满足的方式是「各自写脚本」。想要 1k 星，关键不是功能多，而是 **演示效果直观**（上传一集 → 标 10 条 → 全集自动分好）和 **安装零摩擦**。
-- **版权与声优授权**：AnimeVox 采用 CC BY-NC，多篇教程都提醒要看授权。README 里需要写清楚用途边界（个人研究，不分发提取出的音频）。
-- **重叠说话与带背景音乐的片段** 是任何分类器都会出错的地方，需要有「丢弃/待定」状态，而不是强行分类。
+- **Few target users.** Existing similar projects all have very low star counts. That shows the need is met by "everyone writes their own script". Reaching 1k stars depends less on features than on **a demo that is easy to grasp** (upload an episode → label 10 lines → the whole episode sorts itself), and on **an install with zero friction**.
+- **Copyright and voice actor permissions.** AnimeVox uses CC BY-NC, and many tutorials warn people to check the license. The README must state the limits of use clearly (personal research, and no distribution of extracted audio).
+- **Overlapping speech and clips with background music** are where any classifier goes wrong. They need a "discard or pending" state, rather than being forced into a class.
 
-## 6. 未完成或未核实的部分
+## 6. Unfinished or unverified parts
 
-- Bilibili、知乎、X、note.com、Reddit 的站内内容 **没有逐条检索到**。搜索引擎只返回了通用教程（pyannote、3D-Speaker、GPT-SoVITS 整合包）和两条相关线索：知乎问题「动漫里的人物原声如何干净提取？」（https://www.zhihu.com/question/364392496）、B 站的「BA 全角色日配语音数据集」分享（https://www.bilibili.com/video/BV1eJ4m1s7kq/），均未打开细读。若要写 README 的「用户痛点」引用，建议人工到这些平台补一轮。
-- 各项目的星数以 2026-10-18 的 GitHub API 为准；`pushed_at` 可能包含 README 微调，不一定代表代码仍在更新。
-- Fish Speech 的数据格式只凭印象写出，未对照当前官方文档。
-- 各项目的实际识别准确率没有自行跑过，表中均为 README 自述。
+- Posts on Bilibili, Zhihu, X, note.com and Reddit were **not searched one by one**. The search engine returned only general tutorials (pyannote, 3D-Speaker, GPT-SoVITS packages) and two related leads: the Zhihu question "How can character voices from anime be cleanly extracted?" (https://www.zhihu.com/question/364392496) and a Bilibili share of a "BA all-character Japanese voice dataset" (https://www.bilibili.com/video/BV1eJ4m1s7kq/). Neither was opened and read closely. If you want to quote user pain points in the README, check these platforms by hand.
+- Star counts for each project are as of 2026-10-18 from the GitHub API. `pushed_at` may reflect small README tweaks, so it does not necessarily mean the code is still being updated.
+- Fish Speech's data format was written from memory and has not been checked against its current official docs.
+- The real recognition accuracy of each project has not been run locally. All figures in the tables are self-reported in the READMEs.

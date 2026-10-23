@@ -1,61 +1,61 @@
-# 规矩和教训
+# Rules and lessons
 
-这里放做事的规矩，每条都是吃过亏才定下的，附上那次亏。具体用哪个模型、切法这类技术选择在 [DECISIONS.md](DECISIONS.md)，实验数字在 [EXPERIMENTS.md](EXPERIMENTS.md)。
+This page holds the working rules. Each rule was set after a mistake, and the mistake is noted next to it. Technical choices, such as which model or which cutting method to use, are in [DECISIONS.md](DECISIONS.md). Experiment numbers are in [EXPERIMENTS.md](EXPERIMENTS.md).
 
-| 小节 | 管什么 |
+| Section | What it covers |
 | --- | --- |
-| [打分](#打分) | 什么样的数字才算数 |
-| [调参数](#调参数) | 调分界线、换做法时容易犯的错 |
-| [过滤和诊断](#过滤和诊断) | 想加过滤器、想下结论之前 |
-| [标注](#标注) | 人工标签怎样才是真值 |
-| [保留与删除](#保留与删除) | 什么不能删，删过什么 |
+| [Scoring](#scoring) | Which numbers count as valid |
+| [Tuning parameters](#tuning-parameters) | Mistakes to avoid when tuning the threshold or changing approach |
+| [Filtering and diagnosis](#filtering-and-diagnosis) | Before adding a filter or drawing a conclusion |
+| [Labeling](#labeling) | How manual labels become ground truth |
+| [Keeping and deleting](#keeping-and-deleting) | What must not be deleted, and what has been deleted |
 
-## 打分
+## Scoring
 
-1. **人工真值只有对照画面确认出来的名字。** 给机器分出来的组起个多数标签再拿它打分，会把组内混进的错人藏起来。同一个模型产出的标签不能用来验证这个模型。
-2. **给算法提供身份的参考片段必须从打分中排除**，对照的基线也排除同一批片段。已经用来试过方法的剩余标签仍然不算独立检验。
-3. **片段范围不同就不能继承标签。** 曾把旧的大段身份用到新的小段上，夸大了打分覆盖。
-4. **错误合并和该合没合必须一起报。** 每条片段各自成组也能做到零错误合并。还要看组数，以及有多少片段还没有人工名字。
-5. **样本小到某个数是 0 的时候，那个 0 说明的是样本，不是系统。** 62 条标签上「错误合并为零」，445 条标签上是 68 对；「该合没合的全是短片段」的依据只有 31 对配对。
-6. **同一批标签既调参又打分，看不出问题；换一批标签才看得出。** 分两步的分组做法在旧标签上零错误合并、多连 19 对，全量标签上多出 989 对错误合并。
-7. **调参时看到的增益会缩水。** `anime-va` 在前两集上多连 504 对，独立检验只多 9 对。换模型这个决定是对的，但幅度别信调参时的数字。
-8. **独立检验的打分口径要在标注之前写死。** 第 3 集标完后 `anime-va` 在两个口径下差别很大（预先约定的口径只多 9 对，事后换的口径多 711 对）。先定口径，才没有挑对自己有利那一种的余地。
-9. **配对不是独立观察。** 一个角色有很多条片段就会组合出很多配对；换参考之后打分集也变了，不能把「该合没合的数量下降」直接当改进。
-10. **先固定片段再比分组，再单独比切段的变化。** 同一个对照里不要同时改片段边界。
-11. **近邻检索排除查询自身。** 只有一条标签的角色不作为提问对象，但留在候选池里当陪衬。没有名字的近邻只算线索，不能算错人。
+1. **Ground truth is only the names confirmed by checking the picture.** If you give a machine-made group a majority label and then score against that label, you hide the wrong people mixed into the group. Labels made by one model cannot be used to verify that same model.
+2. **Reference clips that are used to give the algorithm identities must be excluded from scoring.** The baseline must exclude the same clips. Remaining labels that were already used to try a method still do not count as a held-out test.
+3. **Labels cannot be carried over when the clip boundaries differ.** Once an old, large identity span was applied to new, smaller clips, which inflated the scoring coverage.
+4. **Wrong merges and missed merges must be reported together.** Putting every clip in its own group also gives zero wrong merges. Check the number of groups as well, and how many clips still have no manual name.
+5. **When a sample is so small that a count is 0, the 0 describes the sample, not the system.** "Zero wrong merges" on 62 labels, against 68 pairs on 445 labels. The basis for "the missed merges are all short clips" is only 31 pairs.
+6. **Tuning and scoring on the same labels hides problems. Only a different batch of labels reveals them.** The two-step grouping approach gave zero wrong merges on the old labels, with 19 more linked pairs. On the full set of labels it added 989 wrong-merge pairs.
+7. **The gain seen while tuning shrinks.** `anime-va` added 504 linked pairs on the first two episodes, but only 9 on the held-out test. Switching models was the right decision, but do not trust the size of the gain seen during tuning.
+8. **Fix the scoring rule for the held-out test before labeling.** After episode 3 was labeled, `anime-va` gave very different results under two rules. The rule agreed in advance showed 9 more linked pairs. The rule swapped in afterwards showed 711. Fixing the rule first leaves no room to pick whichever one suits you.
+9. **Pairs are not independent observations.** One character with many clips creates many pairs. After the reference changed, the scoring set changed too. So a drop in "the number of missed merges" cannot be taken directly as an improvement.
+10. **Fix the clips first, then compare the grouping, and only then compare changes to the cutting on their own.** Do not change clip boundaries in the same comparison.
+11. **Nearest-neighbor search leaves out the query clip itself.** A character with only one label is not used as a question, but it stays in the candidate pool as background. A nearest neighbor without a name is only a clue. It cannot be counted as a wrong person.
 
-## 调参数
+## Tuning parameters
 
-1. **按整组平均距离合并时，全局分界线不是常数。** 池子越大，整组平均距离越难达标，同一分界线合并越保守。在会持续增长的语料上，「调一个分界线」本身就是个会过期的答案。[依据](EXPERIMENTS.md#分界线漂移)
-2. **两个数同向走只说明分界线位置偏了，反向走才是变差。** 池子变大时固定分界线的连上和错误合并同时下降；把错误合并按住不动重新挪分界线，能达到的连上一点没少，反而更多。光看连上的对数掉了就断定语料变大有害，会去修一个不存在的问题。
-3. **不同模型的相似度刻度不通用。** 照搬分界线会扫在毫无意义的一段上，`compare` 的 `--low` / `--high` 要按模型给。
-4. **不从结果跳到根因。** 换模型或换参考法没有改善，不足以证明声纹这一环没问题。先诊断，再决定改哪一环，不要轮流试模型和分界线。
-5. **中心点会固化上游的错误。** 曾把混进错人的组直接平均成中心点，又把片段级的分界线搬到中心点上，造成大量错误合并。
-6. **近邻检索正确不等于能靠近邻连成组。** 有标签的片段最近的有标签片段几乎总是同角色，但在全池里最近的多是没有名字的片段：按最近一对合并会经它们把角色链成大团。
+1. **When merging by average group distance, the global threshold is not a constant.** As the pool grows, it becomes harder for a group's average distance to pass the threshold. So the same threshold merges more conservatively. On a corpus that keeps growing, "tune one threshold" is itself an answer that goes stale. [Basis](EXPERIMENTS.md#threshold-drift)
+2. **If two numbers move in the same direction, the threshold is probably just in the wrong place. Only when they move in opposite directions is things getting worse.** As the pool grows, with a fixed threshold, both linked pairs and wrong merges go down. If you hold wrong merges still and move the threshold again, the linked count does not drop at all, and it even rises. Judging only by the drop in linked pairs, and concluding that a bigger corpus is harmful, sends you to fix a problem that does not exist.
+3. **Similarity scales differ between models.** A threshold copied from one model sweeps a meaningless range. The `--low` and `--high` options of `compare` must be set for each model.
+4. **Do not jump from a result to its root cause.** Changing models or reference methods without an improvement does not prove that the voiceprint step is fine. Diagnose first, then decide which step to change. Do not take turns trying models and thresholds.
+5. **Centers lock in upstream mistakes.** Once, a group with the wrong people mixed in was averaged into a center point, and the clip-level threshold was then moved onto the center points. This caused many wrong merges.
+6. **Correct nearest-neighbor search does not mean nearest neighbors can be linked into groups.** The nearest labeled clip of a labeled clip is almost always the same character. But across the whole pool, the nearest clips are mostly unnamed. Merging by the nearest pair goes through them and chains characters into one big cluster.
 
-## 过滤和诊断
+## Filtering and diagnosis
 
-1. **想加过滤器之前先数一遍。** 曾想按字幕带定位标记（`\pos`）筛掉招牌和字幕组名，一数，三集里带定位标记的对白行绝大多数是真台词。
-2. **普通降噪不等于识别并去掉另一个角色的声音。** 卡拉 OK 式分离也不按人物分离，主唱和和声两边都可能有多人，不能当目标说话人提取。
-3. **诊断「边界异常」要实际试听。** 说话时间线上「不重叠」只保证标注不重叠，音频里另一个人仍然可能在说。
-4. **字幕一直是可用输入。** 曾误记成没有字幕而绕了路。
+1. **Count before you add a filter.** At one point the idea was to filter out signs and fansub group names using subtitle positioning tags (`\pos`). When counted, most dialogue lines with positioning tags in the three episodes turned out to be real dialogue.
+2. **Ordinary noise reduction is not the same as identifying and removing another character's voice.** Karaoke-style separation also does not split by person. Both the lead vocal and the backing vocals can contain several people, so it cannot be used to extract the target speaker.
+3. **Check "boundary anomalies" by actually listening.** "No overlap" on the speech timeline only means the labels do not overlap. Another person may still be speaking in the audio.
+4. **Subtitles have always been a usable input.** Once, they were wrongly recorded as missing, and a detour was taken because of it.
 
-## 标注
+## Labeling
 
-1. **凭耳朵记忆分组不是可用真值。** 早期靠耳朵分组有近半标不清，对照画面报名字才有可用身份。旧的现场记录保留在 `annotations/legacy/`，但不把听音组号升级成真值。
-2. **试听旧标签只用来帮标注者想起某个名字是谁**，判断仍以画面为准。改成靠耳朵比对相似度，标签就变成人做的分组，而它本来是用来检验机器分组的。
-3. **第 1 至 3 集是盲标的：标注页不显示机器分组、组号或候选归属**，存在 `annotations/`。2026-10-23 起取消独立检验，新的标注（第 1、2 集的补片段和第 4 集起）在修正界面里标，存在工作区的 `labels/`，既拿来训练也拿来打分。标注者只有一人，看过预测再改仍按画面认人。
-4. **各集里同一角色必须用同一个名字。** 第 1 集的 `红毛` 和第 2 集的 `Nice Nature` 曾被当成两个人，把一次正确的合并记成了错误合并。新集标注前先对照 `annotations/names.json` 和上一集的归档。
-5. **整集连着标，不抽样。** 抽样标注每条都要重新定位画面，力气大半花在找位置而不是认人上，覆盖也不完整。
+1. **Groups made by ear from memory are not usable ground truth.** In the early period, nearly half of the groups made by ear were unclear. Only names reported after checking the picture give usable identities. The old field records are kept in `annotations/legacy/`, but the ear-based group numbers are not upgraded to ground truth.
+2. **Listening to old labels is used only to help the labeler remember who a name is.** Judgment still rests on the picture. If similarity is judged by ear, the labels become groups made by a person. But they were meant to test the machine's grouping.
+3. **Episodes 1 to 3 are blind-labeled. The labeling page shows no machine groups, group numbers or candidate assignments.** They are stored in `annotations/`. From 2026-10-23, the held-out test was cancelled. New labels (clips added for episodes 1 and 2, and everything from episode 4 on) are made in the correction interface and stored in the workspace's `labels/`. They are used both for training and for scoring. There is only one labeler. Even after seeing the predictions, identities still come from checking the picture.
+4. **In each episode, a character must always have the same name.** Episode 1's label "Red Hair" and episode 2's "Nice Nature" were once treated as two people. As a result, one correct merge was recorded as a wrong merge. Before labeling a new episode, check against `annotations/names.json` and the previous episode's archive.
+5. **Label a whole episode in one pass, not a sample.** Labeling a sample means finding each picture again every time. Most of the effort then goes into finding the spot rather than identifying the speaker, and the coverage is incomplete.
 
-## 保留与删除
+## Keeping and deleting
 
-**原始素材、对照画面做出来的人工记录、有效模型和昂贵缓存必须保留。** 删除之前先核对引用和迁移。
+**Original material, manual records made by checking pictures, working models and expensive caches must be kept.** Check references and migrations before deleting anything.
 
-做过的清理：
+Cleanups done so far:
 
-- 2026-09-06：删除旧实验目录、过渡分组、旧导出和不适合对白的卡拉 OK 模型，共 1071 个文件、约 1.88 GB，逐路径记录在 `runs/cleanup.json`。
-- 2026-09-06：按标注者要求删除 62 条抽样标签（`annotations/ep01_v4.json`、`ep02.json`），删除前把用过的 27 个角色名提取到 `annotations/names.json`。文件内容仍在 git 历史里（`git show b37ef47:annotations/ep01_v4.json`），但这批标签支撑的数字无法重算。
-- 2026-09-07：把 `runs/` 下已被取代的报告移进 `runs/superseded/`，原因见那里的 `README.txt`。
+- 2026-09-06: deleted the old experiment folders, interim groupings, old exports, and the karaoke model, which was unsuitable for dialogue. 1071 files in total, about 1.88 GB. Each path is recorded in `runs/cleanup.json`.
+- 2026-09-06: at the labeler's request, deleted 62 sampled labels (`annotations/ep01_v4.json`, `ep02.json`). Before deleting, the 27 character names that were used were pulled into `annotations/names.json`. The file contents are still in the git history (`git show b37ef47:annotations/ep01_v4.json`), but the numbers these labels supported can no longer be recomputed.
+- 2026-09-07: moved the superseded reports under `runs/` into `runs/superseded/`. The reason is in the `README.txt` there.
 
-上一版仓库 `anime-audio-classification-model` 的教训（把 MFCC 取平均丢掉音高和节奏、没有任何预处理、做成封闭的二分类、打分没有独立划分而且测试集没有标签）已经吸收进这里和 DECISIONS，不再单独维护。
+The lessons from the previous repo, `anime-audio-classification-model`, have been absorbed into this file and [DECISIONS.md](DECISIONS.md), and are no longer maintained separately. Those lessons were: averaging MFCC features threw away pitch and rhythm; there was no preprocessing at all; it was built as a closed binary classification; and scoring had no independent split, with a test set that had no labels.

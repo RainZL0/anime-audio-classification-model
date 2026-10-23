@@ -1,4 +1,4 @@
-"""标注界面的后端：标签记录、台词文字、重训和接口。"""
+"""Backend of the labeling interface: label records, dialogue text, retraining, and the API."""
 
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ def test_store_keeps_every_step_and_undoes_whole_batches(tmp_path: Path) -> None
 
     again = LabelStore(tmp_path / "labels")
     assert again.labels == store.labels
-    # B 是撤掉的那批建的，撤完没有片段了，跟着去掉。
+    # B was created by the batch that was undone. After the undo it has no clips,
+    # so it is removed too.
     assert [r["name"] for r in again.roles] == ["A"]
 
 
@@ -46,7 +47,8 @@ def test_rename_into_an_existing_role_merges_them(tmp_path: Path) -> None:
 
 
 def test_retired_labels_count_as_unlabeled(tmp_path: Path) -> None:
-    """停用的旧标签（无法确认之类）回放、导入、撤销时都当没标，撤销也不会卡住。"""
+    """A retired old label (such as an unsure one) counts as no label when replayed, imported, or
+    undone. Undo also does not get stuck."""
     folder = tmp_path / "labels"
     folder.mkdir()
     lines = [
@@ -62,7 +64,8 @@ def test_retired_labels_count_as_unlabeled(tmp_path: Path) -> None:
     assert store.labels == {"b": "teo"}
     assert [r["name"] for r in store.roles] == ["teo"]
     assert store.apply([{"clip": "c", "label": "__unclear__"}]) is None
-    # 撤回只动过停用标签的那批：没有实际变化，但照样记下已撤，接着能撤更早的。
+    # Undoing the batch that only touched retired labels: no real change, but it is still recorded
+    # as undone, so earlier batches can be undone next.
     store.undo()
     assert store.labels == {"b": "teo"}
     store.undo()
@@ -84,23 +87,24 @@ def test_a_role_can_start_without_a_name_and_keeps_its_pattern(tmp_path: Path) -
     renamed = store.role("麦昆")
     assert renamed is not None and renamed["named"] is True and renamed["pattern"] == 1
 
-    # 合并掉的角色，它的图案编号不会被下一个新角色接着用。
+    # A character that was merged away does not have its pattern number reused by the next new one.
     store.rename_role("麦昆", "A")
     assert store.role(store.new_role())["pattern"] == 3  # type: ignore[index]
 
 
 def test_undo_puts_the_role_list_back_too(tmp_path: Path) -> None:
-    """撤销一批时，这批顺带新建、改名、合并的角色也改回去，不留空角色。"""
+    """When undoing a batch, the characters that batch also created, renamed, or merged are changed
+    back too, so no empty character is left."""
     store = LabelStore(tmp_path / "labels")
     store.apply([{"clip": "a", "label": "A"}])
     store.update_role("A", target=False)
 
-    # 敲一个新名字建的角色，撤销后没有片段了，就一起去掉。
+    # A character created by typing a new name is also removed once undo leaves it with no clips.
     store.apply([{"clip": "b", "label": "B"}])
     store.undo()
     assert [r["name"] for r in store.roles] == ["A"]
 
-    # 按 N 建的还没起名字的角色也一样。
+    # The same goes for an unnamed character made with the N key.
     fresh = store.new_role()
     store.apply([{"clip": "b", "label": fresh}], cast={"unnamed": [fresh]})
     store.rename_role(fresh, "麦昆")
@@ -111,7 +115,8 @@ def test_undo_puts_the_role_list_back_too(tmp_path: Path) -> None:
     store.undo()
     assert [r["name"] for r in store.roles] == ["A"]
 
-    # 合并撤销后，被并掉的角色原样回来，留下的那个也恢复原来是不是目标。
+    # After undoing a merge, the character that was merged away comes back unchanged. The one that
+    # was kept also gets its original target status back.
     store.apply([{"clip": "c", "label": "C"}])
     store.rename_role("C", "A")
     assert store.role("A")["target"] is True  # type: ignore[index]
@@ -171,9 +176,9 @@ def test_migration_keeps_targets_and_archives_the_rest(tmp_path: Path) -> None:
     assert store.targets() == ["teo"]
     assert not store.can_undo()
     assert "麦昆" in (archive / "events.jsonl").read_text(encoding="utf-8")
-    with pytest.raises(ValueError, match="已经存在"):
+    with pytest.raises(ValueError, match="already exists"):
         migrate_to_targets(store, ["teo"], archive)
-    with pytest.raises(ValueError, match="没有这些角色"):
+    with pytest.raises(ValueError, match="no such characters"):
         migrate_to_targets(store, ["nobody"], tmp_path / "other")
 
 
@@ -186,12 +191,13 @@ def test_text_is_found_by_overlap_not_exact_time() -> None:
 
 
 def test_gap_ignores_the_clips_own_subtitle_lines() -> None:
-    # 片段 1.2 到 2.9 是「你好」那行（双语两行）；下一句台词「再见」从 3.3 开始，没切出片段。
+    # Clip 1.2 to 2.9 is the "你好" line (two bilingual lines). The next line, "再见", starts at 3.3
+    # and was not cut into a clip.
     lines = [(1.0, 3.0, "你好"), (1.0, 3.0, "こんにちは"), (3.3, 4.0, "再见")]
     starts = [line[0] for line in lines]
     spans = [(1.2, 2.9), (10.0, 10.5)]
     assert neighbor_gap(spans, 0, lines, starts) == pytest.approx(0.4)
-    # 别的片段也算，重叠记成 0。
+    # Other clips count too, and an overlap is recorded as 0.
     assert neighbor_gap([(1.2, 2.9), (2.5, 3.5)], 0, [], []) == 0.0
     assert neighbor_gap([(1.2, 2.9)], 0, [], []) is None
     assert neighbor_gap([(1.2, 2.9), (30.0, 31.0)], 0, [], []) is None
@@ -230,8 +236,8 @@ def test_a_voice_unlike_any_known_role_is_not_trusted() -> None:
 
 
 def test_other_only_counts_against_the_targets_of_its_time() -> None:
-    # A 和 C 声音不同。C 的片段在 C 还不是目标时标成了「其他」，
-    # 后来加 C 当目标，它们不该算 C 的反例。
+    # A and C have different voices. C's clips were labeled "other" while C was not yet a target.
+    # C was made a target later, so those clips should not count as C's negative examples.
     rng = np.random.default_rng(1)
     centers = np.eye(3)
     features = np.array([centers[i // 10] + rng.normal(0, 0.05, 3) for i in range(30)])
@@ -262,6 +268,23 @@ def test_an_episode_without_voiceprints_is_skipped_not_fatal(tmp_path: Path) -> 
     assert [e["name"] for e in summary["episodes"]] == ["ep1"]
     assert "avs add" in summary["skipped"]["ep2"]
     assert {c.episode for c in state.workspace.clips} == {"ep1"}
+
+
+def test_messages_follow_the_page_language(tmp_path: Path) -> None:
+    import shutil
+
+    root = _workspace(tmp_path)
+    half = episode(root / "episodes", "ep2", np.array([[1.0, 0.0, 0.0]] * 6, dtype=float))
+    shutil.rmtree(half / "embeddings")
+    client = TestClient(create_app(AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")))
+    english = {"X-Language": "en"}
+    assert "voiceprints" in client.get("/api/state", headers=english).json()["skipped"]["ep2"]
+    assert "声纹" in client.get("/api/state").json()["skipped"]["ep2"]
+    wrong = client.post("/api/label", json={"clips": ["nope"], "label": "A"}, headers=english)
+    assert wrong.json()["detail"] == "no such clip"
+    first = client.get("/api/clips").json()[0]["id"]
+    named = client.post("/api/label", json={"clips": [first], "new_role": True}, headers=english)
+    assert named.json()["role"] == "Character 1"
 
 
 def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
@@ -316,7 +339,8 @@ def test_skipped_clips_stay_out_of_the_work_lists_until_someone_labels_them(
 
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
-    # 测试集里的片段 0.9 秒、彼此只隔 0.1 秒，都要人标。把最后一条挪成孤零零的。
+    # The test set's clips are 0.9 seconds long and only 0.1 seconds apart, so all need a person to
+    # label them. Move the last one so it stands alone.
     assert not any(c.skipped for c in state.workspace.clips)
     lonely = replace(state.workspace.clips[-1], gap=2.0)
     state.workspace.clips[-1] = lonely
@@ -350,13 +374,14 @@ def test_an_added_target_lists_old_others_that_may_be_it(tmp_path: Path) -> None
     listed = {c["id"]: c for c in client.get("/api/clips", params={"episode": "ep1"}).json()}
     assert {listed[i]["guess"][0]["name"] for i in (ids[4], ids[5])} == {OTHER}
 
-    # 后来决定也要 B：ids[3] 当初标「其他」时 B 还不是目标，应该出现在「可能漏掉的」里。
+    # Later B was made a target too. When ids[3] was labeled "other", B was not yet a target, so
+    # ids[3] should appear in the "possibly missed" list.
     client.post("/api/label", json={"clips": [ids[4]], "label": "B"})
     listed = {c["id"]: c for c in client.get("/api/clips", params={"role": "B"}).json()}
     assert listed[ids[3]].get("maybe") is True
     assert ids[5] in listed and not listed[ids[5]].get("maybe")
 
-    # 去掉 A 这个目标：A 的标签留着，机器不再猜 A。
+    # Remove A as a target: A's labels stay, but the machine no longer guesses A.
     client.post("/api/roles", json={"name": "A", "target": False})
     guesses = {
         c["id"]: c["guess"] for c in client.get("/api/clips", params={"episode": "ep1"}).json()
@@ -379,7 +404,8 @@ def test_roles_report_total_length_and_other_can_be_listed(tmp_path: Path) -> No
     assert a["low_seconds"] == round(clips[0].duration, 1)
     assert summary["other"]["seconds"] == round(clips[2].duration + clips[3].duration, 1)
 
-    # 「其他」也能点开：确认过的从最像目标角色的排起，没有「可能漏掉的」。
+    # "Other" can also be opened. Confirmed clips are sorted from the ones closest to a target
+    # character, and there is no "possibly missed" list.
     listed = client.get("/api/clips", params={"role": OTHER}).json()
     assert not any(c.get("maybe") for c in listed)
     mine = [c for c in listed if c["label"] == OTHER]
@@ -401,7 +427,8 @@ def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: 
     import soundfile as sf
 
     root = _workspace(tmp_path)
-    # 导出要从原采样率的人声轨切，测试集自带的是 16 kHz、1 秒，换一条够长的。
+    # Export must cut from the vocals track at its original sample rate. The test set's own file is
+    # 16 kHz and 1 second long, so use a longer one.
     sf.write(root / "episodes/ep1/ep1.wav", np.zeros(44100 * 10), 44100)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
     client = TestClient(create_app(state))
@@ -424,7 +451,8 @@ def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: 
 
 
 def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
-    """一层选择：「TA·质量低」一次标好；改标成干净的 TA、「其他」或清掉时，「质量低」跟着关掉。"""
+    """One choice: labeling "target, low quality" sets both at once. Changing it to clean target,
+    to "other", or clearing it also turns "low quality" off."""
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
     client = TestClient(create_app(state))
@@ -444,7 +472,8 @@ def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
     client.post("/api/undo")
     assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
 
-    # 名字只有空格等于清掉标签，不能顺带留下「质量低」。
+    # A name of only spaces counts as clearing the label, and it must not leave
+    # "low quality" behind.
     assert label("  ", unusable=True)["unusable"] is False
     assert clip not in state.store.labels
 
@@ -455,7 +484,8 @@ def test_changes_api_rejects_unknown_entries_and_reads_old_flag_names(tmp_path: 
     client = TestClient(create_app(state))
     clip = state.workspace.clips[0].id
     client.post("/api/label", json={"clips": [clip], "label": "A"})
-    # 旧的「多人」开关名照样认成「质量低」，不会被当成清掉标签。
+    # The old "multiple people" switch name is still recognized as "low quality", and is not taken
+    # as clearing the label.
     client.post("/api/changes", json={"changes": [{"clip": clip, "overlap": True}]})
     assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
     bad = client.post("/api/changes", json={"changes": [{"clip": clip}]})
@@ -512,7 +542,8 @@ def test_longer_context_is_cut_separately_on_request(tmp_path: Path) -> None:
 
 
 def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
-    """以前单独的「多人」开关已并进「质量低」，旧记录回放、撤销都按「质量低」算。"""
+    """The old separate "multiple people" switch was merged into "low quality". Old records, when
+    replayed or undone, count as "low quality"."""
     folder = tmp_path / "labels"
     folder.mkdir()
     old = {

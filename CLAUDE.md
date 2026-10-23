@@ -1,25 +1,25 @@
 # anime-voice-sorter
 
-按角色收集动画对白。项目简介见 `README.md`。
+Collects an anime character's lines, one character at a time. For the project overview, see `README.md`.
 
-## 动手前
+## Before you start
 
-1. `docs/STATUS.md`：现在到哪、正在检验什么、下一步。
-2. `docs/DECISIONS.md`：已经定下和已经排除的做法。**不要重开已排除的路**，要推翻先拿出新数据。
-3. `docs/HISTORY.md`：做事的规矩，尤其是打分和标注那两节。
+1. `docs/STATUS.md`: where things stand now, what is being tested, and the next steps.
+2. `docs/DECISIONS.md`: approaches that are settled and approaches that were ruled out. **Do not reopen a ruled-out path.** To overturn one, bring new data first.
+3. `docs/HISTORY.md`: working rules, especially the two sections on scoring and labeling.
 
-其余文档从 `docs/index.md` 找，那里也写了每份文档管什么、不管什么，以及怎么维护。**一件事只写在一处，别处只放链接。**
+Other docs are found through `docs/index.md`. That page also says what each doc covers and what it does not, and how to maintain them. **One fact is written in one place only. Elsewhere, only a link.**
 
-## 语言
+## Language
 
-用朴素易懂的话，**不要自造简称，不要用行话**。文档、代码注释、命令行输出、聊天回复一视同仁。名词以 `docs/HOW_IT_WORKS.md` 的名词表为准，新借来的指标名第一次出现时用一句话说清它衡量什么。
+Use plain, easy words. **Do not invent abbreviations, and do not use jargon.** Docs, code comments and CLI output are written in plain English with no jargon. The web app has Chinese and English versions. Use the terms in the glossary in `docs/HOW_IT_WORKS.md`. When a borrowed metric name first appears, explain in one sentence what it measures.
 
-## 检查
+## Checks
 
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
 ty check src
 uv run pytest -q
-lychee --offline --no-progress CLAUDE.md docs   # 改过文档时
+lychee --offline --no-progress CLAUDE.md docs   # after changing docs
 ```

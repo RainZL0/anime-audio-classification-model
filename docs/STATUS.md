@@ -1,75 +1,75 @@
-# 当前状态与下一步
+# Current status and next steps
 
-更新：2026-10-23 晚。眼前的计划只写在这里，到初版发布为止的路线见 [ROADMAP.md](ROADMAP.md)。已经定下的做法见 [DECISIONS.md](DECISIONS.md)，实验数字见 [EXPERIMENTS.md](EXPERIMENTS.md)。
+Updated: 2026-10-23, evening. Current plans are written only here. The route up to the first release is in [ROADMAP.md](ROADMAP.md). Settled approaches are in [DECISIONS.md](DECISIONS.md), and experiment numbers are in [EXPERIMENTS.md](EXPERIMENTS.md).
 
-## 到哪一步了
+## Where things stand
 
-| 环节 | 状态 |
+| Area | Status |
 | --- | --- |
-| 素材 | 整季 13 集的音轨（`data/raw/`）和中文字幕（`data/ass/uma/`）都在。第 1 至 7 集已处理，第 8 至 13 集还没处理 |
-| 片段和声纹 | 七集共 2689 条片段，短于 0.5 秒的没有声纹。七集在 `anime-va`、`anime-char`、`redimnet2-b6` 下都算好了。第 5 至 7 集每条对白行都切出了片段，字幕偏移都是 -0.95 秒，和第 3 集一致 |
-| 视频和字幕 | 七集都记上了视频和字幕，也都另配了 Netflix 日文字幕（偏移 -0.92 至 -0.94 秒） |
-| 界面 | 起步分组、场景、角色、导出四个视图都能用，正在打磨（播放速度、只听人声、多放前后文、刷新回原处、后台预切等都已做） |
-| 标签 | 都在 `runs/labels/`，目标角色只有东海帝皇（标签名 `teo`）。见下表 |
-| 导出 | GPT-SoVITS 格式实测过。第 1 至 3 集的帝皇 171 条筛出 118 条（4.0 分钟），拿来微调 GPT-SoVITS 声音更像（[数字](EXPERIMENTS.md#日文台词)）。七集的 503 条照同样规则筛出 302 条（10.7 分钟），训出的新版更像一些，见下面「正在检验的问题」 |
+| Source material | The audio tracks of the full 13-episode season (`data/raw/`) and the Chinese subtitles (`data/ass/uma/`) are all here. Episodes 1 to 7 have been processed. Episodes 8 to 13 have not |
+| Clips and voiceprints | 2689 clips across the seven episodes. Clips shorter than 0.5 seconds have no voiceprint. Voiceprints for all seven episodes have been computed with `anime-va`, `anime-char` and `redimnet2-b6`. Episodes 5 to 7 have a clip for every dialogue line. Their subtitle offset is -0.95 seconds, the same as episode 3 |
+| Video and subtitles | All seven episodes have their video and subtitles recorded. Each also has Netflix Japanese subtitles attached (offsets -0.92 to -0.94 seconds) |
+| Interface | The four views, Groups, Scenes, Characters and Export, all work and are still being polished. Done so far: playback speed, listening to vocals only, More context, returning to the same spot after a refresh, background pre-cutting, and so on |
+| Labels | In `runs/labels/`. The only target character is Tokai Teio (label name `teo`). See the table below |
+| Export | The GPT-SoVITS format has been tested for real. Of Teio's 171 clips from episodes 1 to 3, 118 passed the filter (4.0 minutes). Fine-tuning GPT-SoVITS on them sounds closer to her ([numbers](EXPERIMENTS.md#japanese-dialogue)). Of the 503 clips from all seven episodes, 302 pass the same rule (10.7 minutes). The new version trained on them sounds somewhat closer. See "Questions being tested" below |
 
-各集标签（2026-10-23 晚，界面里的状态）：
+Labels per episode (2026-10-23 evening, status shown in the interface):
 
-| 集 | 片段 | 人标过 | 其中 `teo` | 其中「其他」 | 机器有把握 | 待确认 | 默认跳过的短句 |
+| Episode | Clips | Manually labeled | Of which `teo` | Of which "Other" | Confident | Needs review | Short lines skipped by default |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 第 1 集 | 408 | 369 | 100 | 269 | 28 | 1 | 10 |
-| 第 2 集 | 401 | 318 | 112 | 206 | 60 | 3 | 20 |
-| 第 3 集 | 375 | 317 | 63 | 254 | 55 | 0 | 3 |
-| 第 4 集 | 378 | 73 | 42 | 31 | 292 | 0 | 13 |
-| 第 5 集 | 365 | 54 | 36 | 18 | 297 | 2 | 12 |
-| 第 6 集 | 373 | 92 | 90 | 2 | 270 | 1 | 10 |
-| 第 7 集 | 389 | 71 | 60 | 11 | 294 | 2 | 22 |
+| Episode 1 | 408 | 369 | 100 | 269 | 28 | 1 | 10 |
+| Episode 2 | 401 | 318 | 112 | 206 | 60 | 3 | 20 |
+| Episode 3 | 375 | 317 | 63 | 254 | 55 | 0 | 3 |
+| Episode 4 | 378 | 73 | 42 | 31 | 292 | 0 | 13 |
+| Episode 5 | 365 | 54 | 36 | 18 | 297 | 2 | 12 |
+| Episode 6 | 373 | 92 | 90 | 2 | 270 | 1 | 10 |
+| Episode 7 | 389 | 71 | 60 | 11 | 294 | 2 | 22 |
 
-- `teo` 共确认 503 条、16 分 1 秒，其中「质量低」2 分 50 秒。机器有把握归给 `teo` 的都已经有人听过，剩下机器有把握的全是「其他」，不逐句确认。
-- 迁移前标的 102 条「不止一个人」「无法确认」已经清掉，回到机器猜测，正在重听。
-- 有 85 条标了「质量低」（七集依次 26、12、4、6、8、11、18），不进训练，导出时跳过。
-- 字幕在同一时间出两行时，两行各切出一条片段，时间几乎重合，两条里都有两个人的声音。前 4 集约 50 条片段和别的片段重叠超过 0.3 秒；现在靠人听着标「质量低」，程序不单独处理。
-- 第 1、2 集原来待标的 324 条补片段，已在界面里标了 230 条。
-- 「待确认」含短于 0.5 秒、没有声纹的片段。
+- `teo` has 503 confirmed clips, 16 minutes 1 second in total. Of these, 2 minutes 50 seconds are "low quality". Every clip the machine is confident belongs to `teo` has already been listened to by a person. The remaining confident clips are all "Other", and they are not confirmed one by one.
+- The 102 clips carried over from before the migration that were labeled "multiple people" or "unclear" have been cleared. They are back to the machine's guesses and are being listened to again.
+- 85 clips are labeled "low quality" (episodes 1 to 7: 26, 12, 4, 6, 8, 11 and 18). They are not used for training and are skipped on export.
+- When the subtitles show two lines at the same time, each line is cut into its own clip. The two clips nearly share the same time range, and both contain two people's voices. About 50 clips in the first four episodes overlap another clip by more than 0.3 seconds. For now a person listens and labels them "low quality". The program does not handle them separately.
+- Clips were added for the 324 lines in episodes 1 and 2 that were still waiting to be labeled. 230 of them have been labeled in the interface.
+- "Needs review" includes clips that are shorter than 0.5 seconds and have no voiceprint.
 
-## 正在检验的问题
+## Questions being tested
 
-按名字分类已经定下，不再检验（[DECISIONS.md](DECISIONS.md#已经定下的)，数字在 [EXPERIMENTS.md](EXPERIMENTS.md#按名字分类)）。
+Classifying by name is settled and is no longer being tested ([DECISIONS.md](DECISIONS.md#settled); numbers in [EXPERIMENTS.md](EXPERIMENTS.md#classify-by-name)).
 
-**让模型读同一句台词，能不能帮着认人。** 拿一条没标的片段，用它的日文台词让帝皇的 GPT-SoVITS 模型读一遍，比较合成音和真片段像不像：说的字一样，剩下的差别只在音色上，对短句也许比直接比声纹准。不太看好：合成音里的角色信息全来自已标的片段，还带着合成误差（合成音和帝皇平均声纹的相似度 0.52～0.70，真录音 0.767，[数字](EXPERIMENTS.md#日文台词)），语气也跟着参考音频走。还没开始，口径见下一步第 2 条。
+**Can a model reading the same line help identify people?** Take an unlabeled clip, use its Japanese line, and have Teio's GPT-SoVITS model read it aloud. Then compare the synthesized voice with the real clip, to see how alike they sound. The words are the same, so the remaining difference is only the voice itself. For short lines this might work better than comparing voiceprints directly. Expectations are low. The character information in the synthesized voice all comes from the labeled clips, the synthesis carries its own error (the similarity between the synthesized voice and Teio's average voiceprint is 0.52 to 0.70, while the real recordings score 0.767; [numbers](EXPERIMENTS.md#japanese-dialogue)), and the tone also follows the reference audio. This has not started yet. The rules are in next step 2.
 
-**数据多了，GPT-SoVITS 能不能更好。** 上次 118 条（4.0 分钟，第 1 至 3 集）微调后声音更像。现在用 302 条（10.7 分钟，第 1 至 7 集，`out/sovits-teio/dataset3/`）照同样参数再训一版，权重叫 `teio7`，旧的 `teio` 留着不动。比法：同一段参考音频合成 8 句训练里没有的台词（上次的 4 句，加兴奋、低落、得意、坚定各一句），底模、旧版、新版各一份，算和帝皇平均声纹的相似度，再由人听语气和发音。人听不出变好，就不再为 GPT-SoVITS 多标。声纹相似度已经量了：不微调 0.538，旧版 0.615，新版 0.646，还在涨但涨幅小了。GPT-SoVITS V5 不微调，换 5 段参考音频平均 0.580，新版 0.593，算打平：V5 跟着参考音频走，新版各有高低。多训几轮只差 0.01 上下，合成音的相似度已经和同样长短的真录音差不多，这把尺子量到头了（[数字](EXPERIMENTS.md#日文台词)）。还差人听。
+**Does more data make GPT-SoVITS better?** Last time, after fine-tuning on 118 clips (4.0 minutes, episodes 1 to 3), the voice sounded closer. Now another version is trained with the same settings on 302 clips (10.7 minutes, episodes 1 to 7, `out/sovits-teio/dataset3/`). Its weights are named `teio7`. The old `teio` is kept untouched. The comparison: synthesize 8 lines that are not in the training data (last time's 4 lines, plus one each for excited, down, smug and determined) using the same reference audio. Do this for the base model, the old version and the new version. Compute the similarity of each to Teio's average voiceprint, then have a person listen for tone and pronunciation. If a person cannot hear an improvement, stop labeling more for GPT-SoVITS. Voiceprint similarity has been measured: without fine-tuning 0.538, old version 0.615, new version 0.646. It is still rising, but by less. GPT-SoVITS V5 without fine-tuning, averaged over 5 reference clips, scores 0.580. The new version scores 0.593, which is a tie. V5 follows the reference audio, and the new version's results go up and down. Training more rounds changes the score by only about 0.01. The similarity of the synthesized voice is already close to that of real recordings of the same length, so this measure has reached its limit ([numbers](EXPERIMENTS.md#japanese-dialogue)). Listening by a person is still needed.
 
-**先放下的：** 分界线随池子漂移（固定 0.70 在池子变大时会滑，对策是 `avs group --relative`）。分类已经定下，分组只在起步时用来让人给整组起名字。数字见 [EXPERIMENTS.md](EXPERIMENTS.md#分界线漂移)。
+**Set aside for now:** the threshold drifts as the clip pool changes. A fixed 0.70 slips as the pool grows. The fix is `avs group --relative`. Classification is settled. Grouping is used only at the start, so that a person can name each whole group. Numbers are in [EXPERIMENTS.md](EXPERIMENTS.md#threshold-drift).
 
-## 下一步
+## Next steps
 
-不再做独立检验，以后各集都在修正界面里标，只分「`teo`」和「其他」。
+No more held-out tests. From now on, each episode is labeled in the correction interface, with only two labels: `teo` and "Other".
 
-1. **打磨界面（当前重点）。** 从零开始的第一次使用、出错时的提示都要顺；之后录 README 的演示动图。已做：`avs add` 一条命令加一集，`--device` 默认自动选，`doctor` 查令牌、模型和磁盘，空工作区给出命令，声纹没算全的集跳过；README 换成英文。还没做：在界面里加一集，在 Linux 上实际装一遍跑一遍。
-2. **标完第 4 集，顺便检验读台词对比。** 还剩 292 条机器有把握的「其他」，日文字幕已配上。口径在标注之前写死：
-   - 只比「是不是东海帝皇」这一个是非题，因为只有帝皇有微调过的模型。模型用现成的 `teio_e8_s240.pth` 和 `teio-e15.ckpt`（放在 GPT-SoVITS 目录下，第 1 至 3 集 118 条训练，第 4 集没参与），参考音频和合成参数照 `out/sovits-teio/infer.py`。新训的 `teio7` 用了第 4 集，不能拿来做这个检验。
-   - 片段：第 4 集标成 `teo` 或「其他」、有声纹、能用 Netflix 日文字幕配上整句台词的。
-   - 每条片段让帝皇模型读它自己的台词，算三种分数：新做法是真片段和合成音的 `anime-va` 声纹相似度；对照一是真片段和第 1 至 3 集帝皇人工标签平均声纹的相似度；对照二是小分类器给帝皇的概率。
-   - 报三种分数把帝皇和非帝皇分开的排序正确率（拿一条帝皇片段和一条非帝皇片段，帝皇那条分数更高的比例），全部和按时长分档（0.5 至 1、1 至 1.5、1.5 至 3、3 秒以上）都报。
-   - 判定：新做法在某一档比两个对照都高出 0.02 以上，才考虑在那一档当第二意见用；没有一档做到，就放下这个想法。
-3. **补完第 1、2 集剩下的 60 条**，再看 0.5 到 1 秒这一档在更多数据上是不是同样勉强（见[证据的边界](EXPERIMENTS.md#证据的边界)）。
-4. **看 GPT-SoVITS 对比的结果再决定**要不要处理第 8 集起的各集：每集一条 `avs add`，带上 `--text-subs` 配日文字幕（[命令](USAGE.md#处理新的一集)），标到哪集处理到哪集。
+1. **Polish the interface (current focus).** A first use from scratch and the error messages must both be smooth. After that, record the demo GIF for the README. Done: `avs add` adds an episode with one command. `--device` is chosen automatically by default. `doctor` checks the token, the models and the disk space. An empty workspace gives the command to run. Episodes whose voiceprints are not all computed are skipped. The README, docs, code comments and command-line output are now in English, and the web app has Chinese and English versions with a switch. Not done yet: adding an episode from inside the interface, and actually installing and running it on Linux.
+2. **Finish labeling episode 4, and run the read-aloud comparison along the way.** 292 clips that the machine is confident are "Other" are still waiting. The Japanese subtitles are attached. The rules are fixed before labeling:
+   - Compare only the yes/no question "is this Tokai Teio?", because only Teio has a fine-tuned model. The models are the existing `teio_e8_s240.pth` and `teio-e15.ckpt` (in the GPT-SoVITS folder, trained on the 118 clips from episodes 1 to 3; episode 4 was not used). The reference audio and synthesis settings follow `out/sovits-teio/infer.py`. The newly trained `teio7` used episode 4, so it cannot be used for this test.
+   - Clips: episode 4 clips labeled `teo` or "Other", that have a voiceprint, and whose whole line can be matched to the Netflix Japanese subtitles.
+   - For each clip, have Teio's model read its own line, and compute three scores. The new method is the `anime-va` voiceprint similarity between the real clip and the synthesized voice. Control 1 is the similarity between the real clip and the average voiceprint of Teio's manual labels from episodes 1 to 3. Control 2 is the probability the small classifier gives to Teio.
+   - Report, for each of the three scores, the ranking accuracy at separating Teio from non-Teio clips (the share of times that a random Teio clip scores higher than a random non-Teio clip). Report it for all clips, and split by length: 0.5 to 1 second, 1 to 1.5, 1.5 to 3, and over 3 seconds.
+   - Verdict: the new method must beat both controls by at least 0.02 in some length band before it is considered as a second opinion for that band. If no band reaches that, drop the idea.
+3. **Finish the remaining 60 clips of episodes 1 and 2.** Then check whether the 0.5 to 1 second band is equally weak on more data (see [limits of the evidence](EXPERIMENTS.md#limits-of-the-evidence)).
+4. **After the GPT-SoVITS comparison, decide whether to handle episodes 8 onward.** Each episode takes one `avs add`, with `--text-subs` to attach the Japanese subtitles ([command](USAGE.md#processing-a-new-episode)). Label each episode as it is processed.
 
-## 文件在哪
+## Where the files are
 
-| 内容 | 位置 |
+| Content | Location |
 | --- | --- |
-| 各集的片段、音轨、声纹缓存、界面切出的画面 | `runs/episodes/ep01/` 至 `ep07/` |
-| 界面的标签和角色表 | `runs/labels/`（格式见[数据文件](HOW_IT_WORKS.md#数据文件)）；迁移前的原样归档在 `runs/labels/archive-20261023-170304/` |
-| 第 1 至 3 集盲标的人工归档 | `annotations/`，见那里的 [README](../annotations/README.md) |
-| 帝皇的 GPT-SoVITS 数据集和脚本 | `out/sovits-teio/` |
-| 当前分组与打分 | `runs/groups/uma3.json`、`uma3-evaluation.json`、`uma3-ep03-evaluation.json` |
-| 按名字分类，第 3 集 | `runs/classify/ep03-*.json` |
-| 第 3 集独立检验 | `runs/groups/blind-redimnet*.json`、`blind-animeva*.json`、`runs/comparison-ep03.json`、`runs/score-ep03.json` |
-| 分界线随池子漂移 | `runs/drift-ep01.json`、`drift-ep02.json`、`drift-ep03.json` |
-| 模型对照 | `runs/score-models.json`、`runs/comparison-anime.json` |
-| 对白覆盖核对 | `runs/coverage/ep01/` 至 `ep07/` |
-| 已被取代的旧报告 | `runs/superseded/`，见那里的 `README.txt` |
+| Each episode's clips, audio tracks, voiceprint cache, and pictures cut by the interface | `runs/episodes/ep01/` to `ep07/` |
+| The interface's labels and cast table | `runs/labels/` (format in [data files](HOW_IT_WORKS.md#data-files)). The original archive from before the migration is in `runs/labels/archive-20261023-170304/` |
+| Manual archives of the blind labels for episodes 1 to 3 | `annotations/`, see the [README](../annotations/README.md) there |
+| Teio's GPT-SoVITS dataset and scripts | `out/sovits-teio/` |
+| Current groups and scores | `runs/groups/uma3.json`, `uma3-evaluation.json`, `uma3-ep03-evaluation.json` |
+| Classify by name, episode 3 | `runs/classify/ep03-*.json` |
+| Held-out test, episode 3 | `runs/groups/blind-redimnet*.json`, `blind-animeva*.json`, `runs/comparison-ep03.json`, `runs/score-ep03.json` |
+| Threshold drift as the pool grows | `runs/drift-ep01.json`, `drift-ep02.json`, `drift-ep03.json` |
+| Model comparison | `runs/score-models.json`, `runs/comparison-anime.json` |
+| Dialogue coverage check | `runs/coverage/ep01/` to `ep07/` |
+| Superseded old reports | `runs/superseded/`, see the `README.txt` there |
 
-`runs/` 和 `out/` 不进 git。
+`runs/` and `out/` are not committed to git.

@@ -1,255 +1,255 @@
-# 做过的实验
+# Experiments done
 
-这里只记做完的实验和数字，不写计划，也不写规矩。名词见[名词表](HOW_IT_WORKS.md#名词表)，由这些实验定下的做法汇总在 [DECISIONS.md](DECISIONS.md)。
+This page records only finished experiments and their numbers. It has no plans and no rules. For the terms, see the [glossary](HOW_IT_WORKS.md#glossary). The approaches settled by these experiments are summarized in [DECISIONS.md](DECISIONS.md).
 
-**分成两个时期看。** 2026-09-06 之前用的是 62 条抽样标签，那批标签已按标注者要求删除，只在[最后一节](#62-条抽样标签时期)留教训。之后是三集全量标注，1184 条片段里 860 条有人工名字，这才是有效证据。
+**Read in two periods.** Before 2026-09-06 the work used 62 sampled labels. Those labels were deleted at the labeler's request, and only the lessons are kept, in [the last section](#62-sampled-labels). After that came full labeling of three episodes: 860 of the 1184 clips have a person's name. That is the valid evidence.
 
-| 小节 | 一句话结论 |
+| Section | One-line conclusion |
 | --- | --- |
-| [按名字分类](#按名字分类) | 有了人工标签就能直接分到角色名下；把握最高的八成片段正确率 0.97，值得做下去 |
-| [只留难分的反例](#只留难分的反例) | 只分 `teo` 和「其他」时，反例删到最难的一成也几乎一样准；容易的反例没用，但也不碍事 |
-| [界面里的有把握](#界面里的有把握) | 加上像不像的检查，有把握的片段从九成二对涨到九成九对，旁白和路人不再被硬认 |
-| [第 3 集独立检验](#第-3-集独立检验) | 换成 `anime-va` 是对的，好在少犯错，不在多连对 |
-| [片段时长](#片段时长) | 短于 0.5 秒基本是废的，0.5 到 1 秒很弱 |
-| [短句默认跳过](#短句默认跳过) | 字幕把长话切碎的情况几乎没有；但只按时间判断，三集只省下 44 条 |
-| [日文台词](#日文台词) | 另配日文字幕按时间给片段配文字可行，帝皇 171 条配上 132 条；拿它微调后声音更像 |
-| [分界线漂移](#分界线漂移) | 池子变大时是固定分界线滑了，不是成绩掉了；按池子定分界线能稳住 |
-| [换动画域模型](#换动画域模型) | 唯一真正有效的改动，按声优训练的变体最好 |
-| [对白覆盖](#对白覆盖) | 旧切法丢了四成台词，按字幕行切全覆盖 |
-| [分数归一化](#分数归一化) | 无效 |
-| [补相邻音频](#补相邻音频) | 无效 |
-| [分两步的分组](#分两步的分组) | 错误合并多出十几倍，否掉 |
-| [合并规则](#合并规则) | 按整组平均距离合并最好 |
-| [62 条抽样标签时期](#62-条抽样标签时期) | 只留教训；WeSpeaker、少量身份参考在这一时期被排除 |
-| [证据的边界](#证据的边界) | 这些结论在哪些地方还不能推广 |
+| [Classify by name](#classify-by-name) | With manual labels, clips can be assigned to character names directly. The most confident 80% of clips are 0.97 correct, which is worth pursuing |
+| [Keep only the hard negatives](#keep-only-the-hard-negatives) | When scoring only `teo` vs "Other", cutting the negatives down to the hardest 10% makes almost no difference. Easy negatives do not help, but they do not hurt either |
+| [Confidence in the interface](#confidence-in-the-interface) | Adding the similarity check raises the accuracy of confident clips from 91.7% to 98.6%. Narration and passers-by are no longer forced into a name |
+| [Episode 3 held-out test](#episode-3-held-out-test) | Switching to `anime-va` was right. It wins by making fewer mistakes, not by linking more pairs |
+| [Clip length](#clip-length) | Under 0.5 seconds is basically useless. 0.5 to 1 second is weak |
+| [Short lines skipped by default](#short-lines-skipped-by-default) | Subtitles almost never cut a long line into short pieces. But judging only by timing, the rule saves just 44 lines across three episodes |
+| [Japanese dialogue](#japanese-dialogue) | Attaching Japanese subtitles to clips by time works: 132 of Teio's 171 clips got text. Fine-tuning on that data makes the voice sound closer |
+| [Threshold drift](#threshold-drift) | As the pool grows, the fixed threshold slides. It is not the scores that fall. A threshold set from the pool keeps things stable |
+| [Switch to an anime model](#switch-to-an-anime-model) | The only change that really worked. The variant trained by voice actor is the best |
+| [Dialogue coverage](#dialogue-coverage) | The old cutting lost 40% of the dialogue. Cutting along every subtitle line covers all of it |
+| [Score normalization](#score-normalization) | Did not work |
+| [Padding with neighboring audio](#padding-with-neighboring-audio) | Did not work |
+| [Two-step grouping](#two-step-grouping) | More than ten times the wrong merges. Rejected |
+| [Merge rules](#merge-rules) | Average linkage is the best |
+| [62 sampled labels](#62-sampled-labels) | Lessons only. WeSpeaker and a few identity references were ruled out in this period |
+| [Limits of the evidence](#limits-of-the-evidence) | Where these conclusions cannot yet be generalized |
 
-## 按名字分类
+## Classify by name
 
-2026-10-18。用第 1、2 集的 445 条人工标签训练，把第 3 集的片段直接分到角色名下，只在第 3 集上打分。第 3 集有 303 条带人名、有声纹的片段，其中 9 条的角色（诗歌剧 7 条、待兼福来 2 条）训练集里没有，一定判错，所以全部片段的正确率最高只能到 0.970。第 3 集当初被用来挑 `anime-va`，**这不是独立检验，只用来判断方向值不值得做下去。**
+2026-10-18. Trained on the 445 manual labels of episodes 1 and 2, the clips of episode 3 are assigned directly to character names, and scored on episode 3 only. Episode 3 has 303 clips that have a person's name and a voiceprint. Nine of them (7 of Matikanetannhauser and 2 of Matikanefukukitaru) belong to characters that are not in the training set. They are necessarily wrong, so the highest possible accuracy on all clips is 0.970. Episode 3 was used earlier to choose `anime-va`. **This is not a held-out test. It is used only to judge whether the direction is worth pursuing.**
 
-三种做法：
+Three methods:
 
-- 最像的一条：跟训练集里最像的那一条已标片段同名，也就是分组所依赖的「一条比一条」。
-- 角色平均：归给平均方向最近的角色。
-- 小分类器：逻辑回归。正则强度只在第 1、2 集之间互相留出来挑。
+- Closest single clip: takes the name of the most similar labeled clip in the training set. This is the clip-to-clip comparison that grouping relies on.
+- Character average: assigns the character whose average direction is closest.
+- Small classifier: a logistic regression (a simple model that outputs a probability for each class). Its regularization strength (a setting that keeps the model from fitting noise too closely) was picked by holding out episodes 1 and 2 in turn.
 
-「把握最高的八成」是把预测按把握从高到低排，只看前 80% 的片段。这些片段将来可以直接采用，其余的交给人确认。
+"The most confident 80%" means sorting the predictions from most to least confident and looking only at the top 80% of the clips. Those clips could be accepted directly, and the rest handed to a person to confirm.
 
-| 声纹 | 最像的一条：全部 / 把握最高的八成 | 角色平均 | 小分类器 |
+| Voiceprint | Closest single clip: all / top 80% most confident | Character average | Small classifier |
 | --- | ---: | ---: | ---: |
 | anime-va | 0.782 / 0.881 | 0.809 / 0.926 | 0.802 / 0.918 |
 | anime-char | 0.782 / 0.860 | 0.792 / 0.922 | 0.822 / 0.934 |
 | redimnet2-b6 | 0.786 / 0.897 | 0.805 / 0.897 | 0.832 / 0.963 |
-| 三个拼在一起 | 0.828 / 0.938 | 0.845 / 0.959 | **0.852 / 0.971** |
+| All three joined together | 0.828 / 0.938 | 0.845 / 0.959 | **0.852 / 0.971** |
 
-三个拼在一起时，小分类器按时长分档的正确率：0.5 至 1 秒 0.714（35 条），1 至 1.5 秒 0.857（70 条），1.5 至 3 秒 0.880（142 条），3 至 6 秒 0.857（56 条）。
+With all three joined together, the small classifier's accuracy by clip length: 0.5 to 1 second 0.714 (35 clips), 1 to 1.5 seconds 0.857 (70 clips), 1.5 to 3 seconds 0.880 (142 clips), 3 to 6 seconds 0.857 (56 clips).
 
-小分类器（三个拼在一起）的 45 条错误：
+The 45 errors of the small classifier (all three joined):
 
-- 15 条是「路人」。它不是一个人的声音，而是一群配角共用的名字，当成一个角色去学本来就学不准。
-- 9 条是训练集里没有的角色。
-- 其余 21 条里有 9 条被归给了 `teo`。`teo` 在训练集里有 112 条，远多于别的角色，训练集里只有 1 到 7 条的角色（里见光钻、北部玄驹、漩涡）容易被它吸走。
+- 15 are "passers-by". That label covers a group of minor characters who share one name. It is not one person's voice, so learning it as a single character was never going to work well.
+- 9 are characters that are not in the training set.
+- Of the remaining 21, 9 were assigned to `teo`. `teo` has 112 clips in the training set, far more than any other character. Characters with only 1 to 7 training clips (Satono Diamond, Kitasan Black, Twin Turbo) are easily pulled into it.
 
-去掉「路人」之后剩 268 条，小分类器的全部正确率是 0.888，把握最高的八成是 1.000。这个对比是事后做的，只用来说明「路人」该当成特殊标签，不进训练。
+After removing "passers-by", 268 clips remain. The small classifier's overall accuracy is 0.888, and its top 80% most confident clips are 1.000 correct. This comparison was done afterwards. It is only used to show that "passers-by" should be a special label that is not used in training.
 
-**怎么读这些数**：
+**How to read these numbers:**
 
-- 有了人工名字，连最简单的「最像的一条」都能直接给出角色名。这是分组做不到的，分组只给出组号，还得人再一组组起名字。
-- 比「最像的一条」，小分类器把全部正确率提高 2 到 5 个百分点，把握最高的八成提高 3 到 7 个百分点。303 条里一条就是 0.33 个百分点，所以同一行里差一两个百分点的做法分不出高下。
-- 拼起三个模型比任何单个都好，而只在通用语音（VoxCeleb2）上训练的 `redimnet2-b6` 并不比动画域的两个差。
-- 正则强度在第 1、2 集之间挑出来都落在候选范围的偏大一端（100 到 1000），说明约束放得很松。
-- 3 至 6 秒那档并不比 1.5 至 3 秒好，错的多是「路人」和训练集里很少的角色，不是片段太短。
+- With a person's name in hand, even the simplest "closest single clip" can give a character name directly. Grouping cannot do that. It only gives a group number, and a person still has to name each group.
+- Compared with "closest single clip", the small classifier raises the overall accuracy by 2 to 5 percentage points, and the top 80% by 3 to 7 points. One clip out of 303 is 0.33 percentage points. So methods within a point or two of each other on the same row cannot be told apart.
+- Joining the three models beats any single one. And `redimnet2-b6`, trained only on general speech (VoxCeleb2), is no worse than the two anime-domain models.
+- The regularization strengths picked between episodes 1 and 2 all landed at the high end of the candidate range (100 to 1000). That means the constraint is set very loosely.
+- The 3 to 6 second band is no better than 1.5 to 3 seconds. Its errors are mostly "passers-by" and characters with few training clips, not short clips.
 
-报告：`runs/classify/ep03-*.json`，每份带逐条预测，可以回头试听。
+Report: `runs/classify/ep03-*.json`. Each report has per-clip predictions, so you can listen back to them.
 
-**只分 `teo` 和「其他」时**（2026-10-23，界面的标签，第 1 至 3 集轮流留出一集打分，其余各集训练，`teo` 共 230 条，特殊标签和「质量低」不算）：
+**Scoring only `teo` vs "Other"** (2026-10-23, labels from the interface. Episodes 1 to 3 are each held out in turn, and the rest are used for training. `teo` has 230 clips in total. Special labels and "low quality" are not counted):
 
-| 声纹 | 排序正确率 | 0.6 处误收 | 0.6 处漏掉 | 1 秒以下的排序正确率 |
+| Voiceprint | Ranking accuracy | Wrongly accepted at 0.6 | Missed at 0.6 | Ranking accuracy under 1 second |
 | --- | ---: | ---: | ---: | ---: |
 | anime-va | 0.9895 | 7 | 25 | 0.994 |
 | anime-char | 0.9971 | 3 | 17 | 0.997 |
 | redimnet2-b6 | 0.9933 | 9 | 21 | 0.969 |
-| 三个拼在一起 | **0.9992** | **0** | **13** | **1.000** |
+| All three joined together | **0.9992** | **0** | **13** | **1.000** |
 
-拼在一起仍然最好，误收从 3 到 9 条降到 0。三个声纹在第 4 集上一共只算了约 37 秒（含加载模型），而分离人声要约 13 分钟，所以多算两个模型不是瓶颈。
+Joining all three is still best. Wrong accepts drop from 3 to 9 clips down to 0. The three voiceprints took only about 37 seconds on episode 4 in total (including loading the models), while voice separation takes about 13 minutes. So computing two extra models is not the bottleneck.
 
-## 只留难分的反例
+## Keep only the hard negatives
 
-2026-10-23。问的是：界面里大量「其他」标签是一眼就不像帝皇的，只留难分的反例（机器觉得最像帝皇的那些）够不够。做法：用界面的标签只分 `teo` 和「其他」（特殊标签、「质量低」不算），第 1 至 3 集轮流留出一集打分，其余各集（含第 4 集已标的）训练，正例全留，反例按全量模型给的帝皇概率从高到低只留一部分，或随机留同样多作对照。三集平均，`teo` 共 230 条：
+2026-10-23. The question: most of the "Other" labels in the interface are clearly not Teio at a glance. Is it enough to keep only the hard negatives (the ones the machine thinks are most like Teio)? Method: using the interface's labels, score only `teo` vs "Other" (special labels and "low quality" not counted). Hold out one of episodes 1 to 3 in turn and score it, training on the rest (including the labeled clips of episode 4). Keep all the positives. Keep only part of the negatives, ranked by the full model's probability of Teio from high to low, or keep the same number at random as a control. Averaged over the three episodes, `teo` has 230 clips in total:
 
-| 反例 | 条数 | 排序正确率 | 0.6 处误收 | 0.6 处漏掉 |
+| Negatives kept | Count | Ranking accuracy | Wrongly accepted at 0.6 | Missed at 0.6 |
 | --- | ---: | ---: | ---: | ---: |
-| 全部 | 约 507 | 0.9992 | 0 | 13 |
-| 最难的一半 | 约 253 | 0.9992 | 0 | 13 |
-| 最难的四分之一 | 约 126 | 0.9991 | 0 | 10 |
-| 最难的一成 | 约 50 | 0.9986 | 1 | 7 |
-| 随机一成 | 约 50 | 0.9977 | 43 | 3 |
+| All | about 507 | 0.9992 | 0 | 13 |
+| Hardest half | about 253 | 0.9992 | 0 | 13 |
+| Hardest quarter | about 126 | 0.9991 | 0 | 10 |
+| Hardest 10% | about 50 | 0.9986 | 1 | 7 |
+| Random 10% | about 50 | 0.9977 | 43 | 3 |
 
-- 容易的反例删掉几乎不影响结果，留下的是哪些比留多少要紧：同样 50 条，随机留的误收 43 条，挑难的只误收 1 条。
-- 也不碍事：逻辑回归对早已分对的样本几乎不再调整，一千来条训练不到一秒，删掉省不下什么。
-- 帝皇和别人本来就分得很开（排序正确率 0.999），声音相近的目标角色上会不会一样，没有量过。「最难」是用全量模型挑的，界面里只能用上一轮的模型挑。
+- Removing easy negatives hardly changes the result. What matters is which ones are kept, not how many. With the same 50 clips, random keeping wrongly accepts 43, while picking the hard ones wrongly accepts only 1.
+- It does not hurt either. Logistic regression hardly adjusts to samples it already gets right. Training on about a thousand clips takes under a second, so removing them saves little.
+- Teio is already well separated from the others (ranking accuracy 0.999). Whether the same holds for target characters with similar voices has not been measured. "Hardest" was picked with the full model. The interface can only use the previous round's model to pick.
 
-## 界面里的有把握
+## Confidence in the interface
 
-2026-10-18。在界面里只标两个角色时，旁白被说成 `teo` 而且把握 67%：小分类器只会在认识的角色里挑。于是加了[像不像的检查](HOW_IT_WORKS.md#标注与修正界面)，用和上一节同样的分法量它的作用：第 1、2 集的标签训练，「路人」不进训练，在第 3 集上看。第 3 集同样不是独立检验。
+2026-10-18. When only two characters are labeled in the interface, narration was read as `teo` with 67% confidence. The small classifier can only pick among the characters it knows. So a [similarity check](HOW_IT_WORKS.md#labeling-and-correction-interface) was added. The same split as in the previous section measures its effect: train on the labels of episodes 1 and 2, leave out the passers-by, and evaluate on episode 3. Episode 3 is again not a held-out test.
 
-| 算「有把握」的条件 | 有把握的片段占多少 | 其中判对的 |
+| Condition for "confident" | Share of clips that are confident | Of those, correct |
 | --- | ---: | ---: |
-| 把握不低于 0.6 | 79.9% | 91.7% |
-| 把握不低于 0.6，且通过像不像的检查 | 68.3% | 98.6% |
+| Confidence at least 0.6 | 79.9% | 91.7% |
+| Confidence at least 0.6, and passes the similarity check | 68.3% | 98.6% |
 
-- 没通过像不像检查的片段里，小分类器只判对了 35.7%，所以把它们交给人看是对的。
-- 35 条「路人」里只有 2 条被当成有把握。
-- 代价是要人看的片段从约两成涨到约三成。
+- Among clips that fail the similarity check, the small classifier got only 35.7% right. So handing them to a person is the right call.
+- Of the 35 passers-by, only 2 were counted as confident.
+- The cost: the clips a person has to check rise from about 20% to about 30%.
 
-## 第 3 集独立检验
+## Episode 3 held-out test
 
-第 3 集 375 条全部标完（306 条人名、69 条特殊标签、19 个角色），是全项目第一份完全没参与过调参的数据。**打分口径在标注之前就写定了**：三集一起分组，只在第 3 集的配对上打分。这样分界线来自前两集，被打分的配对全是新的。
+All 375 clips of episode 3 are labeled (306 with names, 69 with special labels, 19 characters). This is the first data in the project that took no part in tuning at all. **The scoring rule was fixed before labeling.** All three episodes are grouped together, and only the pairs from episode 3 are scored. This way the threshold comes from episodes 1 and 2, and every pair scored is new.
 
-预先约定的口径：
+The rule agreed in advance:
 
-| 模型 | 分界线 | 连上 | 错误合并 | 该合没合 | 连上的比例 |
+| Model | Threshold | Linked | Wrong merges | Missed merges | Linked share |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | redimnet2-b6 | 0.50 | 2082 | 63 | 3182 | 39.6% |
 | anime-va | 0.70 | 2091 | **25** | 3173 | 39.7% |
 
-前两集上 `anime-va` 多连上 504 对，独立检验只多 9 对，连上的比例差距从 4.8 个百分点缩到 0.2。兑现的是另一半：错误合并从 63 降到 25，少了六成。
+On episodes 1 and 2, `anime-va` linked 504 more pairs. On the held-out test it links only 9 more, and the gap in linked share shrank from 4.8 percentage points to 0.2. What did come true is the other half: wrong merges fell from 63 to 25, a cut of 60%.
 
-**换个口径它又是压倒性的。** 第 3 集单独成池、扫分界线（这是事后做的说明性对照，不是预先约定的）：
+**Under a different rule, it wins by a landslide.** Episode 3 alone as the pool, with the threshold swept. This is an explanatory comparison done afterwards, not one agreed in advance:
 
-| 错误合并上限 | redimnet2-b6 最多连上 | anime-va 最多连上 |
+| Wrong-merge limit | redimnet2-b6, most linked | anime-va, most linked |
 | ---: | ---: | ---: |
-| ≤25 | 1376 @0.42 | **2105** @0.67 |
-| ≤63 | 1766 @0.46 | **2477** @0.69 |
-| ≤120 | 1919 @0.49 | **3259** @0.77 |
-| ≤250 | 2437 @0.55 | **3423** @0.79 |
+| 25 or fewer | 1376 @0.42 | **2105** @0.67 |
+| 63 or fewer | 1766 @0.46 | **2477** @0.69 |
+| 120 or fewer | 1919 @0.49 | **3259** @0.77 |
+| 250 or fewer | 2437 @0.55 | **3423** @0.79 |
 
-两个口径都支持换模型，幅度差得很远。取信预先约定的那个：`anime-va` 更好，但好在少犯错，不在多连对。
+Both rules support switching models, but by very different margins. Trust the rule agreed in advance: `anime-va` is better, but because it makes fewer mistakes, not because it links more pairs.
 
-丢掉短于 0.5 秒的片段之后，`anime-va` 在第 3 集上是连上 2095、错误合并 21、该合没合 3169。
+After dropping clips shorter than 0.5 seconds, `anime-va` on episode 3 gives 2095 linked, 21 wrong merges and 3169 missed merges.
 
-报告：`runs/groups/blind-*.json`、`runs/comparison-ep03.json`、`runs/score-ep03.json`。
+Reports: `runs/groups/blind-*.json`, `runs/comparison-ep03.json`, `runs/score-ep03.json`.
 
-## 片段时长
+## Clip length
 
-第 3 集是第一份含 1 秒以下片段的标注，这个问题终于量得出来：
+Episode 3 is the first labeling with clips under 1 second, so this question can finally be measured:
 
-| 配对中较短那条的时长 | 同一角色的配对 | redimnet2-b6 排序正确率 / 错误率 | anime-va 排序正确率 / 错误率 |
+| Shorter clip in the pair | Same-character pairs | redimnet2-b6 ranking accuracy / error rate | anime-va ranking accuracy / error rate |
 | --- | ---: | ---: | ---: |
-| 0 至 0.5 秒 | 130 | 0.6113 / 0.415 | 0.5500 / 0.478 |
-| 0.5 至 1 秒 | 1105 | 0.8068 / 0.271 | 0.8252 / 0.257 |
-| 1 至 1.5 秒 | 1791 | 0.8989 / 0.177 | 0.8725 / 0.206 |
-| 1.5 至 3 秒 | 2015 | 0.8975 / 0.184 | 0.9032 / 0.161 |
-| 3 至 6 秒 | 223 | 0.9590 / 0.081 | 0.9502 / 0.081 |
+| 0 to 0.5 seconds | 130 | 0.6113 / 0.415 | 0.5500 / 0.478 |
+| 0.5 to 1 second | 1105 | 0.8068 / 0.271 | 0.8252 / 0.257 |
+| 1 to 1.5 seconds | 1791 | 0.8989 / 0.177 | 0.8725 / 0.206 |
+| 1.5 to 3 seconds | 2015 | 0.8975 / 0.184 | 0.9032 / 0.161 |
+| 3 to 6 seconds | 223 | 0.9590 / 0.081 | 0.9502 / 0.081 |
 
-0 至 0.5 秒那一档排序正确率 0.61，完全随机是 0.50，基本是废的。丢掉之后第 3 集的错误合并从 25 降到 21，连上的还多了 4 对。0.5 至 1 秒是 0.81，很弱但暂时保留。
+The 0 to 0.5 second band has a ranking accuracy of 0.61. Pure chance is 0.50, so this band is essentially useless. Dropping it lowers episode 3's wrong merges from 25 to 21, and linked pairs even rise by 4. The 0.5 to 1 second band gives 0.81. That is weak, but it is kept for now.
 
-**这修正了一条旧结论。** 之前写过「片段短不是主要矛盾」，那是在最短 1.0 秒的数据上得出的，1 秒以下的悬崖当时看不见。1 秒以上的部分那句话仍然成立：3 至 6 秒也只有 0.96、错误率 0.081，把片段都切长并不能把问题解决掉。
+**This corrects an old conclusion.** Earlier it was written that "short clips are not the main problem". That was based on data whose shortest clip was 1.0 second, so the cliff below 1 second could not be seen. The statement still holds for clips over 1 second: even 3 to 6 seconds only reaches 0.96, with an error rate of 0.081. Making all the clips longer does not solve the problem.
 
-## 短句默认跳过
+## Short lines skipped by default
 
-2026-10-23。问的是：1 秒以下的短句拿去训练语音合成基本用不上，能不能不让人标；会不会有一句长话被字幕切成好几段、每段都短于 1 秒。
+2026-10-23. The question: short lines under 1 second are of little use for training speech synthesis, so can they go unlabeled? Also: could a long line have been cut by the subtitles into several pieces, each shorter than 1 second?
 
-**第 3 集（全部标完）里切碎的长话几乎没有。** 36 条有名字的 1 秒以下片段（不算「听不清」「多人」「路人」），只有 4 条在 0.5 秒内紧挨同一角色的片段，放宽到 1 秒也只有 6 条；没有哪个角色的连续几条片段全都短于 1 秒。和[补相邻音频](#补相邻音频)里「短是字幕行本身短」一致。
+**In episode 3 (fully labeled), almost no long lines are cut into pieces.** Of the 36 named clips under 1 second (not counting "unclear", "multiple" and "passers-by"), only 4 sit within 0.5 seconds of another clip of the same character. Widening that to 1 second gives only 6. No character has several consecutive clips that are all under 1 second. This matches [padding with neighboring audio](#padding-with-neighboring-audio), where the short clips turned out to be short because the subtitle line itself is short.
 
-**但界面认不出谁在说话，只能看时间。** 规则定成：短于 1 秒，并且和前后任何一句台词（别的片段或没切出片段的字幕行）都隔 0.5 秒以上，才跳过。对白很密，大多数短句前后 0.5 秒内都有别人在说：
+**But the interface cannot tell who is speaking, so it can only look at timing.** The rule: skip a clip if it is under 1 second and at least 0.5 seconds away from every other line before and after it (other clips, or subtitle lines with no clip). Dialogue is dense. Most short lines have someone else speaking within 0.5 seconds before or after:
 
-| 短句和最近另一句台词的间隔 | 条数（三集） |
+| Gap between the short line and the nearest other line | Count (three episodes) |
 | --- | ---: |
-| 重叠或挨着 | 37 |
-| 0 至 0.3 秒 | 81 |
-| 0.3 至 0.5 秒 | 22 |
-| 0.5 秒以上，或 20 秒内没有别的台词 | 45 |
+| Overlapping or touching | 37 |
+| 0 to 0.3 seconds | 81 |
+| 0.3 to 0.5 seconds | 22 |
+| 0.5 seconds or more, or no other line within 20 seconds | 45 |
 
-三集 185 条短句只跳过 44 条（每集 12、20、12 条；另 1 条正好隔 0.5 秒，按规则留下），省下的标注不到四分之一。第 3 集跳过的 12 条里有 6 条是东海帝皇，留下的 42 条里同一角色紧挨着的只有上面那 4 条，其余是和别人的台词挨着。想再多省，要用声纹判断前后是不是同一个人，现在没做。
+Of the 185 short lines across the three episodes, only 44 are skipped (12, 20 and 12 per episode). One more sits exactly 0.5 seconds away and is kept under the rule. So the saving is less than a quarter of the labeling. Of the 12 skipped in episode 3, 6 are Tokai Teio. Of the 42 kept, only the 4 described above sit next to the same character. The rest sit next to other people's lines. To save more, you would need to use voiceprints to decide whether the lines before and after are the same person. That has not been done.
 
-## 日文台词
+## Japanese dialogue
 
-2026-10-23。片段按中文字幕切，训练日语模型要日语原文。问的是：另找一份日文字幕，按时间给片段配上文字，靠不靠得住；配出来的数据训练 GPT-SoVITS 有没有用。日文字幕来自 kitsunekko 镜像，有 Netflix、Amazon、TX、NanakoRaws 四个来源，存在 `data/subtitles/uma_s2/ja/`。
+2026-10-23. Clips were cut along the Chinese subtitles, but training a Japanese model needs the Japanese original text. The question: can a separate Japanese subtitle file be used to give the clips their text by time, and is the result useful for training GPT-SoVITS? The Japanese subtitles come from the kitsunekko mirror. There are four sources: Netflix, Amazon, TX and NanakoRaws. They are stored in `data/subtitles/uma_s2/ja/`.
 
-**偏移量得出来，拿错了能拦住。** 重合度是两份字幕显示时间的交集除以并集。日文字幕的分行和中文不同，所以对上了也到不了 1：
+**The offset can be measured, and a wrong file can be caught.** The overlap score is the intersection of the two subtitle files' display times divided by their union. Japanese subtitles split lines differently from Chinese ones, so even a correct match never reaches 1:
 
-| 日文字幕 | 第 1 集 | 第 2 集 | 第 3 集 |
+| Japanese subtitles | Episode 1 | Episode 2 | Episode 3 |
 | --- | ---: | ---: | ---: |
 | Netflix | 0.78 | 0.72 | 0.73 |
 | Amazon | 0.78 | 0.78 | 0.77 |
 | TX | 0.70 | 0.69 | 0.69 |
 | NanakoRaws | 0.68 | 0.67 | 0.69 |
-| 拿错成下一集的 Netflix | 0.51 | 0.49 | 0.50 |
+| Wrong file: the next episode's Netflix | 0.51 | 0.49 | 0.50 |
 
-拒绝线定在 0.6。量出的 Netflix 偏移是 −0.93 至 −0.94 秒，和中文字幕自己的偏移 −0.95 秒几乎一样。另一道检查「多少片段碰得到台词」对的是 99% 以上，拿错的也有 83% 到 88%，只能拦明显的错。
+The rejection line is set at 0.6. The measured Netflix offset is −0.93 to −0.94 seconds, almost the same as the Chinese subtitles' own offset of −0.95 seconds. Another check, "how many clips touch a dialogue line", gives over 99% for the right file and 83% to 88% for the wrong one. So it only catches obvious errors.
 
-**整行都在片段里的才收。** 日文字幕常比说话多显示一会儿，两头各伸出不到 0.8 秒照样收；伸出更多就是这句台词只说了一部分。Netflix 字幕给画外音标（名字），一个字幕条目里常是两个人各说一句，所以条目拆成行，标了别人名字的行和片段重叠超过 0.2 秒就不收。东海帝皇人工确认的 171 条（Netflix 字幕）：
+**Only keep a clip if every line falls inside it.** Japanese subtitles often stay on screen a little longer than the speech. A line that extends less than 0.8 seconds at either end is still kept. Extending further means the line is only partly spoken. Netflix subtitles tag off-screen narration with names, and one subtitle entry often holds two people each saying one line. So entries are split into lines, and a clip is dropped if a line with someone else's name overlaps it by more than 0.2 seconds. Results for the 171 Teio clips confirmed by a person (Netflix subtitles):
 
-| 结果 | 条数 |
+| Result | Count |
 | --- | ---: |
-| 配上文字 | 132（4.2 分钟） |
-| 有一行台词只对上一部分 | 32 |
-| 台词里有别人的话 | 5 |
-| 没有对上的台词 | 2 |
+| Text attached | 132 (4.2 minutes) |
+| One line only partly matches | 32 |
+| Someone else's speech in the line | 5 |
+| No matching dialogue | 2 |
 
-**训练有用。** 再去掉短于 1 秒、长于 12 秒和与别的片段重叠的，剩 118 条（4.0 分钟），微调 GPT-SoVITS v2ProPlus（SoVITS 8 轮、GPT 15 轮，官方默认参数）。同一段参考音频合成 4 句训练里没有的台词，拿 `anime-va` 声纹和东海帝皇人工标签的平均声纹比余弦相似度（参考音频本身是 0.767）：
+**Training helps.** After also dropping clips shorter than 1 second, longer than 12 seconds, or overlapping other clips, 118 remain (4.0 minutes). GPT-SoVITS v2ProPlus was fine-tuned on them (SoVITS 8 rounds, GPT 15 rounds, official default settings). The same reference audio was used to synthesize 4 lines that were not in training. Each synthesized line was compared with Teio's average voiceprint from the human labels, using cosine similarity (a score of how alike two voiceprints point). The `anime-va` voiceprint was used. The reference audio itself scores 0.767:
 
-| 台词 | 不微调 | 微调后 |
+| Line | Not fine-tuned | After fine-tuning |
 | --- | ---: | ---: |
 | トレーナー、今日もボクと一緒に走ろうよ！ | 0.505 | 0.566 |
 | えへへ、カイチョーに褒められちゃった。 | 0.463 | 0.518 |
 | 無敗の三冠ウマ娘になるのは… | 0.614 | 0.702 |
 | もう、なんでわかってくれないのさ。 | 0.494 | 0.609 |
 
-四句都更像，和最像的另一个角色也拉得更开。发音对不对、语气像不像没有人耳检查过，这一项没有结论。
+All four lines score closer after fine-tuning, and they also pull further away from the most similar other character. Pronunciation and tone have not been checked by ear, so there is no conclusion on those points.
 
-**数据加到 10.7 分钟，还在变好，但涨幅小了。** 2026-10-23 晚，第 1 至 7 集的 503 条照同样规则筛（另外去掉标了质量低的），剩 302 条（10.7 分钟），同样参数训出 `teio7`。同一段参考音频合成 8 句训练里没有的台词：上面 4 句，加兴奋、低落、得意、坚定各一句。平均声纹改用七集的人工标签、不算质量低的，所以旧版的数和上表略有出入：
+**Data grew to 10.7 minutes. It is still improving, but by less.** On the evening of 2026-10-23, the 503 clips of episodes 1 to 7 were filtered by the same rules (also removing clips marked low quality). 302 remain (10.7 minutes), and the same settings trained `teio7`. The same reference audio was used to synthesize 8 lines not in training: the 4 above, plus one each for excited, down, smug and determined. The average voiceprint is now taken from the manual labels of all seven episodes, excluding low quality. So the old version's numbers differ slightly from the table above:
 
-| | 8 句平均相似度 | 比前一版高 |
+| | Average similarity over 8 lines | Gain over the previous version |
 | --- | ---: | ---: |
-| 不微调 | 0.538 | |
-| `teio`（4.0 分钟，第 1 至 3 集） | 0.615 | 0.077 |
-| `teio7`（10.7 分钟，第 1 至 7 集） | 0.646 | 0.031 |
+| Not fine-tuned | 0.538 | |
+| `teio` (4.0 minutes, episodes 1 to 3) | 0.615 | 0.077 |
+| `teio7` (10.7 minutes, episodes 1 to 7) | 0.646 | 0.031 |
 
-`teio7` 有 6 句比 `teio` 高，另 2 句（「無敗の三冠…」和低落的那句）差不到 0.01。参考音频本身是 0.768。这个分数只量音色，语气和发音要人听，试听页面在 `out/sovits-teio/samples-teio7/index.html`。
+`teio7` beats `teio` on 6 of the 8 lines. The other 2 (the 無敗の三冠… line and the down line) trail by less than 0.01. The reference audio itself scores 0.768. This score measures only the timbre. Tone and pronunciation must be judged by ear. The listening page is at `out/sovits-teio/samples-teio7/index.html`.
 
-**GPT-SoVITS V5 不微调，和微调过的 `teio7` 打平。** 用 2026-10-05 发布的 V5 turbo 底模（4 步、不用 CFG，GPT 部分仍是 `s1v3.ckpt`）直接合成同 8 句。只用上面那段参考音频时 V5 平均 0.663，比 `teio7` 高 0.017；再换 4 段情绪不同的参考音频（都是 `teo` 已确认的片段），两边各有输赢：
+**GPT-SoVITS V5 without fine-tuning ties with the fine-tuned `teio7`.** The V5 turbo base model, released 2026-10-05 (4 steps, no CFG, a sampling setting; the GPT part is still `s1v3.ckpt`), was used to synthesize the same 8 lines directly. With only the reference audio above, V5 averages 0.663, which is 0.017 higher than `teio7`. Then 4 more reference clips with different emotions were tried (all `teo` clips confirmed by a person). Each side wins some:
 
-| 参考音频 | 参考本身 | `teio7` 8 句平均 | V5 turbo 8 句平均 |
+| Reference audio | Reference itself | `teio7`, 8-line average | V5 turbo, 8-line average |
 | --- | ---: | ---: | ---: |
-| 自信（第 1 集 13:54，上面那段） | 0.768 | 0.646 | 0.663 |
-| 开朗（第 1 集 1:56） | 0.610 | 0.503 | 0.595 |
-| 慌乱（第 5 集 19:05） | 0.603 | 0.589 | 0.481 |
-| 低落（第 6 集 0:59） | 0.670 | 0.598 | 0.601 |
-| 轻松调皮（第 7 集 7:01） | 0.591 | 0.630 | 0.560 |
-| 40 句合计 | | 0.593，标准差 0.070 | 0.580，标准差 0.080 |
+| Confident (episode 1, 13:54, the clip above) | 0.768 | 0.646 | 0.663 |
+| Cheerful (episode 1, 1:56) | 0.610 | 0.503 | 0.595 |
+| Flustered (episode 5, 19:05) | 0.603 | 0.589 | 0.481 |
+| Down (episode 6, 0:59) | 0.670 | 0.598 | 0.601 |
+| Relaxed and playful (episode 7, 7:01) | 0.591 | 0.630 | 0.560 |
+| Total of 40 lines | | 0.593, standard deviation 0.070 | 0.580, standard deviation 0.080 |
 
-40 对里 `teio7` 赢 19 对。V5 的分数大致跟着参考音频本身走，慌乱那段掉得最多；`teio7` 在调皮那段比参考本身还高，但开朗那段最低，原因没查。这把尺子是 `teo` 已确认片段的平均声纹，`teio7` 正是拿这些片段训的，可能偏向它。试听页面在 `out/sovits-teio/refs4/index.html`，分数在 `out/sovits-teio/refs4-scores.csv`。
+Of the 40 pairs, `teio7` wins 19. V5's scores roughly follow the reference audio itself, and the flustered clip drops the most. `teio7` scores even higher than its reference on the playful clip, but is lowest on the cheerful one, and the cause has not been checked. This measure is the average voiceprint of Teio's confirmed clips, which `teio7` was trained on, so it may favor `teio7`. The listening page is at `out/sovits-teio/refs4/index.html`, and the scores are in `out/sovits-teio/refs4-scores.csv`.
 
-**多训几轮，这把尺子上涨不了多少。** 拿 `teio7` 训练中途存下的权重，同样 5 段参考音频、8 句台词：
+**More training rounds do not move this measure much.** Using `teio7` weights saved partway through training, with the same 5 reference clips and 8 lines:
 
-| SoVITS 轮数 | GPT 轮数 | 40 句平均 |
+| SoVITS rounds | GPT rounds | 40-line average |
 | ---: | ---: | ---: |
 | 4 | 15 | 0.579 |
 | 8 | 5 | 0.605 |
-| 8 | 15（即 `teio7`） | 0.593 |
+| 8 | 15 (that is, `teio7`) | 0.593 |
 
-SoVITS 从 4 轮到 8 轮涨了 0.014，GPT 从 5 轮到 15 轮反而低了 0.012，都只有 0.01 上下，和换一段参考音频带来的差别比起来很小。真录音本身在这把尺子上也到不了很高：`teo` 已确认、不算质量低的 415 条片段，和平均声纹的相似度平均 0.532，2 至 3 秒的 0.598，3 秒以上的 0.665；合成的 8 句多在 2.5 至 5 秒，0.58 至 0.61 已经和同样长短的真录音差不多。要再分出好坏，得换别的量法，比如语音识别量发音对不对，或者靠人听。
+SoVITS from 4 to 8 rounds gained 0.014. GPT from 5 to 15 rounds actually dropped 0.012. Both changes are around 0.01, which is small next to the difference a change of reference audio makes. Real recordings do not score very high on this measure either. The 415 clips of `teo` that are confirmed and not low quality average 0.532 similarity to the average voiceprint. The 2 to 3 second clips average 0.598, and those over 3 seconds average 0.665. The 8 synthesized lines are mostly 2.5 to 5 seconds long, and 0.58 to 0.61 is already close to real recordings of the same length. To tell good from bad at this level, a different measure is needed. Options include speech recognition to check whether the pronunciation is right, or listening by a person.
 
-## 分界线漂移
+## Threshold drift
 
-最早只有两个数据点：
+At first there were only two data points:
 
-| 模型 @分界线 | 只有第 3 集，375 条 | 三集一起，1184 条 |
+| Model @ threshold | Episode 3 only, 375 clips | Episodes 1 to 3 together, 1184 clips |
 | --- | ---: | ---: |
-| redimnet2-b6 @0.50 | 连上 2059 / 错误合并 146 | 连上 2082 / 错误合并 63 |
-| anime-va @0.70 | 连上 2613 / 错误合并 80 | 连上 2091 / 错误合并 25 |
+| redimnet2-b6 @0.50 | linked 2059 / wrong merges 146 | linked 2082 / wrong merges 63 |
+| anime-va @0.70 | linked 2613 / wrong merges 80 | linked 2091 / wrong merges 25 |
 
-池子越大合并越保守，因为按整组平均距离合并要求两组之间所有片段的平均距离达标，组一大平均值就上去了。
+The larger the pool, the more conservative the merging gets. Average-linkage merging requires the average distance between all the clips of two groups to pass the threshold. Once a group is large, its average goes up.
 
-`avs drift` 把中间填满了：**被打分的那一集始终整集在池子里，只往池子里加别的集的片段**，分九档，每档随机抽 8 遍。这样每一档面对的是同一批标签、同一批配对，成绩可以直接比。报告在 `runs/drift-ep01.json`、`drift-ep02.json`、`drift-ep03.json`。
+`avs drift` fills in the middle. **The scored episode always stays in the pool in full, and only clips from other episodes are added.** It uses nine stages, with 8 random draws at each stage. This way each stage faces the same labels and the same pairs, so the scores can be compared directly. Reports: `runs/drift-ep01.json`, `drift-ep02.json` and `drift-ep03.json`.
 
-### 固定分界线时两个数一起掉
+### Both numbers fall together at a fixed threshold
 
-第 3 集 306 条标签、19 个角色，`anime-va` 固定 0.70：
+Episode 3, with 306 labeled clips and 19 characters. `anime-va` with a fixed 0.70:
 
-| 片段池 | 连上 | 错误合并 |
+| Pool size | Linked | Wrong merges |
 | ---: | ---: | ---: |
 | 372 | 2613 | 76 |
 | 573 | 2382 | 43 |
@@ -257,40 +257,40 @@ SoVITS 从 4 轮到 8 轮涨了 0.014，GPT 从 5 轮到 15 轮反而低了 0.01
 | 975 | 2215 | 31 |
 | 1176 | 2095 | 21 |
 
-连上掉了两成，错误合并掉了七成。**两个数一起往下走，说明分组没有变差，是同一条分界线在自己的取舍曲线上往保守那端滑。** 另两集同样：第 1 集 1128/44 走到 1123/11，第 2 集 1979/17 走到 1683/12。
+Linked pairs fell by 20%, and wrong merges fell by 70%. **When both numbers go down together, the grouping has not gotten worse. The same threshold is sliding toward the conservative end of its own trade-off curve.** The other two episodes show the same pattern. Episode 1 goes from 1128/44 to 1123/11, and episode 2 from 1979/17 to 1683/12.
 
-### 按住错误合并，连上反而更多
+### Holding wrong merges fixed, linked pairs rise instead
 
-对每一档池子，允许分界线自由挪动，只要求错误合并不超过「固定 0.70 在最小那档池子上犯的数目」：
+For each pool size, let the threshold move freely, but require wrong merges to stay no higher than what the fixed 0.70 produced on the smallest pool:
 
-| 片段池 | 第 3 集，错误合并 ≤76 | 第 2 集，错误合并 ≤17 | 第 1 集，错误合并 ≤44 |
+| Pool | Episode 3, wrong merges ≤76 | Episode 2, wrong merges ≤17 | Episode 1, wrong merges ≤44 |
 | ---: | ---: | ---: | ---: |
-| 最小档 | 2613 @0.700 | 2073 @0.720 | 1128 @0.700 |
-| 中间档 | 2932 @0.749 | 2696 @0.765 | 1136 @0.695 |
-| 最大档 1176 | **3278** @0.780 | 2373 @0.760 | 1123 @0.700 |
+| Smallest pool | 2613 @0.700 | 2073 @0.720 | 1128 @0.700 |
+| Middle pool | 2932 @0.749 | 2696 @0.765 | 1136 @0.695 |
+| Largest pool, 1176 | **3278** @0.780 | 2373 @0.760 | 1123 @0.700 |
 
-一档也没有变差。**能达到的取舍曲线本身不随池子变大而退化，退化的只是「某个固定数字落在曲线的哪个位置」。** 所以这是个标定问题，不是「语料一大就不行了」。
+No stage got worse. **The trade-off curve that can be reached does not decline as the pool grows. What declines is where a fixed number happens to sit on the curve.** So this is a calibration problem, not "a bigger corpus is no good".
 
-要把位置守住，分界线得随池子往外挪 0.00 至 0.08，也就是 4% 至 11%；挪动幅度随池子变大逐渐收窄。第 1 集几乎不需要挪，第 3 集需要挪最多。
+To keep the position, the threshold has to move outward as the pool grows, by 0.00 to 0.08. That is 4% to 11%. The move narrows as the pool grows. Episode 1 needs almost no move, and episode 3 needs the most.
 
-### 按池子定分界线
+### Setting the threshold from the pool
 
-要找的是一个不看人工标签、只看池子就能算出来的量，而且它得随池子变大往上走 4% 至 11%。试过的几个：
+What is needed is a quantity that can be computed from the pool alone, without manual labels, and that rises by 4% to 11% as the pool grows. Several were tried:
 
-| 只看池子能算出来的量 | 372 条 → 1176 条 |
+| Quantity computed from the pool alone | 372 clips → 1176 clips |
 | --- | ---: |
-| 全部配对距离的第 1 百分位 | +8.2% |
-| 全部配对距离的第 5 百分位 | +1.8% |
-| 全部配对距离的中位数 | +0.3% |
-| 每条片段到最近邻的距离，取中位数 | −2.6% |
-| 层次聚类各次合并高度的中位数 | −2.7% |
-| 组数与片段数之比固定 | 分界线往回缩 |
+| 1st percentile of all pair distances | +8.2% |
+| 5th percentile of all pair distances | +1.8% |
+| Median of all pair distances | +0.3% |
+| Median of each clip's distance to its nearest neighbor | −2.6% |
+| Median merge height in hierarchical clustering | −2.7% |
+| Ratio of groups to clips held fixed | threshold shrinks back |
 
-只有**第 1 百分位**方向和幅度都对。原因说得通：池子里绝大多数配对本来就是不同角色，中位数之类的高分位几乎全由它们决定，池子变大也不动；而靠得很近的那一小撮配对基本是同一角色的，池子里角色越多它们就越稀，这个距离就越往外。后几个方向不对或几乎不动，不用再试。
+Only the **1st percentile** has both the right direction and the right size. The reason makes sense. Most pairs in a pool are different characters, so high percentiles such as the median are almost entirely set by them, and they do not move as the pool grows. The few pairs that are very close are mostly same-character pairs. As the pool gets more characters, these pairs become more spread out, so this distance moves outward. The other directions are wrong or hardly move, so they need not be tried again.
 
-于是规则是：**分界线 = 倍数 × 池子内全部配对距离的第 1 百分位**。`anime-va` 的倍数定为 1.275，也就是在现在三集 1176 条的池子上正好乘出 0.70。第 3 集上两种做法并排：
+So the rule is: **threshold = multiplier × the 1st percentile of all pair distances in the pool**. For `anime-va`, the multiplier is set at 1.275. On the current pool of 1176 clips from three episodes, that gives exactly 0.70. On episode 3, the two approaches side by side:
 
-| 片段池 | 固定 0.70 连上/错误合并 | 按池子定 分界线 → 连上/错误合并 |
+| Pool size | Fixed 0.70: linked / wrong merges | Threshold from the pool: threshold → linked / wrong merges |
 | ---: | ---: | ---: |
 | 372 | 2613 / 76 | 0.6465 → 1950 / 18 |
 | 573 | 2382 / 43 | 0.6878 → 2131 / 25 |
@@ -298,120 +298,120 @@ SoVITS 从 4 轮到 8 轮涨了 0.014，GPT 从 5 轮到 15 轮反而低了 0.01
 | 975 | 2215 / 31 | 0.6993 → 2221 / 31 |
 | 1176 | 2095 / 21 | 0.6999 → 2095 / 21 |
 
-固定那条线从 2613/76 滑到 2095/21，按池子定那条线在 1950/18 到 2221/31 之间基本不动。第 2 集同样（1697/11 到 1683/12，而固定那条从 1979/17 掉到 1683/12）。第 1 集本来就没漂，两条线一样，也没有变坏。
+The fixed line slides from 2613/76 down to 2095/21. The pool-based line stays nearly still, between 1950/18 and 2221/31. Episode 2 is similar: 1697/11 to 1683/12, while the fixed line falls from 1979/17 to 1683/12. Episode 1 hardly drifted in the first place, so the two lines are the same and neither got worse.
 
-**倍数决定的是松紧，跟稳不稳是两回事。** 倍数取 1.38（在只有第 3 集 372 条时乘出 0.70）也一样稳，但那是松得多的位置：第 3 集连上的从 2095 涨到 3075，第 1 集的错误合并却从 11 涨到 155。错误合并是更贵的那种错，所以取保守的 1.275。**今天这条规则和固定 0.70 分出来的组一模一样**，已核对过全部 1184 条片段的归属；分岔要等语料继续长大才开始。
+**The multiplier sets how strict the threshold is. That is a separate question from stability.** A multiplier of 1.38 (which gave 0.70 on the 372 clips of episode 3 alone) is equally stable. But that position is much looser. On episode 3, linked pairs rise from 2095 to 3075, while on episode 1 wrong merges rise from 11 to 155. Wrong merges are the more costly error, so the conservative 1.275 was chosen. **Today this rule makes exactly the same groups as the fixed 0.70.** The group membership of all 1184 clips was checked. The two only split once the corpus keeps growing.
 
-### 还没有解决的
+### Not yet solved
 
-- **倍数和分位都是在已有三集的标签上挑的，没有经过独立检验。**
-- **只验证了往回缩，没验证往外推。** 规则是在 372 到 1176 条之间对上的，13 集大约 5000 条，那一段没有数据。
-- 加进池子的片段是从另外两集里随机抽的，角色构成跟原集一样。整集整集地加新角色进来，第 1 百分位会怎么走，只有 1176 条这一个真实的点。
-- 第 2 集的曲线不是单调的（981 条那档最高，1176 条又回落），第 1 集几乎没有漂移。**三集之间差别不小，别把第 3 集的形状当成通例。**
+- The multiplier and the percentile were chosen on the labels of only three episodes. There has been no held-out test.
+- Only shrinking back was checked, not pushing outward. The rule was matched between 372 and 1176 clips. There is no data for the range of 13 episodes, about 5,000 clips.
+- The clips added to the pool were drawn at random from the other two episodes, with the same character mix as the original episode. What the 1st percentile does when whole episodes with new characters are added is known only from the single real point at 1176 clips.
+- Episode 2's curve is not monotonic. It is highest at the 981-clip stage and then drops again at 1176. Episode 1 barely drifts. **The three episodes differ quite a lot, so do not take episode 3's shape as the general rule.**
 
-## 换动画域模型
+## Switch to an anime model
 
-前面所有尝试都不动模型，全部无效。这次换模型：[anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding)，有按角色训练的 `anime-char` 和按声优训练的 `anime-va` 两个变体（模型本身的介绍见 [TOOLS.md](TOOLS.md)）。原有两个模型都是在 VoxCeleb 上训练的，训练素材是以英语为主的真人访谈。
+Every earlier attempt kept the same model, and all of them failed. This time the model was changed to [anime_speaker_embedding](https://github.com/litagin02/anime_speaker_embedding), which has two variants: `anime-char`, trained by character, and `anime-va`, trained by voice actor. For what the model is, see [TOOLS.md](TOOLS.md). The original two models were trained on VoxCeleb, whose material is mostly interviews with real people, mainly in English.
 
-前两集 809 条片段、445 条标签、98790 对配对，同一套代码：
+Episodes 1 and 2: 809 clips, 445 labels and 98790 pairs, with the same code:
 
-| 模型 | 排序正确率 | 相等错误率 | 1 至 1.5 秒 | 1.5 至 3 秒 | 3 至 6 秒 | 跨集 |
+| Model | Ranking accuracy | Equal error rate | 1 to 1.5 seconds | 1.5 to 3 seconds | 3 to 6 seconds | Across episodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| redimnet2-b6（原来的） | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
+| redimnet2-b6 (the original) | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
 | anime-char | 0.9274 | 0.1439 | 0.9209 | 0.9456 | 0.9828 | 0.9164 |
 | **anime-va** | **0.9441** | **0.1244** | **0.9382** | **0.9545** | **0.9851** | **0.9382** |
 
-**按角色训练的那个反而不如按声优训练的。** 一个解释是本作里同一声优配多个角色的情况不多，角色身份基本等同于声优身份，而按角色训练的那个「积极区分」的目标会把同一角色在不同情绪下的声音也推开。
+**The one trained by character does worse than the one trained by voice actor.** One explanation: in this show, one voice actor rarely voices several characters, so character identity is almost the same as voice actor identity. The "push apart" objective of the by-character model also pushes apart the same character's voice in different emotions.
 
-`anime-va` 的失败方式如预期出现：同一声优配多角会被并到一起。前两集 53 对错误合并里 `丸善斯基` 出现两次（与 `suzuka` 12 对、与 `麦昆` 9 对）。
+`anime-va` fails in the expected way: a voice actor who voices several characters gets merged together. Among the 53 wrong-merge pairs in episodes 1 and 2, Maruzensky appears twice (with `suzuka` 12 pairs, and with McQueen 9 pairs).
 
-**分界线不能照搬。** 作者提醒这个模型「倾向于积极区分说话人」。实测同一角色的相似度中位数 0.337，而 redimnet2-b6 是 0.541，换算成距离是 0.663 对 0.460。原来 0.20 至 0.90 的扫描区间对它几乎全无意义，所以 `compare` 加了 `--low` / `--high`，各模型也有了自己的默认分界线。
+**Thresholds cannot be copied across.** The author warns that this model "tends to actively distinguish speakers". Measured: the median similarity of the same character is 0.337 for it, while redimnet2-b6 gets 0.541. Converted to distance, that is 0.663 against 0.460. The 0.20 to 0.90 sweep range used before is almost meaningless for it. So `compare` gained `--low` and `--high`, and each model now has its own default threshold.
 
-报告：`runs/score-models.json`、`runs/comparison-anime.json`。
+Reports: `runs/score-models.json`, `runs/comparison-anime.json`.
 
-## 对白覆盖
+## Dialogue coverage
 
-`coverage` 用「片段边界应当等于字幕行边界」反推偏移（第 1 集 -0.95 秒、第 2 集 -0.96 秒，两集片段全部落在字幕行内），再找完全没有片段的对白行。
+`coverage` works backward from "clip boundaries should equal subtitle line boundaries" to infer the offset (episode 1: −0.95 seconds, episode 2: −0.96 seconds; all clips of both episodes fall inside subtitle lines). Then it finds dialogue lines with no clip at all.
 
-| | 对白行 | 有片段 | 没片段 | 行本身短于 1 秒 | 行够长却没切出 |
+| | Dialogue lines | With a clip | Without a clip | Line itself under 1 second | Line long enough but not cut |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 第 1 集（旧切法） | 409 | 243 | 166 | 53 | 113 |
-| 第 2 集（旧切法） | 401 | 243 | 158 | 78 | 80 |
-| 第 3 集（按字幕行切） | 375 | **375** | 0 | 0 | 0 |
+| Episode 1 (old cutting) | 409 | 243 | 166 | 53 | 113 |
+| Episode 2 (old cutting) | 401 | 243 | 158 | 78 | 80 |
+| Episode 3 (cut along subtitle lines) | 375 | **375** | 0 | 0 | 0 |
 
-旧切法是拿语音检测结果和字幕求重叠再切。按响度分不出好坏：第 2 集那 80 条够长却没切出的行，人声轨响度中位 -25.2 dBFS，而 243 条真片段是 -25.4，几乎一样，最安静的几条反而是真台词。
+The old cutting method overlapped voice-detection results with the subtitles, then cut. Loudness does not tell good from bad. The 80 lines in episode 2 that were long enough but not cut have a median loudness of −25.2 dBFS on the vocal track. The 243 real clips are at −25.4, almost the same, and the quietest few of them are actually real dialogue.
 
-丢的不是零星句子，是整场戏。连续一整段没有任何片段、里面却有台词的空档，前两集各 7 处（第 1 集共 3.7 分钟含 132 秒台词，第 2 集 6.1 分钟含 47 秒台词）。
+What was lost was not a few stray lines but whole scenes. Gaps where a whole stretch has no clip at all, yet there is dialogue: 7 in each of the first two episodes (episode 1 has 3.7 minutes in total, including 132 seconds of dialogue; episode 2 has 6.1 minutes, including 47 seconds of dialogue).
 
-**标注者试听了第 1 集的 7 处**，判断记在 [annotations/coverage-ep01.json](../annotations/coverage-ep01.json)：3 处是真丢的角色台词（89.9 秒、28 行），4 处不该收（134.8 秒、30 行：整段赛马解说、跑步喘气声、众人欢呼，以及主角哼歌压在电视机声音上那处，分离不出主角的声音）。
+**The labeler listened to the 7 gaps in episode 1.** The judgments are recorded in [annotations/coverage-ep01.json](../annotations/coverage-ep01.json). 3 are real lost character dialogue (89.9 seconds, 28 lines). 4 should not have been kept (134.8 seconds, 30 lines): a whole stretch of horse-race commentary, running and panting sounds, a crowd cheering, and one place where the main character hums over the sound of a TV, where voice separation cannot pull out the main character's voice.
 
-这说明**「按字幕行全收」会连带收进电视解说和群体欢呼**。
+This shows that **keeping every subtitle line also pulls in TV commentary and crowd cheers.**
 
-`extend` 已经把这些没有片段的对白行补进前两集的片段表（第 1 集 242→408 条，第 2 集 243→401 条，最短 0.42 秒）。已有的 485 条片段一条没动，所以标签全部有效。
+`extend` has already added the dialogue lines with no clips to the clip tables of the first two episodes (episode 1 from 242 to 408 clips, episode 2 from 243 to 401, the shortest 0.42 seconds). None of the existing 485 clips was changed, so all the labels are still valid.
 
-报告：`runs/coverage/ep01/`、`ep02/`、`ep03/`。
+Reports: `runs/coverage/ep01/`, `ep02/`, `ep03/`.
 
-## 分数归一化
+## Score normalization
 
-猜想是短片段跟谁都不太像，属于整体偏移，那就先量出每条片段跟一堆无关片段的相似度水平，减掉之后再比。98790 对配对，redimnet2-b6：
+The idea: short clips are not much like anyone, so that is a global offset. First measure how similar each clip is to a pile of unrelated clips, subtract that, then compare. 98790 pairs, redimnet2-b6:
 
-| 做法 | 排序正确率 | 相等错误率 | 0 至 1.5 秒 | 1.5 至 3 秒 | 3 至 6 秒 | 跨集 |
+| Method | Ranking accuracy | Equal error rate | 0 to 1.5 seconds | 1.5 to 3 seconds | 3 to 6 seconds | Across episodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 不做 | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
-| 用全部无关片段作基准 | 0.9318 | 0.1414 | 0.9216 | 0.9467 | 0.9507 | 0.9222 |
-| 只用最像的 100 条作基准 | 0.9000 | 0.1790 | 0.8824 | 0.9250 | 0.9278 | 0.8842 |
+| No normalization | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
+| Baseline from all unrelated clips | 0.9318 | 0.1414 | 0.9216 | 0.9467 | 0.9507 | 0.9222 |
+| Baseline from the 100 most similar clips only | 0.9000 | 0.1790 | 0.8824 | 0.9250 | 0.9278 | 0.8842 |
 
-排序正确率只涨 0.0022，相等错误率反而从 0.1412 变成 0.1414，最该受益的短片段还退了一点。只用最像的 100 条作基准全面更差，原因清楚：我们没有另一批与本作无关的片段，「最像的 100 条」里混进了同一角色的片段，等于拿同角色的分数当基准。
+Ranking accuracy rose by only 0.0022. The equal error rate went from 0.1412 to 0.1414, slightly worse, and the short clips that should benefit most fell a little. Using only the 100 most similar clips as the baseline is worse across the board. The reason is clear: there is no separate batch of clips unrelated to this show, so the "100 most similar" include clips of the same character. That amounts to using same-character scores as the baseline.
 
-WeSpeaker 上这个做法确实有效（0.8774 → 0.8922，错误率 0.1932 → 0.1778），但归一化后仍然低于 redimnet2-b6 不做归一化的 0.9296，不改变模型选择。
+On WeSpeaker this method did help (0.8774 → 0.8922, error rate 0.1932 → 0.1778). But after normalization it is still below redimnet2-b6 without normalization, at 0.9296, so it does not change the model choice.
 
-**只量了分得开不开，没有接进分组。** 合并规则只决定「哪些距离算连上」，改不了距离本身；分不开就没必要往下做。
+**Only the separability was measured, not the grouping.** The merge rule only decides which distances count as linked. It cannot change the distances themselves. If the clips cannot be separated, there is no point going further.
 
-## 补相邻音频
+## Padding with neighboring audio
 
-猜想是模型听到的音太少，那就向两侧借相邻音频补足，片段本身的时间范围不变。前两集 485 条固定片段，redimnet2-b6：
+The idea: the model hears too little sound. So borrow neighboring audio from both sides to fill it up, keeping the clip's own time range. 485 fixed clips from episodes 1 and 2, redimnet2-b6:
 
-| 最小音频长度 | 排序正确率 | 相等错误率 | 1 至 1.5 秒 | 1.5 至 3 秒 | 3 至 6 秒 | 跨集 |
+| Minimum audio length | Ranking accuracy | Equal error rate | 1 to 1.5 seconds | 1.5 to 3 seconds | 3 to 6 seconds | Across episodes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 不补 | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
-| 补到 1.5 秒 | 0.9317 | 0.1386 | 0.9257 | 0.9430 | 0.9402 | 0.9242 |
-| 补到 2 秒 | 0.9309 | 0.1432 | 0.9231 | 0.9435 | 0.9402 | 0.9245 |
-| 补到 3 秒 | 0.9175 | 0.1668 | 0.8982 | 0.9402 | 0.9402 | 0.9112 |
+| No padding | 0.9296 | 0.1412 | 0.9239 | 0.9430 | 0.9402 | 0.9215 |
+| Padded to 1.5 seconds | 0.9317 | 0.1386 | 0.9257 | 0.9430 | 0.9402 | 0.9242 |
+| Padded to 2 seconds | 0.9309 | 0.1432 | 0.9231 | 0.9435 | 0.9402 | 0.9245 |
+| Padded to 3 seconds | 0.9175 | 0.1668 | 0.8982 | 0.9402 | 0.9402 | 0.9112 |
 
-补到 1.5 秒时短片段那一档从 0.9239 涨到 0.9257，而 1.5 秒以上的两档一个数都没变。它们本来就不需要补，正好当了对照，说明变化确实来自补音。但涨幅只有 0.0018，等于没有。再往上补就变坏：补到 3 秒把短片段打到 0.8982，因为借来的音里越来越多是别人在说话。
+When padded to 1.5 seconds, the short band rose from 0.9239 to 0.9257. The two bands above 1.5 seconds did not change at all. They did not need padding, so they serve as a control, showing that the change really came from the padding. But the gain is only 0.0018, which amounts to nothing. Padding further makes it worse. Padded to 3 seconds, the short band drops to 0.8982, because more and more of the borrowed audio is other people speaking.
 
-**结论：短片段的劣势既不是分数标定问题，也不是上下文不够。** 把短片段按整句字幕重切也不行：整句只比原片段长约 0.1 秒，短是字幕行本身短。
+**Conclusion: the weakness of short clips is neither a problem of score calibration nor a lack of context.** Re-cutting short clips along the whole subtitle line does not help either. A whole line is only about 0.1 seconds longer than the clip. The clips are short because the subtitle lines themselves are short.
 
-## 分两步的分组
+## Two-step grouping
 
-前两集 485 条片段全部标完（445 条人名）时做的，结论仍然有效。做法是先只用不短于 1.5 秒的片段分组，再把短片段挂到最近的组上。它在 62 条抽样标签上看起来零错误合并、多连 19 对，全量标签上是：
+Done when all 485 clips of episodes 1 and 2 had been labeled (445 with names). The conclusion still holds. The method first grouped only the clips at least 1.5 seconds long, then attached the short clips to the nearest group. On the 62 sampled labels it looked like zero wrong merges, with 19 more linked pairs. On the full set of labels:
 
-| 做法（redimnet2-b6，分界线 0.50） | 连上 | 错误合并 | 该合没合 |
+| Method (redimnet2-b6, threshold 0.50) | Linked | Wrong merges | Missed merges |
 | --- | ---: | ---: | ---: |
-| 按整组平均距离合并 | 5745 | **68** | 4876 |
-| 分两步 | 6364 | **1057** | 4257 |
+| Average-linkage merge | 5745 | **68** | 4876 |
+| Two-step | 6364 | **1057** | 4257 |
 
-多连 619 对，代价是多 989 对错误合并，其中 870 对来自同一处：把 87 条 `teo` 和 10 条 `大和赤骥` 并进了一个组。剔掉这一处，错误合并仍是 187 对 68。按错误合并上限逐档比较，两种做法互有胜负、差距小且随分界线反复，不构成替换理由。
+It links 619 more pairs, at the cost of 989 more wrong merges. 870 of those come from one spot: 87 `teo` clips and 10 Daiwa Scarlet clips were merged into one group. Without that spot, wrong merges are still 187 pairs against 68. Compared bucket by bucket at each wrong-merge limit, the two methods trade wins. The gaps are small and change back and forth with the threshold, which is not a reason to replace one with the other.
 
-## 合并规则
+## Merge rules
 
-同一时期、同一批标签。按最近一对合并会经由没有名字的片段把不同角色链成一个大团（分界线 0.40 时就产生 271 对错误合并，0.50 时 705 对）；互相都是对方最近邻的规则几乎连不上（0.55 之后完全不再变化）；按最远一对合并零错误合并能维持到 0.66，但连上的始终少于按整组平均距离合并。284 个设置里，「错误合并不更多、连上不更少」的最优设置全部是按整组平均距离合并。
+Same period, same labels. Merging by nearest pair chains different characters into one big cluster, through unnamed clips. At threshold 0.40 this already gives 271 wrong-merge pairs, and at 0.50 it gives 705. The rule of "mutual nearest neighbors" links almost nothing (after 0.55 it stops changing at all). Merging by farthest pair keeps zero wrong merges up to 0.66, but it always links fewer pairs than average linkage. Of the 284 settings, the best ones with "no more wrong merges and no fewer linked pairs" were all average linkage.
 
-## 62 条抽样标签时期
+## 62 sampled labels
 
-那批标签已删除，所有数字无法重算，也不该再引用。留下的是教训：
+Those labels have been deleted, so none of the numbers can be recomputed, and they should no longer be cited. What remains are the lessons:
 
-- **「错误合并为零」是样本太小的假象。** 62 条标签上现行分组报零错误合并，445 条标签上是 68 对。
-- **「该合没合的全是短片段」也是。** 当时说「双方都不短于 1.5 秒的 31 对一对没漏」，全量标签上这类配对仍有 27.6% 连不上。
-- **同一批标签既调参又打分，看不出问题。** 分两步的做法在旧标签上零错误合并，全量标签上 1057 对；它的 1.5 秒分界和 0.05 领先幅度都是在那批标签上选的。
-- 近邻检索的命中率也被高估了：49 次查询 95.9%，438 次查询 92.0%，按角色平均只有 81.3%。
-- 不同角色的配对落在分界线内的比例，从「不到 1%」变成 3.0%。
+- **"Zero wrong merges" was a small-sample illusion.** On 62 labels, the grouping in use reported zero wrong merges. On 445 labels it is 68 pairs.
+- **"All the missed merges are short clips" was also an illusion.** At the time it was said that "of the 31 pairs where both sides are at least 1.5 seconds long, none was missed". On the full labels, 27.6% of such pairs still fail to link.
+- **Tuning and scoring on the same labels hides problems.** The two-step method had zero wrong merges on the old labels, but 1057 pairs on the full labels. Its 1.5 second cut and its 0.05 lead margin were both chosen on that batch of labels.
+- The nearest-neighbor hit rate was also overestimated: 95.9% over 49 queries, 92.0% over 438 queries, and only 81.3% when averaged by character.
+- The share of different-character pairs falling inside the threshold went from "under 1%" to 3.0%.
 
-那个时期还做过两件事，结论保留但依据已不可复算：换 WeSpeaker 没有优势（142 个设置里没有一个能压过 redimnet2-b6）；少量身份参考收益有限，还可能把原组里混进的错人一起传播出去。相关代码留在 `evaluation/references.py`。
+Two more things were done in that period. Their conclusions are kept, but their evidence can no longer be recomputed. Switching to WeSpeaker had no advantage: none of 142 settings beat redimnet2-b6. A few identity references gave limited gains, and could also spread wrong people already mixed into the original groups. The related code is kept in `evaluation/references.py`.
 
-## 证据的边界
+## Limits of the evidence
 
-- 全部结论都建立在这一部作品的三集上，换作品要重新验。
-- 前两集是两种切法混在一起：原有 485 条是旧的重叠切法，后补的 324 条是整条字幕行。第 3 集全是整条字幕行。
-- 第 3 集有一个疑点没排除：同样 1.5 至 3 秒这一档，第 3 集是 0.8975，前两集是 0.9430。整条字幕行包含台词前后的静音，稀释了声纹，这是合理解释，但集与集本身也有差异，两者分不开。前两集后补的 324 条片段能判定这件事，因为它们和旧片段同集、同时长档、不同切法。2026-10-23 已在界面里标了其中 230 条，但只分 `teo` 和「其他」，只能拿帝皇的配对来比，还没量。
-- 「一条片段里只有一个人说话」始终是假设。快问快答式对白的边界误差会把邻座切进片段：第 1 集曾测得 44% 的检测语音段与前一段换了人且间隔不到 0.25 秒。
+- All conclusions rest on three episodes of one series. Another series would need to be checked again.
+- Episodes 1 and 2 mix two cutting methods. The original 485 clips use the old overlap-based cutting, and the 324 added later are whole subtitle lines. Episode 3 is all whole subtitle lines.
+- One doubt is not ruled out for episode 3. In the same 1.5 to 3 second band, episode 3 scores 0.8975, while episodes 1 and 2 score 0.9430. Whole subtitle lines include the silence before and after the speech, which dilutes the voiceprint. That is a reasonable explanation, but the episodes also differ among themselves, and the two cannot be separated. The 324 clips added later to episodes 1 and 2 could settle this, because they come from the same episodes and the same length bands but use a different cut. On 2026-10-23, 230 of them were labeled in the interface. But they are labeled only as `teo` or "Other", so only Teio's pairs can be compared, and this has not been measured yet.
+- "Only one person speaks in a clip" has always been an assumption. In rapid-fire dialogue, boundary errors can pull the neighbor's speech into a clip. In episode 1, 44% of detected speech segments were found to differ in speaker from the segment before, with a gap of under 0.25 seconds.

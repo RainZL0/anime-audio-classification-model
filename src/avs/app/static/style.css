@@ -23,7 +23,7 @@
   --mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
   color-scheme: light;
 }
-/* 默认白天。夜间只在用户点了顶栏的切换之后才用，不跟系统走。 */
+/* Daytime by default. Night mode is used only after the user clicks the switch in the top bar. It does not follow the system. */
 :root[data-theme="dark"] {
   --bg: #161615;
   --panel: #1f1f1e;
@@ -89,7 +89,7 @@ kbd {
   white-space: nowrap;
 }
 
-/* 整体布局：顶栏、左边舞台、右边列表、底部角色栏。整页不滚动，只滚列表。 */
+/* Overall layout: top bar, stage on the left, list on the right, character bar at the bottom. The whole page does not scroll, only the list does. */
 .shell { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
 .top {
   display: flex; align-items: center; gap: 14px;
@@ -117,7 +117,7 @@ kbd {
 .stage { border-right: 1px solid var(--line); padding: 16px; overflow-y: auto; background: var(--panel); }
 .main { min-height: 0; overflow-y: auto; padding: 8px 20px 40px; scroll-padding: 80px; }
 
-/* 舞台：画面、台词、候选 */
+/* Stage: picture, dialogue, candidates */
 .screen { position: relative; aspect-ratio: 16 / 9; background: #0e0e0e; border-radius: var(--radius); overflow: hidden; }
 .screen video { width: 100%; height: 100%; object-fit: contain; display: block; }
 .screen .wait { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; font-size: 12px; }
@@ -125,7 +125,7 @@ kbd {
 .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #555; border-top-color: #ddd;
   animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* 画面正下方一排管怎么放：听哪条声音、放多快。 */
+/* The row just below the picture controls which sound is played and how fast. */
 .player { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .player button { padding: 1px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .line-text { font-size: 19px; line-height: 1.5; margin: 10px 2px 4px; min-height: 28px; }
@@ -146,11 +146,11 @@ kbd {
 .cand:hover { border-color: var(--accent-ring); }
 .cand.top { border-color: var(--accent-ring); background: var(--accent-soft); }
 .cand .name { font-weight: 560; }
-/* 头像占两行；概率条单独一行，从名字下面铺到最右边，不跟按钮抢宽度。 */
+/* The avatar takes two rows. The probability bar has its own row, running from under the name to the far right, so it does not compete with the buttons for width. */
 .cand > :first-child { grid-row: span 2; }
 .cand .meter { grid-column: 2 / -1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .cand .meter i { display: block; height: 100%; background: var(--accent); }
-/* 百分比固定在最后一列，没有按钮的「其他」也靠右，几行上下对齐。 */
+/* The percentage is fixed in the last column. "Other" rows, which have no button, are also pushed right, so the rows line up. */
 .cand .pct { grid-column: -2; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; min-width: 34px; text-align: right; }
 .cand .ref { padding: 3px 8px; font-size: 12px; }
 .confirmed-box { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius);
@@ -160,7 +160,7 @@ kbd {
 .confirmed-box .actions button { font-size: 12px; white-space: nowrap; }
 .stage .hint { margin-top: 16px; font-size: 12px; color: var(--text-3); line-height: 1.9; }
 
-/* 头像是认人的主要依据，名字是可选的。有截图用截图，没有就用按编号生成的图案。 */
+/* The avatar is the main way to recognize a person; the name is optional. Use a screenshot if there is one, otherwise a pattern generated from the number. */
 .av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
   font-size: 13px; font-weight: 600; color: #fff; background-size: cover; background-position: center;
   user-select: none; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
@@ -173,13 +173,17 @@ kbd {
 .av.unknown { background: var(--line-strong); color: var(--text-2); }
 .av.edit { cursor: pointer; position: relative; }
 .av.edit:hover { box-shadow: 0 0 0 2px var(--accent); }
-.av.edit:hover::after { content: "截取"; position: absolute; inset: auto 0 0 0; font-size: 10px; line-height: 1.6;
+.av.edit:hover::after { content: "Crop"; position: absolute; inset: auto 0 0 0; font-size: 10px; line-height: 1.6;
   text-align: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-weight: 500; }
+:lang(zh) .av.edit:hover::after { content: "截取"; }
 .av.xs.edit:hover::after, .av.sm.edit:hover::after { content: none; }
 .rn.unnamed { color: var(--text-3); font-style: italic; font-weight: 500; }
 .theme { font-size: 15px; padding: 4px 9px; }
+.lang { min-width: 44px; }
+/* The language button on pages without the top bar (empty workspace, can't connect) */
+.corner { position: fixed; top: 12px; right: 16px; }
 
-/* 场景列表：每句一行，像聊天记录 */
+/* Scenes view: one line per sentence, like a chat log */
 .scene-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 14px 4px 6px;
   color: var(--text-3); font-size: 12px; display: flex; gap: 8px; align-items: center; }
 .scene-head b { color: var(--text-2); font-weight: 600; }
@@ -218,7 +222,7 @@ kbd {
 .seg button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12px; background: var(--panel); color: var(--text-2); }
 .seg button.on { background: var(--accent-soft); color: var(--accent); }
 
-/* 角色栏 */
+/* Character bar */
 .dock { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--line);
   background: var(--panel); overflow-x: auto; }
 .chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 99px;
@@ -233,7 +237,7 @@ kbd {
 .dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
 .dock > button { white-space: nowrap; flex: none; }
 
-/* 角色视图 */
+/* Characters view */
 .roles-grid { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding-top: 10px; }
 .role-list { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 8px; align-self: start;
   max-height: calc(100vh - 170px); overflow-y: auto; }
@@ -243,7 +247,7 @@ kbd {
 .role-item.on { background: var(--panel); border-color: var(--accent-ring); }
 .role-item .c { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; text-align: right; }
 .role-item .c b { color: var(--warn); font-weight: 600; }
-/* 不是目标角色的排在目标角色下面，名字淡一些；「其他」放在最下面，上面一条分隔线。 */
+/* Characters that are not targets are listed under the target characters, with a lighter name. "Other" goes at the very bottom, with a divider line above it. */
 .role-item.off .nm { color: var(--text-3); }
 .role-item.other { position: relative; margin-top: 9px; }
 .role-item.other::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; border-top: 1px solid var(--line); }
@@ -255,7 +259,7 @@ kbd {
 .conf { width: 46px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 6px; }
 .conf i { display: block; height: 100%; background: var(--accent); }
 
-/* 起步分组 */
+/* Groups view */
 .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; padding-top: 12px; }
 .group { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex;
   flex-direction: column; gap: 10px; }
@@ -276,12 +280,12 @@ kbd {
 .pick-row .av { cursor: pointer; }
 .pick-row .av:hover { box-shadow: 0 0 0 2px var(--accent); }
 .pill.hint { display: inline-flex; align-items: center; gap: 5px; padding-left: 2px; }
-/* 名字框占满第一行，按钮放不下就换到下一行，不把输入框挤没。 */
+/* The name box takes the whole first row. If the buttons do not fit, they wrap to the next row, so they do not squeeze the input box. */
 .name-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .name-form input { flex: 1 1 140px; min-width: 120px; }
 .name-form button { white-space: nowrap; }
 
-/* 空状态与引导 */
+/* Empty state and onboarding */
 .empty { max-width: 560px; margin: 60px auto; text-align: center; color: var(--text-2); }
 .empty h2 { color: var(--text); font-size: 20px; margin: 0 0 8px; }
 .empty .command { text-align: left; background: var(--accent-soft); border: 1px solid var(--accent-ring);
@@ -294,7 +298,7 @@ kbd {
 .welcome p { margin: 0; color: var(--text-2); font-size: 13px; }
 .welcome ol { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 
-/* 导出 */
+/* Export */
 .form { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-top: 12px; }
 .field label.title { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
 .role-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
@@ -312,7 +316,7 @@ kbd {
 .note.warn { color: var(--warn); }
 .result { background: var(--ok-soft); border-radius: var(--radius); padding: 12px 14px; }
 
-/* 浮层：搜索角色、快捷键、提示条 */
+/* Overlays: character search, keyboard shortcuts, hint bar */
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start;
   justify-content: center; padding-top: 14vh; z-index: 20; }
 .palette { width: min(460px, 92vw); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);

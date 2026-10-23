@@ -1,14 +1,16 @@
-# 人工身份标签
+# Manual identity labels
 
-这些文件来自人对照视频画面确认角色，不能靠重跑恢复，必须保留。标注命令见 [docs/USAGE.md](../docs/USAGE.md#标注)，标注的规矩见 [docs/HISTORY.md](../docs/HISTORY.md#标注)。
+These files come from a person checking each line's character against the video picture. They cannot be recovered by running the pipeline again, so they must be kept.
 
-| 文件 | 内容 |
+The labeling commands are in [docs/USAGE.md](../docs/USAGE.md#labeling), and the labeling rules are in [docs/HISTORY.md](../docs/HISTORY.md#labeling).
+
+| File | Contents |
 | --- | --- |
-| `ep01-full.json`、`ep02-full.json`、`ep03-full.json` | 第 1 至 3 集盲标的人工身份，带全部角色名。已导进界面并迁移成目标角色和「其他」，之后的标注只在界面的 `runs/labels/` 里，不再写回这里。各集标到哪见 [STATUS](../docs/STATUS.md#到哪一步了) |
-| `names.json` | 角色名词表，只有名字，没有片段归属。标注页用它给可点的名字排序，新集标注前先对照它 |
-| `coverage-ep01.json` | 标注者试听第 1 集「整段没有片段却有台词」的空档之后，逐处给的判断（该收 / 不该收） |
-| `legacy/` | 重构前的现场姓名记录和早期靠耳朵分组的记录，保留备查，不当真值 |
+| `ep01-full.json`, `ep02-full.json`, `ep03-full.json` | Manual identities for episodes 1 to 3, from blind labeling, with all character names. They have been imported into the interface and converted to target characters and "Other". Later labels live only in the interface's `runs/labels/`, and are no longer written back here. For how far each episode was labeled, see [STATUS](../docs/STATUS.md#where-things-stand). |
+| `names.json` | The list of character names. It has names only, with no clip assignments. The labeling page uses it to sort the clickable names. Check it before labeling a new episode. |
+| `coverage-ep01.json` | The labeler's judgments, one by one, on the gaps found by listening to episode 1: places where a whole stretch has dialogue but no clips (keep / do not keep). |
+| `legacy/` | Name notes taken in the field before the refactor, and early records made by grouping by ear. Kept for reference, not treated as ground truth. |
 
-归档里每条片段的 `name` 是角色名、特殊标签（`__multiple__`、`__unclear__`、`__not_speech__`），或 `null` 表示还没标。
+In each archive, a clip's `name` is a character name, a special label (`__multiple__`, `__unclear__`, `__not_speech__`), or `null` if the clip has not been labeled yet.
 
-每次按下就存进归档，已有归档会继续使用。片段边界不同时要求换新文件名，不会覆盖旧的人工工作。
+Each press is saved to the archive right away, and an existing archive keeps being used. If the clip boundaries are different, a new file name is required, so old manual work is never overwritten.

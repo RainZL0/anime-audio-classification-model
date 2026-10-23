@@ -1,51 +1,53 @@
-# 初版路线
+# Roadmap to the first release
 
-更新：2026-10-23 晚。这里写到初版发布为止的目标、方向和标准；眼前的下一步在 [STATUS.md](STATUS.md)。「方向」已经定下（[DECISIONS.md](DECISIONS.md#已经定下的)），没有经过独立检验，独立检验已取消（[DECISIONS.md](DECISIONS.md#已经排除的)）；「标注界面」已经做出第一版，怎么运转见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。
+Updated: 2026-10-23, evening. This page covers the goals, the direction and the standards up to the first release. The next steps for now are in [STATUS.md](STATUS.md). The direction has been settled ([DECISIONS.md](DECISIONS.md#settled)). It has not been checked on a held-out test, and the held-out test has been cancelled ([DECISIONS.md](DECISIONS.md#ruled-out)). The labeling interface has a first version. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
 
-## 目标
+## Goal
 
-- 做成值得公开发布的工具，目标是 GitHub 上 1000 星。
-- 主要用户：想给某个角色训练语音模型（GPT-SoVITS、Style-Bert-VITS2、RVC 等），需要这个角色干净的单人语音的人。其次是想找出某个角色全部台词的人。
-- 同类工具几乎都没有「改错之后模型跟着变好」这一步，详见 [COMPETITORS.md](COMPETITORS.md#5-我们能占据的空位gaps-we-can-own)。
+- Make a tool that is worth publishing publicly. The target is 1000 stars on GitHub.
+- Main users: people who want to train a voice model for one character (GPT-SoVITS, Style-Bert-VITS2, RVC and so on), and who need clean audio of that character speaking alone. Second, people who want to find all of a character's lines.
+- Almost no similar tool has a step where the model gets better after you correct its mistakes. See [COMPETITORS.md](COMPETITORS.md#5-gaps-we-can-own).
 
-## 仓库
+## Repo
 
-- 初版在本仓库本地开发，发布前不推送。
-- 发布时替换 GitHub 上旧仓库 `RainbowZL0/anime-audio-classification-model` 的 `main`：先给旧 `main` 打标签保存，再把本仓库的历史推上去。沿用旧仓库是为了保留已有的星和链接；要不要改名，发布前再定。
+- The first release is developed locally in this repo. Nothing is pushed before release.
+- Before pushing, decide what to do with `annotations/`: the blind labels of episodes 1 to 3 are tracked in git, with Chinese character names and the subtitle text. Subtitle text should not be distributed publicly. Either move the folder out of the repo, or keep it and accept that.
+- At release, replace the `main` branch of the old GitHub repo `RainbowZL0/anime-audio-classification-model`. First tag the old `main` to keep it, then push this repo's history onto it. The old repo is kept so that its existing stars and links are kept. Whether to rename it is decided before release.
 
-## 方向
+## Direction
 
-- **输入**：每集的视频和字幕都必须有，缺一样就拒绝处理。字幕决定怎么切片段，视频给标注者认人。
-- **认人**：声纹模型不动，在人工标签上训练一个小分类器，把片段直接分到角色名下。小分类器几秒就能训完，所以每改一条标签都可以马上重训。每条预测附带把握大小：把握高的直接采用，把握低的进待确认，跟谁都不像的标成未知或新角色。
-- **为什么可能比分组好**：分组拿一条片段去比另一条片段，两边都有噪声，还要靠一个全局分界线，而这个分界线会随池子大小漂移（[依据](EXPERIMENTS.md#分界线漂移)）。分类拿一条片段去比一个角色的几十条片段，而且每个角色有自己的界线。
-- **起步**：用现有分组（错误合并少，但分得碎）让人给整组起名字，一次就能标一批。
-- **以后再做**：利用前后台词的顺序、字幕文字、画面里的口型。标签攒到几千条，再考虑微调声纹模型，那时要先改 [DECISIONS.md](DECISIONS.md#已经定下的) 里「不微调模型」那一条。
+- **Input**: each episode must have both video and subtitles. If either is missing, processing is refused. The subtitles decide how to cut the clips, and the video lets the labeler identify people.
+- **Identifying people**: the voiceprint models stay as they are. A small classifier is trained on the manual labels, and it assigns clips directly to character names. The small classifier trains in a few seconds, so it can be retrained right away after every label change. Each prediction comes with a confidence. Confident predictions are accepted directly. Low-confidence ones go to "needs review". Clips that resemble nobody are marked as unknown or as a new character.
+- **Why it may beat grouping**: grouping compares one clip with another clip, and both are noisy. It also relies on one global threshold, which drifts as the pool grows ([basis](EXPERIMENTS.md#threshold-drift)). Classification compares one clip with dozens of clips of one character, and each character has its own boundary.
+- **Start**: use the existing groups (few wrong merges, but split into many small pieces) so that a person can name each whole group. A batch of clips is labeled in one go.
+- **Later**: use the order of neighboring lines, the subtitle text, and the lip movement in the picture. Once labels reach several thousand, consider fine-tuning the voiceprint model. At that point, the "do not fine-tune the models" item in [DECISIONS.md](DECISIONS.md#settled) must be changed first.
 
-## 标注界面
+## Labeling interface
 
-第一版已经做出：起步分组、场景、角色、导出四个视图。各视图怎么用、快捷键见 [USAGE.md](USAGE.md#标注与修正界面)，机器怎么猜、标签存在哪见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。设计上要守住的几条：
+The first version is done, with four views: Groups, Scenes, Characters and Export. How to use each view and its shortcuts are in [USAGE.md](USAGE.md#labeling-and-correction-interface). How the machine guesses and where the labels are stored is in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface). These design rules must be kept:
 
-- 头像是认人的主要依据，名字可以不起。没截头像时显示彼此分得开的默认图，头像由用户从画面里截。
-- 键盘为主，大多数时候按 Enter 就是接受预测；每一步都能撤销。
-- 默认白天配色。
-- 拿不准的片段不单开视图，在场景里用「只看要处理的」筛出来；角色视图从最没把握的开始，挑出不对的，其余一键确认。
-- 跟已知角色都不像时提示「可能是没见过的人」，不硬给名字。
-- **只标自己要的角色。** 用户可能只要一个角色，也可能要几个，标到一半还可能改主意，不该被迫给全集每句起名字。只给目标角色起名字，其余的人一律标「其他」；目标角色随时能加减，已有标签不作废。已做出，怎么运转见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。
+- Avatars are the main way to identify people, and names can be left blank. Until an avatar is cropped, a default picture that is easy to tell apart from the others is shown. Users crop the avatars from the picture themselves.
+- Keyboard first. Most of the time, pressing Enter accepts the prediction. Every step can be undone.
+- The day color scheme is the default.
+- Clips that are hard to call do not get a separate view. Filter them out in Scenes with "Only to do". The Characters view starts with the least confident clips, so the wrong ones can be picked out, and the rest are confirmed with one key.
+- When a clip is not similar to any known character, show "may be someone not seen before", and do not force a name onto it.
+- **Label only the characters you want.** A user may want one character or several, and may change their mind halfway through. They should not be forced to name every line of the whole episode. Only the target characters get names. Everyone else is "Other". Target characters can be added or removed at any time, and existing labels stay valid. This is built. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
 
-还没做的：
-- 第一次使用的引导、出错时的提示、在界面里添加新的一集。已做的：命令行 `avs add` 一条命令加一集，断了再跑同一条接着做；空工作区页面给出这条命令；声纹没算全的集跳过，不让整个界面打不开。
-- **提示哪些句子质量低。** 在目标角色的片段内部再训练一个分类器，分「干净」和「质量低」（背景音太重、有人同时出声），提示人该选「质量低」。它只回答能不能进干净数据集，不回答是谁，所以质量低的片段在这里是反例，在认人的分类器里仍然不当反例。等「质量低」的标签攒到几十条再做，先量它准不准；声纹模型本来就是为了不管噪声认人练出来的，可能分不出干净和嘈杂，那就要换别的特征。以前试过的「片段内多窗口声纹的离散程度」见 [TOOLS.md](TOOLS.md)。
+Not done yet:
 
-## 初版发布标准
+- A first-use guide, error messages for when something goes wrong, and adding a new episode from inside the interface. Done so far: the command-line `avs add` adds an episode with one command, and running the same command again after an interruption carries on. The empty-workspace page gives this command. Episodes whose voiceprints are not all computed are skipped, so the whole interface does not fail to open.
+- **Show which lines are low quality.** Train another classifier, inside the clips of a target character, that separates "clean" from "low quality" (heavy background sound, several people speaking at once). It would hint that the person should choose "low quality". It only answers whether a clip can go into a clean dataset, not who is speaking. So low-quality clips count as negatives here, but they still do not count as negatives in the classifier that identifies people. Do this once a few dozen "low quality" labels have built up, and first measure how accurate it is. The voiceprint models were trained to recognize people regardless of noise, so they may not be able to separate clean clips from noisy ones. If so, a different feature is needed. The "spread of voiceprints across several windows within a clip" that was tried earlier is described in [TOOLS.md](TOOLS.md).
 
-原来第一条是「拿数字证明分类明显好于分组」，2026-10-23 去掉：实际标注时分类的体验好很多，不再为发布另做对比（[DECISIONS.md](DECISIONS.md#已经定下的)）。
+## First release standard
 
-1. **标注界面**：给整组起名字、场景和角色两种看法、键盘操作、撤销、改完马上重训。第一版已做出，待打磨。
-2. **导出**：至少支持 GPT-SoVITS 的清单格式，带台词文字。已支持 GPT-SoVITS、Style-Bert-VITS2 和按角色分文件夹，文字取自字幕（格式见 [COMPETITORS.md](COMPETITORS.md#2-训练端期望的数据集格式)）。切片段的字幕是译文时，可以每集另配一份日文字幕取文字，不用语音转文字（[依据](EXPERIMENTS.md#日文台词)）。
-3. **安装**：`uv sync` 一条命令装好，加一集用一条 `avs add`。Windows 和 Linux 都装 CUDA 版 torch，没有显卡时自动用 CPU；Linux 和 macOS 还没实际跑过。Windows 一键包可以放到初版之后。
-4. **README**：开头一张演示动图，一句话说清用途，只用英文，推送的仓库里不放中文 README。英文版已写，还缺动图。许可已定：代码用 MIT，提取内容的使用范围写在 README 的「使用规范」一节。MIT 本身允许商用，所以「不得商用」约束的是提取出的内容，不是代码。
+The first item used to be "prove with numbers that classification is clearly better than grouping". It was removed on 2026-10-23. In real labeling, classification feels much better, so no separate comparison is made for the release ([DECISIONS.md](DECISIONS.md#settled)).
 
-## 发布
+1. **Labeling interface**: naming whole groups, two views of the same clips (Scenes and Characters), keyboard use, undo, and immediate retraining after each edit. The first version is done and is still being polished.
+2. **Export**: at least the GPT-SoVITS list format, with the dialogue text. GPT-SoVITS, Style-Bert-VITS2 and one folder per character are already supported, with the text taken from the subtitles (format in [COMPETITORS.md](COMPETITORS.md#2-dataset-format-expected-by-training)). When the subtitles used for cutting are translations, each episode can have a separate Japanese subtitle file for the text. No speech-to-text is needed ([basis](EXPERIMENTS.md#japanese-dialogue)).
+3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avs add`. Windows and Linux both install the CUDA build of torch, and the CPU is used automatically when there is no graphics card. Linux and macOS have not been run in practice yet. A one-click Windows package can come after the first release.
+4. **README**: a demo GIF at the top, and one sentence saying what the tool is for. The README is English only, so the pushed repo has no Chinese README. The English version is written. The GIF is still missing. The license is settled: MIT for the code. The scope of use for the extracted material is written in the "Usage rules" section of the README. The MIT license itself allows commercial use, so the "no commercial use" rule applies to the extracted material, not to the code.
 
-- 先找大约 10 位目标用户试用，修好问题，再在 Bilibili、知乎、V2EX、Reddit、Hacker News、X 同一天发布。
-- 在日本，声优的声音授权是敏感话题。README 写清用途边界，宣传重点放在整理和检索台词上。
+## Release
+
+- First, find about 10 target users to try it and fix the problems they find. Then release on the same day on Bilibili, Zhihu, V2EX, Reddit, Hacker News and X.
+- In Japan, permission to use voice actors' voices is a sensitive topic. The README states the limits of use clearly. The promotion focuses on organizing and searching the lines.

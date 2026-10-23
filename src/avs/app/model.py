@@ -1,15 +1,23 @@
-"""在人工标签上给每个目标角色训练一个「是不是 TA」的小分类器，给每条有声纹的片段排出名次。
+"""For each target character, train a small classifier on the human labels that answers "is this
+them?". Then rank every clip that has a voiceprint.
 
-用户只给目标角色起名字，其余的人标「其他」（见 labels.py）。所以不在全部角色里挑一个，而是
-每个目标角色单独训练一个逻辑回归：这个角色确认过的片段是正例，确定不是 TA 的片段是反例。
-「其他」只对标它的那一刻已经是目标的角色算反例，所以中途加减目标角色不会把旧标签用错。
-训练集只有几百到几千条，一次训练不到一秒，所以每改一条标签都整个重训，不做增量更新。
+Users only name the target characters. Everyone else is labeled "other" (see labels.py). So instead
+of picking one character out of all characters, each target character gets its own logistic
+regression (a standard, simple classifier). Clips the person confirmed for that character are
+positive examples. Clips that are certainly not the target are negative examples.
+"Other" only counts as a negative example for characters that were already targets when the label
+was made. So adding or removing target characters midway does not misuse old labels.
+The training set is only a few hundred to a few thousand clips, and one training run takes under a
+second. So every label change retrains everything; there are no incremental updates.
 
-**分类器只会在认识的角色里挑。** 一个从没标过的声音，也可能被说成某个目标角色，而且把握
-还不低。所以另加一道「像不像」的检查：这句和它被归给的角色里最像的那一条已确认片段，
-相似度要够高。够高的标准不写死，从当前的人工标签里量：每条已确认片段和同角色其余片段
-最像的那个相似度，取其中偏低的一端（第 `FAMILIAR_QUANTILE` 分位）。归给「其他」的不做这道
-检查：没见过的声音本来就是「其他」。
+**The classifier only picks among the characters it knows.** A voice that was never labeled may
+still be guessed as some target character, and the confidence can still be fairly high. So there is
+an extra similarity check: among the confirmed clips of the character the clip was assigned to,
+the most similar one must be similar enough. The bar is not fixed. It is measured
+from the current human labels: for each confirmed clip, take its highest similarity to the other
+confirmed clips of the same character, and use a low-end value of those (the `FAMILIAR_QUANTILE`
+percentile). Clips assigned to "other" skip this check, because a voice never seen is "other"
+anyway.
 """
 
 from __future__ import annotations
@@ -20,34 +28,43 @@ from typing import Any
 from avs.app.labels import OTHER
 
 STRENGTH = 100.0
-"""逻辑回归的正则强度。第 1、2 集互相留出时挑出来的值在 30 到 1000 之间，取中间。"""
+"""Regularization strength of the logistic regression. The value picked when episodes 1 and 2 were
+held out in turn was between 30 and 1000. The middle value was used."""
 
 AUTO_CONFIDENCE = 0.6
-"""把握到这个数就算「机器有把握」，界面上不再要求人逐条确认。
+"""A confidence at or above this number counts as "confident". The interface then stops asking the
+person to confirm each clip one by one.
 
-第 3 集上量的（当时在全部角色里挑一个）：把握不低于 0.6 的片段占八成，其中 97% 判对；
-低于 0.6 的只对了三成多。改成每个目标角色各自判断之后，只量过 teo 一个目标角色：
-第 1 至 3 集轮流留出，230 条 teo 里 0.6 处漏掉 13 条，别人没有一条被误收成 teo。
+Measured on episode 3, back when the model chose among all characters: clips with confidence of at
+least 0.6 made up 80% of clips, and 97% of those were right. Below 0.6, only a little over 30% were
+right. After switching to a separate judgment for each target character, only teo was measured.
+Across episodes 1 to 3, each held out in turn, at 0.6 the model missed 13 of 230 teo clips, and no
+other character was wrongly accepted as teo.
 """
 
 FAMILIAR_QUANTILE = 0.05
-"""「像不像」的门槛取同角色最近相似度的这个分位。九成五的已确认片段都能过这道门槛。"""
+"""The percentile of each character's nearest-clip similarity used as the "similar enough" bar.
+95% of confirmed clips pass this bar."""
 
 MIN_FAMILIAR_LABELS = 20
-"""已确认片段少于这么多时量不出可靠的门槛，这时机器一律不算有把握。"""
+"""If there are fewer confirmed clips than this, no reliable bar can be measured. In that case the
+machine never counts as confident."""
 
 
 @dataclass(frozen=True)
 class Guess:
     names: tuple[str, ...]
-    """全部目标角色加上「其他」，从最像往下排。"""
+    """All target characters plus "other", sorted from most similar to least similar."""
     probabilities: tuple[float, ...]
-    """目标角色是「是 TA」的概率；「其他」是 1 减去最高的那个。几个数加起来不一定是 1。"""
+    """For a target character, the chance that the clip is them. For "other", 1 minus the
+    highest of those. The numbers do not necessarily add up to 1."""
     similarity: float
-    """和最像的目标角色里最像的那条已确认片段的余弦相似度。"""
+    """Cosine similarity (a score for how alike two voiceprints are) to the most similar confirmed
+    clip of the most similar target character."""
     familiar: bool | None
-    """第一名是目标角色时：相似度过没过门槛，没过就可能是还没见过的人。第一名是「其他」时
-    不做这道检查，记成过了。标签太少量不出门槛时是 None。"""
+    """When the top-ranked name is a target character: whether the similarity passed the bar. If it
+    did not, this may be a person not seen before. When the top-ranked name is "other", this check
+    is skipped and counted as passed. It is None when there are too few labels to measure a bar."""
 
     @property
     def confidence(self) -> float:
@@ -64,7 +81,8 @@ class Trained:
 
 
 def familiar_threshold(features: Any, rows: list[int], names: list[str]) -> float | None:
-    """每条已确认片段和同角色其余片段的最高相似度，取偏低一端的分位。"""
+    """For each confirmed clip, its highest similarity to the other confirmed clips of the same
+    character. Then take a low-end percentile of those values."""
     import numpy as np
 
     if len(rows) < MIN_FAMILIAR_LABELS:
@@ -89,10 +107,11 @@ def train_and_predict(
     examples: dict[str, tuple[list[int], list[int]]],
     rejects: dict[int, set[str]],
 ) -> Trained:
-    """对声纹表的每一行给出预测。
+    """Give a prediction for each row of the voiceprint table.
 
-    `examples` 是目标角色到（正例行号, 反例行号）；`rejects` 是人说过「不是这个角色」的行和角色，
-    这些行上那个角色的概率记成 0。
+    `examples` maps each target character to (positive row numbers, negative row numbers).
+    `rejects` lists the rows and characters where the person said "not this character". On those
+    rows, that character's probability is recorded as 0.
     """
     import numpy as np
 
@@ -110,7 +129,8 @@ def train_and_predict(
         positive_rows += positives
         positive_names += [target] * len(positives)
         if not negatives:
-            # 还没有反例，分不出谁不是 TA，只能都算像。
+            # There are no negative examples yet, so it cannot tell who is not the target. Everyone
+            # counts as similar.
             chances[:, k] = 1.0
         else:
             from sklearn.linear_model import LogisticRegression
@@ -118,7 +138,8 @@ def train_and_predict(
             model = LogisticRegression(C=STRENGTH, max_iter=3000)
             model.fit(features[positives + negatives], [1] * len(positives) + [0] * len(negatives))
             chances[:, k] = model.predict_proba(features)[:, 1]
-        # 每一行和这个角色里最像的那条已确认片段的相似度；已确认片段不和自己比。
+        # Similarity of each row to the most similar confirmed clip of this character. A confirmed
+        # clip is not compared with itself.
         similarity = features @ features[positives].T
         similarity[positives, np.arange(len(positives))] = -np.inf
         nearest[:, k] = np.maximum(similarity.max(axis=1), -1.0)

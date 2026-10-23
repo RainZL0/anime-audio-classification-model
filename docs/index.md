@@ -1,48 +1,48 @@
-# 文档索引
+# Documentation index
 
-## 计划
+## Plans
 
-| 想知道什么 | 读哪份 | 主要小节 |
+| What you want to know | Read | Main sections |
 | --- | --- | --- |
-| 现在到哪了、下一步做什么 | [STATUS.md](STATUS.md) | [正在检验的问题](STATUS.md#正在检验的问题)、[下一步](STATUS.md#下一步)、[文件在哪](STATUS.md#文件在哪) |
-| 做到初版发布的目标、方向和标准 | [ROADMAP.md](ROADMAP.md) | [方向](ROADMAP.md#方向)、[标注界面](ROADMAP.md#标注界面)、[初版发布标准](ROADMAP.md#初版发布标准) |
-| 同类工具有哪些、缺什么 | [COMPETITORS.md](COMPETITORS.md) | [结论先行](COMPETITORS.md#0-结论先行)、[训练端期望的数据集格式](COMPETITORS.md#2-训练端期望的数据集格式) |
+| Where things stand now, and what comes next | [STATUS.md](STATUS.md) | [Questions being tested](STATUS.md#questions-being-tested), [Next steps](STATUS.md#next-steps), [Where the files are](STATUS.md#where-the-files-are) |
+| Goals, direction and standards up to the first release | [ROADMAP.md](ROADMAP.md) | [Direction](ROADMAP.md#direction), [Labeling interface](ROADMAP.md#labeling-interface), [First release standard](ROADMAP.md#first-release-standard) |
+| Similar tools, and what they lack | [COMPETITORS.md](COMPETITORS.md) | [Bottom line first](COMPETITORS.md#0-bottom-line-first), [Dataset format expected by training](COMPETITORS.md#2-dataset-format-expected-by-training) |
 
-## 用法与原理
+## Usage and how it works
 
-| 想知道什么 | 读哪份 | 主要小节 |
+| What you want to know | Read | Main sections |
 | --- | --- | --- |
-| 命令怎么敲 | [USAGE.md](USAGE.md) | [处理新的一集](USAGE.md#处理新的一集)、[标注与修正界面](USAGE.md#标注与修正界面)、[分组、打分、导出](USAGE.md#分组打分导出)、[对照实验](USAGE.md#对照实验) |
-| 东西怎么运转、名词什么意思 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [名词表](HOW_IT_WORKS.md#名词表)、[五步流程](HOW_IT_WORKS.md#五步流程)、[标注与修正界面](HOW_IT_WORKS.md#标注与修正界面)、[打分怎么算](HOW_IT_WORKS.md#打分怎么算)、[数据文件](HOW_IT_WORKS.md#数据文件) |
-| 依赖、模型、运行环境 | [TOOLS.md](TOOLS.md) | |
-| 人工标签文件 | [annotations/README.md](../annotations/README.md) | |
+| How to type the commands | [USAGE.md](USAGE.md) | [Processing a new episode](USAGE.md#processing-a-new-episode), [Labeling and correction interface](USAGE.md#labeling-and-correction-interface), [Grouping, scoring, export](USAGE.md#grouping-scoring-export), [Comparison experiments](USAGE.md#comparison-experiments) |
+| How things work, and what the terms mean | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [Glossary](HOW_IT_WORKS.md#glossary), [Five-step flow](HOW_IT_WORKS.md#five-step-flow), [Labeling and correction interface](HOW_IT_WORKS.md#labeling-and-correction-interface), [How scoring works](HOW_IT_WORKS.md#how-scoring-works), [Data files](HOW_IT_WORKS.md#data-files) |
+| Dependencies, models, runtime environment | [TOOLS.md](TOOLS.md) | |
+| Manual label files | [annotations/README.md](../annotations/README.md) | |
 
-## 结论与证据
+## Conclusions and evidence
 
-| 想知道什么 | 读哪份 | 主要小节 |
+| What you want to know | Read | Main sections |
 | --- | --- | --- |
-| 哪些做法已经定了、哪些路已经排除 | [DECISIONS.md](DECISIONS.md) | [已经定下的](DECISIONS.md#已经定下的)、[已经排除的](DECISIONS.md#已经排除的) |
-| 做事的规矩，以及每条吃过什么亏 | [HISTORY.md](HISTORY.md) | [打分](HISTORY.md#打分)、[调参数](HISTORY.md#调参数)、[标注](HISTORY.md#标注)、[保留与删除](HISTORY.md#保留与删除) |
-| 实验做了什么、数字是多少 | [EXPERIMENTS.md](EXPERIMENTS.md) | 开头有按结论排的目录 |
+| Which approaches are settled, and which paths were ruled out | [DECISIONS.md](DECISIONS.md) | [Settled](DECISIONS.md#settled), [Ruled out](DECISIONS.md#ruled-out) |
+| Working rules, and the mistake behind each one | [HISTORY.md](HISTORY.md) | [Scoring](HISTORY.md#scoring), [Tuning parameters](HISTORY.md#tuning-parameters), [Labeling](HISTORY.md#labeling), [Keeping and deleting](HISTORY.md#keeping-and-deleting) |
+| What experiments were done, and the numbers | [EXPERIMENTS.md](EXPERIMENTS.md) | Starts with a table of contents sorted by conclusion |
 
-## 每份管什么
+## What each doc covers
 
-一件事只写在一处，别处只放链接。
+One fact is written in one place only. Elsewhere, only a link.
 
-| 文档 | 只写 | 不写 |
+| Doc | Only covers | Does not cover |
 | --- | --- | --- |
-| STATUS | 当前数字、正在检验的问题、下一步、当前有效的文件 | 已定下的做法、实验过程、远期路线 |
-| ROADMAP | 初版的目标、用户、方向、界面设计、发布标准和发布方式 | 眼前的下一步、实验数字 |
-| COMPETITORS | 同类工具、训练端格式、调研日期和没核实的部分 | 我们自己的计划 |
-| USAGE | 命令和参数 | 为什么这样选 |
-| HOW_IT_WORKS | 名词、流程、数据格式、打分的算法 | 规矩、实验数字 |
-| DECISIONS | 已定下和已排除的技术选择，各一句理由加链接 | 数字细节、还没检验完的做法 |
-| HISTORY | 做事的规矩，以及定下它的那次教训；清理记录 | 具体选了哪个模型、哪种切法 |
-| EXPERIMENTS | 做完的实验和数字 | 计划、规矩 |
-| TOOLS | 依赖和模型是什么、怎么接进来 | 谁好谁坏 |
+| STATUS | Current numbers, questions being tested, next steps, files in use now | Settled approaches, experiment process, long-term route |
+| ROADMAP | Goals, users, direction, interface design, release standards and how to release, all for the first release | Next steps for now, experiment numbers |
+| COMPETITORS | Similar tools, training-side formats, survey date, and what was not verified | Our own plans |
+| USAGE | Commands and options | Why these were chosen |
+| HOW_IT_WORKS | Terms, flow, data formats, the scoring method | Rules, experiment numbers |
+| DECISIONS | Settled and ruled-out technical choices, each with one reason and a link | Numeric details, approaches not fully tested yet |
+| HISTORY | Working rules and the lesson behind each one; cleanup records | Which model or cutting method was picked |
+| EXPERIMENTS | Finished experiments and their numbers | Plans, rules |
+| TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
 
-维护时：眼前的计划变了改 STATUS，路线变了改 ROADMAP；做完一个实验，数字进 EXPERIMENTS，由此定下的做法进 DECISIONS；被推翻的做法直接改掉或移进「已经排除的」，不留成流水账。新加一份文档，在本页对应的小节加一行；某一类超过 8 份，就拆出它自己的索引页。改完文档跑一遍 `lychee --offline --no-progress CLAUDE.md docs`，修好断掉的链接；去掉 `--offline` 会连网页链接一起查。
+When maintaining: if the plan for now changes, change STATUS. If the route changes, change ROADMAP. When an experiment is done, its numbers go into EXPERIMENTS, and any approach it settles goes into DECISIONS. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
 
-## 怎么写
+## How to write
 
-用朴素易懂的话，不自造简称、不用行话。借来的指标名第一次出现时用一句话说清它衡量什么，统一收在[名词表](HOW_IT_WORKS.md#名词表)。已测事实、解释性猜想和还没做的计划要分开写。
+Use plain, easy words. Do not invent abbreviations, and do not use jargon. The first time a borrowed metric name appears, explain in one sentence what it measures. All such terms are collected in the [glossary](HOW_IT_WORKS.md#glossary). Measured facts, guesses that explain them, and plans not yet carried out must be written separately.

@@ -1,13 +1,19 @@
-"""导出时给台词换一份文字：片段照旧按切片段的那份字幕切，文字从另配的字幕里取。
+"""When exporting, swap the text of each dialogue line. Clips are still cut by the subtitles they
+were cut with, but the text is taken from separately supplied subtitles.
 
-用途是中文字幕切片段、日文字幕给文字，训练日语模型要的是日语原文。两份字幕的分行和
-时间都不一样，所以先量出另配的字幕相对音轨差多少秒，再一条片段一条片段地找它的台词，
-找不全的就不导出，记下原因。实测见 docs/EXPERIMENTS.md 的「日文台词」。
+The use case: Chinese subtitles are used to cut the clips, and Japanese subtitles supply the text,
+because training a Japanese model needs the original Japanese. The two subtitle files have
+different line breaks and times. So first measure how many seconds the separate subtitles must be
+shifted to line up with the audio. Then find the dialogue for each clip, one clip at a time. A clip
+whose dialogue cannot be found in full is not exported, and the reason is recorded. Measurements
+are in docs/EXPERIMENTS.md, section "Japanese dialogue".
 
-日文字幕常见的写法，这里都照顾到了：
-- 一个字幕条目里的几行常常是两个人各说一句，所以拆成行，条目的时间按字数分给各行。
-- 行首的（名字）是画外音标出说话人，拿来认出混进来的别人的话，正文里去掉。
-- 其余括号里的是声音说明，比如（歓声），去掉。
+Common patterns in Japanese subtitles are handled here:
+- Several lines in one subtitle entry are often two people each saying one sentence. So the entry
+  is split into lines, and its time is shared among the lines by character count.
+- A speaker tag such as (Name) at the start of a line names the speaker. It is used to spot other
+  people's lines that got mixed in, and it is removed from the text.
+- Other brackets hold sound notes, such as （歓声）, and they are removed.
 """
 
 from __future__ import annotations
@@ -18,32 +24,42 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-MIN_AGREEMENT = 0.6
-"""对上之后两份字幕显示时间的重合度（交集除以并集）至少这么多，否则多半不是这一集的字幕。
+from avs.language import say
 
-第 1 至 3 集上，四个来源的日文字幕对中文字幕在 0.67 到 0.78 之间，拿错成下一集的只有 0.50 左右。"""
+MIN_AGREEMENT = 0.6
+"""After matching, the two subtitle files must agree on display times (overlap divided by union) by
+at least this much. Otherwise they probably are not the subtitles for this episode.
+
+In episodes 1 to 3, the four sources of Japanese subtitles scored between 0.67 and 0.78 against the
+Chinese subtitles. A wrong match to the next episode scored only about 0.50."""
 
 MIN_MATCHED = 0.95
-"""对上之后至少这么多片段要碰得到台词。第 1 至 3 集是 99% 以上，拿错成下一集也有 83% 到 88%：
-台词密的地方随便错开都能碰到几行，所以这一道只能拦明显的错，主要靠重合度。"""
+"""After matching, at least this share of clips must touch some dialogue. In episodes 1 to 3 it was
+99% or more. A wrong match to the next episode still got 83% to 88%, because where dialogue is
+dense, even a shifted match touches a few lines. So this check only catches obvious errors. The
+overlap score does most of the work."""
 
 TOUCH = 0.1
-"""一行和片段重叠超过这么多秒才算碰到。"""
+"""A line counts as touching a clip only if they overlap by more than this many seconds."""
 
 INSIDE = 0.7
-"""碰到的每一行至少这么多落在片段里。"""
+"""At least this share of each touching line must fall inside the clip."""
 
 SPARE = 0.8
-"""字幕比说话多显示一会儿是常事：一行两头各伸出片段不到这么多秒，也算整行在里面。"""
+"""Subtitles often stay on screen a little longer than the speech. If a line sticks out past the
+clip at either end by less than this many seconds, the whole line still counts as inside."""
 
 COVER = 0.5
-"""碰到的行合起来至少盖住片段这么多，否则片段里有一段话没有文字。"""
+"""The touching lines together must cover at least this share of the clip. Otherwise part of the
+clip has no text."""
 
 MIXED = 0.2
-"""标了别人名字的行和片段重叠超过这么多秒，就是片段里混着别人的话。"""
+"""A line tagged with someone else's name that overlaps the clip by more than this many seconds
+means someone else's speech is mixed into the clip."""
 
 OWN_TAG_SHARE = 0.5
-"""一个角色的片段碰到的带名字的行里，同一个名字要占到这么多，才认它是这个角色在字幕里的名字。"""
+"""For a character's clips, one name must make up at least this share of the named lines they
+touch. Only then is that name accepted as the character's name in the subtitles."""
 
 _TAG = re.compile(r"^[（(]([^）)]*)[）)]")
 _NOTE = re.compile(r"[（(][^）)]*[）)]")
@@ -55,11 +71,12 @@ class TextLine:
     end: float
     text: str
     speaker: str
-    """行首（名字）里的名字，没有就是空的。"""
+    """The name in the speaker tag at the start of the line. Empty if there is none."""
 
 
 def load_text_lines(path: Path) -> list[TextLine]:
-    """读 ASS 或 SRT，拆成行，去掉说话人标记和声音说明，按时间排好。时间是字幕自己的。"""
+    """Read an ASS or SRT file, split it into lines, remove speaker tags and sound notes, and sort
+    by time. The times are the subtitle file's own."""
     import pysubs2
 
     lines: list[TextLine] = []
@@ -91,10 +108,13 @@ def shifted(lines: list[TextLine], offset: float) -> list[TextLine]:
 def measure_offset(
     lines: list[TextLine], cut_lines: list[tuple[float, float]]
 ) -> tuple[float, float]:
-    """另配的字幕要加多少秒才对上音轨。返回（偏移, 重合度）。
+    """How many seconds the separate subtitles must be shifted to line up with the audio. Returns
+    (offset, overlap score).
 
-    `cut_lines` 是切片段那份字幕的行，已经换算到音轨时间。两份字幕说的是同一串台词，
-    显示时间大体一样，所以拿它们互相比，和 `find_offset` 拿字幕比语音检测是同一个量法。
+    `cut_lines` are the lines of the subtitles used for cutting, already converted to audio-track
+    time. Both subtitle files carry the same dialogue, with roughly the same display times. So they
+    are compared with each other, using the same method that `find_offset` uses to compare
+    subtitles with speech detection.
     """
     from avs.stages.subtitle import find_offset
 
@@ -113,8 +133,9 @@ def touching(lines: list[TextLine], start: float, end: float) -> list[TextLine]:
 
 
 def own_tag(hits: Iterable[TextLine]) -> str | None:
-    """一个角色在字幕里的名字。`hits` 是这个角色所有片段碰到的行；其中带名字的行里最常见的
-    那个名字，占不到 `OWN_TAG_SHARE` 就是 None。"""
+    """The name this character has in the subtitles. `hits` are the lines touched by all of this
+    character's clips. If the most common name among the named lines makes up less than
+    `OWN_TAG_SHARE`, the result is None."""
     tags = Counter(x.speaker for x in hits)
     tags.pop("", None)
     if not tags:
@@ -126,29 +147,31 @@ def own_tag(hits: Iterable[TextLine]) -> str | None:
 def match(
     lines: list[TextLine], start: float, end: float, tag: str | None = None
 ) -> tuple[str, str | None]:
-    """片段的台词文字和不收它的原因。原因是 None 才算对上了。
+    """The clip's dialogue text, and the reason it is not accepted. A reason of None means it
+    matched.
 
-    `tag` 是这个角色在字幕里的名字（见 `own_tag`）。知道时，标了别的名字的行就是别人的话；
-    不知道时，只有碰到的行标了两个以上不同名字才算混进了别人。
+    `tag` is this character's name in the subtitles (see `own_tag`). When it is known, lines tagged
+    with another name are someone else's speech. When it is not known, lines count as someone
+    else's only if the touched lines carry two or more different names.
     """
     hits = touching(lines, start, end)
     named = {x.speaker for x in hits if x.speaker}
     others = [x for x in hits if x.speaker and x.speaker != tag] if tag else []
     if any(_shared(x, start, end) > MIXED for x in others) or (not tag and len(named) > 1):
-        return "", "台词里有别人的话"
+        return "", say("台词里有别人的话", "someone else's line is mixed in")
     hits = [x for x in hits if x not in others]
     texts: list[str] = []
     for x in hits:
-        if x.text not in texts:  # 同一句常被重复显示
+        if x.text not in texts:  # The same line is often shown twice.
             texts.append(x.text)
     text = " ".join(texts)
     if not hits:
-        return "", "没有对上的台词"
+        return "", say("没有对上的台词", "no matching line")
     for x in hits:
         inside = _shared(x, start, end) / (x.end - x.start)
         if inside < INSIDE and max(start - x.start, x.end - end) > SPARE:
-            return text, "有一行台词只对上一部分"
+            return text, say("有一行台词只对上一部分", "a line only partly matches")
     covered = sum(_shared(x, start, end) for x in hits) / (end - start)
     if covered < COVER:
-        return text, "台词只盖住片段一小部分"
+        return text, say("台词只盖住片段一小部分", "the lines cover only a small part of the clip")
     return text, None

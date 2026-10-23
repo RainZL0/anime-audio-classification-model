@@ -1,1 +1,4 @@
-"""标注与修正界面：本地服务加一个网页，改一条标签就重训一次。"""
+"""Labeling and correction interface: a local server plus a web page.
+
+Each label change retrains the model once.
+"""

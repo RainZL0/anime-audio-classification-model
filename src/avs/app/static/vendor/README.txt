@@ -1,2 +1,2 @@
-preact-htm.js 是 htm 3.1.1 自带的 preact/standalone.module.js，里面打包了 Preact（MIT 许可）和 htm（Apache-2.0 许可，见 htm-LICENSE.txt）。
-放进仓库是为了不需要 Node 和构建步骤：装好 Python 依赖就能打开界面。升级时用 npm pack htm 取同一个文件替换。
+preact-htm.js is the preact/standalone.module.js that comes with htm 3.1.1. It bundles Preact (MIT license) and htm (Apache-2.0 license, see htm-LICENSE.txt).
+It is kept in the repo so that no Node and no build step are needed: install the Python dependencies and the interface opens. To upgrade, run npm pack htm to get the same file and replace this one with it.

@@ -1,7 +1,7 @@
-# 统一仓库内为 LF，检出时由 core.autocrlf 决定工作区形态
+# Line endings are LF in the repo. On checkout, core.autocrlf decides the form in the working tree.
 * text=auto eol=lf
 
-# 二进制
+# Binary files
 *.wav binary
 *.flac binary
 *.mp3 binary
@@ -12,5 +12,5 @@
 *.onnx binary
 *.parquet binary
 
-# 锁文件不参与 diff 展开
+# Lock file: do not expand it in diffs
 uv.lock -diff linguist-generated

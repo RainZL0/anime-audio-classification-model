@@ -1,93 +1,93 @@
-# 命令
+# Commands
 
-全部命令只写在这里。每一步内部怎么运转见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md)。`uv run avs --help` 列出全部命令，`uv run avs <命令> --help` 列出参数。
+All the commands are listed only here. For how each step works inside, see [HOW_IT_WORKS.md](HOW_IT_WORKS.md). `uv run avs --help` lists all the commands, and `uv run avs <command> --help` lists the options of one command.
 
-| 小节 | 做什么 |
+| Section | What it does |
 | --- | --- |
-| [装好](#装好) | 第一次运行前 |
-| [处理新的一集](#处理新的一集) | 分离人声、切片段、算声纹、核对覆盖 |
-| [补片段](#补片段) | 把漏掉的对白行补进旧的片段表 |
-| [标注与修正界面](#标注与修正界面) | 日常主流程：标几句、让机器猜、改它猜错的、导出 |
-| [标注](#标注) | 盲标检验集用的旧页面 |
-| [分组、打分、导出](#分组打分导出) | 不经界面，按机器分组打分、导出；留作对照 |
-| [对照实验](#对照实验) | 扫分界线、量漂移、比分不分得开、近邻诊断 |
-| [检查](#检查) | 提交前跑的检查 |
+| [Set up](#set-up) | Before the first run |
+| [Processing a new episode](#processing-a-new-episode) | Separate voices, cut clips, compute voiceprints, check coverage |
+| [Extending clips](#extending-clips) | Add the dialogue lines that were missed into an old clip table |
+| [Labeling and correction interface](#labeling-and-correction-interface) | The daily main workflow: label a few lines, let the machine guess, fix its wrong guesses, export |
+| [Labeling](#labeling) | The old page used for blind labeling of the held-out test set |
+| [Grouping, scoring, export](#grouping-scoring-export) | Group, score and export by machine, without the interface. Kept for comparison |
+| [Comparison experiments](#comparison-experiments) | Sweep thresholds, measure drift, check whether pairs can be told apart, nearest-neighbor diagnosis |
+| [Checks](#checks) | Checks to run before committing |
 
-## 装好
+## Set up
 
-需要 FFmpeg 在 PATH 里。GPU 环境和各模型说明见 [TOOLS.md](TOOLS.md)。
+You need FFmpeg on your `PATH`. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
 
 ```powershell
 uv sync --locked
 uv run avs doctor
 ```
 
-`doctor` 逐项列出显卡、FFmpeg、抠人声模型、Hugging Face 令牌和磁盘空间，标「缺」的要先处理，标「可选」的不处理也能用。
+`doctor` lists each item in turn: the graphics card, FFmpeg, the voice separation model, the Hugging Face token, and the free disk space. Items marked "missing" must be fixed first. Items marked "optional" can be left alone and the tool still works.
 
-## 处理新的一集
+## Processing a new episode
 
 ```powershell
 uv run avs add runs "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
 ```
 
-`add` 一条命令做完：抽音轨、抠人声、按字幕切片段，再算界面要用的三个声纹。集名省略时取工作区里下一个没用过的 `epNN`，也可以用 `--name` 指定。给了 `--text-subs 日文字幕` 就顺手配上导出用的台词字幕（同下面的 `set-text-subtitles`）。中途出错（比如显存不够），改好后再跑同一条命令，从断的地方接着做：已经切好的片段和算好的声纹不重算。切片段那一步自己失败时，建了一半的目录会删掉。
+`add` does everything in one command: it extracts the audio track, separates the voices, cuts clips along the subtitle lines, and then computes the three voiceprints that the interface needs. If the episode name is left out, it uses the next unused `epNN` in the workspace. You can also name it with `--name`. If you give `--text-subs <Japanese subtitle file>`, the dialogue text used for export is attached in the same step (the same as `set-text-subtitles` below). If the run stops halfway (for example, because there is not enough GPU memory), fix the problem and run the same command again. It picks up where it stopped: clips that are already cut and voiceprints that are already computed are not recomputed. If the clip-cutting step itself fails, the half-built folder is deleted.
 
-视频和字幕都必需。音轨默认从视频里抽；另有同一时间线的无损音轨就用 `--audio` 给，时长和视频差超过 0.5 秒会拒绝。`--device` 默认 `auto`：有 NVIDIA 显卡就用显卡，没有就用 CPU，CPU 上抠人声改用全精度。`prepare` 和 `embed` 的 `--device` 也一样。
+Both the video and the subtitles are required. The audio track is extracted from the video by default. If you have a lossless audio track on the same timeline, give it with `--audio`. If its length differs from the video by more than 0.5 seconds, it is refused. `--device` defaults to `auto`: it uses the NVIDIA GPU if there is one, and otherwise the CPU. On the CPU, voice separation switches to full precision. The `--device` option of `prepare` and `embed` works the same way.
 
-**建议直接给 `--offset`。** 同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测。不给时要用 pyannote 量偏移，它要求先在 [模型页面](https://huggingface.co/pyannote/speaker-diarization-community-1) 接受使用条款，再用 `uv run hf auth login` 登录 Hugging Face；没有令牌时 `add` 和 `prepare` 一开始就报错，不会做到一半才停。
+**Giving `--offset` directly is recommended.** For the same source and the same subtitle group, the offset is stable (measured on episodes 1 to 3: -0.95, -0.96, -0.96). When it is given, speech detection does not run at all. If it is not given, the offset is measured with pyannote. That requires you to accept the terms on the [model page](https://huggingface.co/pyannote/speaker-diarization-community-1) first, and then to log in to Hugging Face with `uv run hf auth login`. Without a token, `add` and `prepare` report the error right at the start. They do not stop halfway through.
 
-想分步做时，`add` 等于下面几条：
+If you prefer to run the steps one at a time, `add` is equal to the following:
 
 ```powershell
-uv run avs prepare "视频" --subs "字幕" --name ep08 --out runs/episodes/ep08 --offset -0.95
+uv run avs prepare "video" --subs "subtitles" --name ep08 --out runs/episodes/ep08 --offset -0.95
 uv run avs embed runs/episodes/ep08 --model anime-va
 uv run avs embed runs/episodes/ep08 --model anime-char
 uv run avs embed runs/episodes/ep08 --model redimnet2-b6
 ```
 
-切完可以核对覆盖：
+After cutting, check the coverage:
 
 ```powershell
 uv run avs coverage runs/episodes/ep08 --subtitle "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --out runs/coverage/ep08
 ```
 
-`coverage` 验收切得对不对：「有片段的对白行」应该等于对白行总数（第 3 集是 375/375）。它顺便把没有片段的台词切成音频，放在 `below_floor`（行本身太短）和 `no_speech_found`（行够长却没切出）两个目录，另出 `lines.txt` 和 `report.json`。
+`coverage` checks whether the cutting is right. The number of dialogue lines that have a clip should equal the total number of dialogue lines (episode 3: 375 of 375). It also cuts the dialogue that has no clip into audio files. These go into two folders, `below_floor` (the line itself is too short) and `no_speech_found` (the line is long enough, but no clip was cut from it). It also writes `lines.txt` and `report.json`.
 
-## 补片段
+## Extending clips
 
 ```powershell
 uv run avs extend runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass"
 uv run avs embed runs/episodes/ep02
 ```
 
-把字幕里没有对应片段的对白行补进片段表。只增不改，已有标签照旧有效。片段表变了声纹缓存就失效，所以要重跑 `embed`。补进来的解说、欢呼不在这里挑，标注时由人打标签。
+Adds the dialogue lines in the subtitles that have no matching clip into the clip table. It only adds and never changes, so existing labels stay valid. The voiceprint cache is invalid once the clip table changes, so `embed` must be run again. Narration and cheers that get added are not filtered here. A person labels them while labeling.
 
-## 标注与修正界面
+## Labeling and correction interface
 
-工作区是一个目录，下面的 `episodes/` 放各集（`add` 或 `prepare` 的输出），标签自动存在 `labels/`。本仓库用 `runs/` 当工作区。
+The workspace is a folder. Its `episodes/` subfolder holds the episodes (the output of `add` or `prepare`), and labels are saved automatically in `labels/`. This repo uses `runs/` as the workspace.
 
 ```powershell
 uv run avs app runs
 ```
 
-在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。网址 `#` 后面记着当前的视图、集、角色和选中的句子，刷新后回到原处。声纹没算全的集（多半是 `add` 中途断了）不载入，启动时在命令行里列出来，其余各集照常能用。工作区里一集都没有时，页面上给出可以直接复制的 `add` 命令。
+Open `http://127.0.0.1:8765` in your browser. `--port` changes the port. `--no-open` stops the browser from opening by itself. `--model` can be repeated, to use only the named voiceprint models. The part of the address after `#` records the current view, episode, character and selected line, so after a refresh you return to the same spot. Episodes whose voiceprints are not all computed (usually because `add` was interrupted) are not loaded. They are listed on the command line at startup, and the other episodes work as usual. When the workspace has no episodes at all, the page shows an `add` command that you can copy.
 
-只给要收集的人（目标角色）起名字，别的人一律按 Q 标「其他」，拿不准是不是目标角色的也标「其他」。几个人同时说话、里面没有目标角色的，欢呼、音效这类不是说话的，也标「其他」。目标角色自己的笑声、叹气算 TA 的声音，标成 TA。每个目标角色有两个选项，一次选好：数字键是干净的 TA，Shift + 同一个数字是「TA·质量低」，给背景音太重或有人同时出声的，不拿来认人，导出时跳过、写进 `rejected.tsv`。两个目标角色时底部一共 5 个选项（再加「其他」）；左边机器猜测的每个目标角色旁边也有「质量低」按钮。改标成干净的 TA 或「其他」时，「质量低」自动去掉。目标角色可以有好几个，在「角色」视图里随时加减，加减时已有的标签怎么算见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。
+Give names only to the people you want to collect (the target characters). Label everyone else "Other" with the Q key, including anyone you are not sure is a target. Clips where several people speak and none of them is a target are also labeled "Other", and so are clips that are not speech, such as cheers and sound effects. The target character's own laughs and sighs count as the target's voice, so label them as the target. Each target character has two options, chosen in one go. The number key gives the clean target. Shift plus the same number gives "target, low quality". Use the low-quality option for clips with heavy background sound or with several people talking at once. Those clips are not used to recognize the character. They are skipped on export and written to `rejected.tsv`. With two target characters, the bottom bar has 5 options in all: four for the two targets (clean and low quality for each), plus "Other". Next to each target character's guess on the left there is also a "Low quality" button. When you change a clip to the clean target or to "Other", "Low quality" is removed automatically. There can be several target characters. You can add or remove them at any time in the Characters view. For how existing labels are handled when you add or remove a target, see [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface).
 
-- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，一次标一整组：点已有目标角色的头像就标成 TA，「是新角色」定成一个新的目标角色（名字可以不填），「都是其他」标成「其他」。也可以用按键只标选中的那一句；标过的句子留在组里、显示标成了什么，组按钮只管还没标的，按 Z 撤销后原样回来。
-- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的名次，默认「只听人声」：画面照放、换成分离出的人声，想听原声点「画面原声」；旁边可以选 1 到 2 倍速，参考音也一样快。这两样都记得上次的选择，刷新不变；空格或再点一下选中的那句会重播。看不出是谁时按 L，这句临时前后各多放 5 秒，再按 15 秒，再按回到平常，换一句自动回到平常。目标角色附一条参考音，Enter 接受第一名，数字键选底部的目标角色，Q 标「其他」，`/` 搜索或新建角色。F 只看要人处理的。短于 1 秒、前后 0.5 秒内没有别的台词的短句标成「太短，默认跳过」，不算要处理的，「整集」里也默认不显示，点「显示短句」才列出来，想标也能标。
-- **角色**（O）：左边上面是目标角色，下面是不再作为目标、但还有标签的角色，最后一行是「其他」。每行右边是确认过几句、机器归给几句，下面是确认过的台词累计多长。点开一个角色，先列机器归给 TA 的，从最没把握的开始，可以连着播；听到不对的，直接标成对的人或按 Q 标「其他」，它就离开这一列，听完 Shift+Enter 确认其余。再往下是「可能漏掉的」：机器没归给 TA、但听起来有可能是的，从最像的开始，和别处一样标。这里也能改名、合并角色、设头像、设为或不再作为目标角色。「其他」也能点开，每句旁边标着机器觉得最像哪个目标角色、概率多少；确认过的从最像目标角色的排起，标错的先看到。
-- **导出**（E）：选角色和格式（GPT-SoVITS、Style-Bert-VITS2 或按角色分文件夹），可以只导人确认过的，也可以带上机器有把握的。切片段的字幕是中文译文、要训练日语模型时，「台词文字从哪来」选「每集另配的台词字幕」，在下面每集贴上日文字幕的路径，点「对齐并配上」；也可以用下面的 `set-text-subtitles` 命令配。配不上台词的片段不导出，明细在导出目录的 `rejected.tsv`。
+- **Groups (G)**: start here when there are no labels yet. The machine puts clips that sound alike into one group, so you can label a whole group at once. Click the avatar of an existing target character to label the group as that character. "New character" makes the group a new target character (the name can be left blank). The "Other" button labels the whole group "Other". You can also use the keys to label only the selected line. A labeled line stays in the group and shows what it was labeled as. The group buttons only act on lines that are not labeled yet. Undoing with Z restores the group as it was.
+- **Scenes (S)**: lists all the lines by episode and scene, in order. The left side shows the picture and the machine's ranking of its guesses. "Vocals only" is on by default: the picture plays, but the sound switches to the separated vocals. To hear the original sound, click "Original sound". Beside it you can choose 1x or 2x speed, and the reference audio plays at the same speed. Both settings are remembered, so they stay after a refresh. Pressing Space, or clicking the selected line again, replays it. When you cannot tell who is speaking, press L to play the line with 5 seconds of extra time on each side (this is "More context"). Press L again for 15 seconds, and again to go back to normal. Moving to another line goes back to normal automatically. Each target character has a reference sound. Enter accepts the first guess. The number keys pick a target character from the bottom bar. Q labels "Other". `/` searches for a character or creates one. F shows only "Only to do". Lines shorter than 1 second, with no other dialogue within 0.5 seconds on either side, are marked "too short, skipped by default". They do not count as work to do, and they are hidden by default in "Whole episode". Click "Show short lines" to list them. You can still label them if you want.
+- **Characters (O)**: at the top of the left side are the target characters. Below them are characters that are no longer targets but still have labels. The last row is "Other". Each row shows, on the right, how many lines have been confirmed, how many the machine assigned to it, and the total length of the confirmed dialogue. Open a character to see first the lines the machine assigned to it, starting with the least confident. You can play them one after another. When you hear a wrong one, label it as the right person, or press Q for "Other", and it leaves this list. After listening to the rest, press Shift+Enter ("Confirm the other N lines") to confirm the remaining lines. Below that is "Maybe missed": lines the machine did not assign to this character, but that might be it. They start with the most similar, and are labeled like any other line. Here you can also rename characters, merge them, set an avatar, and set or unset a target character. "Other" can also be opened. Each line there shows which target character the machine thinks is closest, and with what probability. Confirmed lines are sorted starting from those closest to a target, so wrong labels show up first.
+- **Export (E)**: choose the character and the format (GPT-SoVITS, Style-Bert-VITS2, or one folder per character). You can export only the lines that a person has confirmed, or also include the lines the machine is confident about. When the subtitles used for cutting are Chinese translations and you want to train a Japanese model, set "Where the text comes from" to "Separate text subtitles for each episode". Then paste the path of each episode's Japanese subtitle file below, and click "Align and attach". You can also attach them with the `set-text-subtitles` command below. Clips whose dialogue text cannot be matched are not exported. The details are in `rejected.tsv` in the export folder.
 
-认人主要靠头像，名字可以不起：
+Identifying people mainly relies on avatars, and names can be left blank:
 
-- N 把当前这句标成一个新角色，先叫「角色 1」「角色 2」这样的临时名字，以后在「角色」视图里点「起名字」再补。
-- 没截头像的角色显示一张按编号生成的图（底色、形状、花纹三样一起变），不同角色一眼分得开。
-- 截头像：新建角色时有画面就会直接弹出来；以后点头像就能截，左边已确认那一栏和「角色」视图顶部的头像都行。拖方框挪位置，拖右下角或滚轮缩放，滑块换一帧，Enter 保存。
+- Press N to label the current line as a new character. It first gets a temporary name such as "Character 1" or "Character 2". Later, in the Characters view, click "Name it" to fill in the real name.
+- A character with no avatar shows a picture generated from its number. The background color, shape and pattern all change together, so different characters are easy to tell apart at a glance.
+- Cropping an avatar: when a new character is created and there is a picture, the cropper pops up straight away. Later, click the avatar to crop it. You can do this from the confirmed lines on the left, or from the avatar at the top of the Characters view. Drag the box to move it. Drag the bottom-right corner or use the scroll wheel to zoom. Use the slider to change the frame, and press Enter to save.
 
-每次标注立刻落盘、立刻重训。Backspace（或 Delete）清掉当前这句的标签，回到机器的猜测；已确认的句子左边也有「清掉标签」按钮。Z 是撤回上一步，一直往回撤，新建、改名、合并角色也跟着撤回，头像和设不设目标角色不在撤销里。全部快捷键按 `?` 查看。页面默认白天配色，顶栏右上角可以切到夜间，选择记在浏览器里。
+Each label is saved to disk and the model is retrained right away. Backspace (or Delete) clears the label of the current line and returns it to the machine's guess. Confirmed lines also have a "Clear label" button on the left. Z undoes the last step, and you can keep pressing it to go further back. Creating, renaming and merging characters are also undone. Avatars and setting or unsetting a target character are not part of undo. Press `?` to see all the shortcuts. The page uses a light color scheme by default. You can switch to dark mode at the top right. Next to it, the EN / 中文 button switches the page between English and Chinese; the first time, the page follows the browser's language. Messages from the server, such as errors, follow the page language. Both choices are remembered in the browser.
 
-旧的集补信息用的命令：
+Commands for filling in information for older episodes:
 
 ```powershell
 uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
@@ -97,35 +97,35 @@ uv run avs import-labels runs --annotation annotations/ep01-full.json --annotati
 uv run avs migrate-targets runs --target teo
 ```
 
-- `set-video`：给 `prepare` 改成必需视频之前处理的集记上视频。时长和音轨对不上就拒绝。
-- `set-subtitles`：给没记字幕的集补上字幕，偏移从已有片段推出来，按时间重叠找台词文字。
-- `set-text-subtitles`：给一集另配一份字幕（ASS 或 SRT），导出时台词文字从它取。偏移自动量，和切片段的字幕对不上就拒绝。来源以 Netflix、Amazon 的为好，电视台录的字幕带 🎤 之类的符号，不会被去掉。
-- `import-labels`：把旧的人工归档一次导进标签记录，只在记录还空着时可用，导入不能撤销。给了 `--target` 就接着做下面的 `migrate-targets`。
-- `migrate-targets`：只留下给定的目标角色（可重复给），其余角色的标签都改成「其他」。改之前把 `labels/` 里的标签记录和角色表原样复制到 `labels/archive-日期-时间/`。迁移不能用 Z 撤回，要找回原来的名字就看归档。
+- `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.
+- `set-subtitles`: adds subtitles to an episode that has none recorded. The offset is worked out from the existing clips, and the dialogue text is found by matching the times that overlap.
+- `set-text-subtitles`: attaches a second subtitle file (ASS or SRT) to an episode. On export, the dialogue text is taken from it. The offset is measured automatically. If it does not match the subtitles used for cutting, it is refused. Subtitles from Netflix or Amazon are preferred. Subtitles recorded from TV carry symbols such as 🎤, and these are not removed.
+- `import-labels`: imports the old manual archives into the label records in one go. It can only be used while the label records are still empty. Imports cannot be undone. If you give `--target`, follow it with `migrate-targets` below.
+- `migrate-targets`: keeps only the given target characters (the option can be repeated), and changes the labels of all other characters to "Other". Before changing anything, it copies the label records and the cast table in `labels/` as they are into `labels/archive-date-time/`. A migration cannot be undone with Z. To recover the old names, use the archive.
 
-## 标注
+## Labeling
 
-第 1 至 3 集是用这个旧页面盲标的，它不显示机器的猜测。独立检验取消后，新的集改在修正界面里标，这个页面留着备用。标注的规矩（为什么只认画面、为什么页面不给机器答案）见 [HISTORY.md](HISTORY.md#标注)，归档文件见 [annotations/README.md](../annotations/README.md)。
+Episodes 1 to 3 were blind-labeled with this old page, which does not show the machine's guesses. Now that the held-out test has been cancelled, new episodes are labeled in the correction interface. This page is kept as a backup. The labeling rules (why only the picture counts, and why the page gives no machine answers) are in [HISTORY.md](HISTORY.md#labeling). The archive files are described in [annotations/README.md](../annotations/README.md).
 
 ```powershell
 uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
 ```
 
-对照画面报名字，每条按下就存进人工归档。
+Check each name against the picture. Each press is saved to the manual archive right away.
 
-- `--all`：标这一集全部片段，按时间顺序连着走。不给就随机抽 `--count` 条。片段表后来补进新片段时，再跑一次 `--all` 会把它们以空标签追加到已有归档，已标的不动。
-- `--known`：页面上可点的角色名从哪来，可以重复给。给人工归档时，里面的片段还能在页面上回放；给 `annotations/names.json` 这种只有名字的词表就只有名字。名字按出现条数排序，数字键 1 至 9 对应前九个。
-- `--video`：放当前片段对应的画面，前后各多给 0.5 秒。翻到哪条才用 ffmpeg 切哪条（一段两三秒实测不到半秒），同时预热下一条。统一转成 360p 的 H.264，一集约 46 MB。
+- `--all`: labels all the clips of this episode, going through them in time order. Without it, `--count` clips are picked at random. If new clips are added to the clip table later, running `--all` again appends them to the existing archive with empty labels. Clips that are already labeled are not touched.
+- `--known`: where the clickable character names on the page come from. It can be repeated. If you give a manual archive, the clips in it can be played back on the page. If you give `annotations/names.json`, a list of names only, you get names only. Names are sorted by how many lines they appear in. The number keys 1 to 9 select the first nine.
+- `--video`: plays the picture for the current clip, with 0.5 seconds of extra time on each side. ffmpeg cuts each clip only when you reach it (measured: a 2 to 3 second clip takes less than half a second), and it also pre-cuts the next one. The output is converted to 360p H.264, about 46 MB per episode.
 
-  **视频和音轨必须是同一条时间线。** `data/raw/*.flac` 就是从这些 mp4 里抽的，时长精确一致、波形对齐位移 0 毫秒。换片源前先核对，否则画面会对错人。
+  **The video and the audio track must be on the same timeline.** `data/raw/*.flac` is extracted from these mp4 files. Their lengths match exactly, and the waveform alignment shift is 0 ms. Check this before switching sources, or the picture will show the wrong person.
 
-页面操作：
+Page operations:
 
-- 角色名排成小块，点一下给当前片段打标。特殊标签也成块显示，否则标成「不止一个人」的片段就再也翻不出来复核。
-- 名字右边的数字打开面板，按集和时间列出这个名字下的全部片段：本轮的点一下跳过去，旧归档里的点一下就地试听（用单独的播放器，不打断正在标的那条）。面板里可以改名、整批撤掉标签，也可以把某一条直接拖到另一个名字上改归属。
-- 在筛名字框里敲一个新名字，点「＋ 建这个名字」先建出来再往上拖。没用到的名字和从列表里删掉的名字只影响当前页面，不落盘。
+- Character names are shown as small blocks. Click one to label the current clip. Special labels are also shown as blocks. Otherwise, clips labeled "multiple people" could never be found again for review.
+- Clicking the number to the right of a name opens a panel that lists all the clips under that name, by episode and time. In the current round, clicking one jumps to it. In an old archive, clicking one plays it in place, using a separate player so that the clip being labeled is not interrupted. In the panel you can rename a name, remove labels in bulk, or drag a single clip onto another name to change its owner.
+- Type a new name in the filter box and click "+ Create this name" to create it first, then drag clips onto it. Unused names, and names removed from the list, only affect the current page. They are not saved to disk.
 
-## 分组、打分、导出
+## Grouping, scoring, export
 
 ```powershell
 uv run avs group runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --out runs/groups/uma-next.json
@@ -133,61 +133,61 @@ uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full
 uv run avs export runs/groups/uma-next.json --out out/uma-next
 ```
 
-`group` 的参数：
+Options of `group`:
 
-- `--threshold`：不给就用这个模型自己的默认分界线，并把它打印出来。
-- `--relative`：按池子自己的距离定分界线（见[名词表](HOW_IT_WORKS.md#名词表)）。没有经过独立检验，默认不开，现状见 [STATUS.md](STATUS.md)。
-- `--model`：`anime-va`（默认）、`redimnet2-b6`、`anime-char`、`wespeaker-resnet293`。换模型要重新扫分界线。
-- `--method`：默认 `average`。另有 `single`、`complete`、`mutual_knn`、`two_stage`，都已排除，留着只为复算。
+- `--threshold`: if not given, the model's own default threshold is used, and it is printed.
+- `--relative`: sets the threshold from the pool's own distances (see the [glossary](HOW_IT_WORKS.md#glossary)). It has not been checked on a held-out test, so it is off by default. For the current status, see [STATUS.md](STATUS.md).
+- `--model`: `anime-va` (default), `redimnet2-b6`, `anime-char` or `wespeaker-resnet293`. Changing the model means sweeping the threshold again.
+- `--method`: default `average`. The others are `single`, `complete`, `mutual_knn` and `two_stage`. All are ruled out, and kept only for recomputing.
 
-分组文件和导出目录每次用新名字，免得旧音频混进新结果。
+Group files and export folders always get new names, so that old audio does not get mixed into new results.
 
-## 对照实验
+## Comparison experiments
 
-用人工标签挑出来的数字只能算探索，要另找一份没参与过的数据检验。
+Numbers picked out using manual labels only count as exploration. They must be checked on a separate set of data that took no part in choosing them.
 
-**扫分界线，比模型和合并规则：**
+**Sweep thresholds; compare models and merge rules:**
 
 ```powershell
 uv run avs compare runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --model redimnet2-b6 --method average --low 0.25 --high 1.15 --out runs/comparison-next.json
 ```
 
-会先核验各模型覆盖同一批片段。`--low` / `--high` 要按模型的相似度刻度给，默认的 0.20 至 0.90 是给 `redimnet2-b6` 定的，对 `anime-va` 几乎全无意义。
+It first checks that each model covers the same clips. `--low` and `--high` must be given on each model's own similarity scale. The default 0.20 to 0.90 was set for `redimnet2-b6`, and it is almost meaningless for `anime-va`.
 
-**量成绩随片段池变大怎么变：**
+**Measure how scores change as the clip pool grows:**
 
 ```powershell
 uv run avs drift runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --scored ep03 --annotation annotations/ep03-full.json --out runs/drift-next.json --steps 9 --seeds 8
 ```
 
-被打分的那一集始终整集在池子里，只往池子里加别的集的片段。`--steps` 分几档，`--seeds` 每档随机抽几遍。报告并排给固定分界线和按池子定分界线两条线，`--multiplier` 可以试别的松紧。
+The scored episode always stays in the pool in full. Only clips from other episodes are added to the pool. `--steps` sets how many stages there are, and `--seeds` sets how many random draws are made at each stage. The report puts two lines side by side: a fixed threshold, and a threshold set from the pool. `--multiplier` can try other levels of strictness.
 
-**按集留出，把片段直接分到角色名下：**
+**Hold out by episode, and assign clips directly to character names:**
 
 ```powershell
 uv run avs classify-check runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --test ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --model anime-va --model anime-char --model redimnet2-b6 --out runs/classify/next.json
 ```
 
-`--test` 那一集的标签不进训练，只用来打分，其余各集的标签都拿来训练。`--model` 可重复，多个时把声纹拼在一起，各模型的缓存要先用 `avs embed` 算好。报告并排给「最像的一条」「角色平均」「小分类器」三种做法，每份带逐条预测。
+Labels from the `--test` episode are not used for training. They are only used for scoring. Labels from all the other episodes are used for training. `--model` can be repeated. With several models, their voiceprints are joined together. The cache for each model must be computed beforehand with `avs embed`. The report puts three methods side by side: "closest single clip", "character average" and "small classifier". Each one comes with its per-clip predictions.
 
-**只比同一角色和不同角色分不分得开，不做分组：**
+**Compare only how well same-character and different-character pairs separate, without grouping:**
 
 ```powershell
 uv run avs scores runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --norm none --out runs/score-next.json
 ```
 
-报告给排序正确率和相等错误率，按片段时长和是否跨集分层。`--norm` 可重复（`none` / `snorm` / `asnorm`），后两个是分数归一化，已排除。`--window` 读用别的最小音频长度算出的声纹。
+The report gives ranking accuracy and equal error rate, split by clip length and by whether a pair crosses episodes. `--norm` can be repeated (`none`, `snorm` or `asnorm`). The last two are score normalization, which is ruled out. `--window` reads voiceprints computed with a different minimum clip length.
 
-**近邻检索与距离分布：**
+**Nearest-neighbor search and distance distribution:**
 
 ```powershell
 uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --groups runs/groups/uma3.json --out runs/diagnosis-next
 ```
 
-输出报告、全部标签配对的距离，以及 `examples/` 下可试听的错误实例。
+The output is a report, the distances for all label pairs, and error examples under `examples/` that you can listen to.
 
-**已排除路线留下的命令**，只为复算：`avs embed --window`（给短片段补相邻音频，存在 `embeddings/<模型>@w<秒数>`）、`avs references`（少量身份参考）、`avs label-plan`（只标候选改动过的片段）。
+**Commands left over from ruled-out routes**, kept only for recomputing: `avs embed --window` (pads short clips with the neighboring audio, stored in `embeddings/<model>@w<seconds>`), `avs references` (a few identity references), and `avs label-plan` (labels only the clips whose candidate changed).
 
-## 检查
+## Checks
 
-提交前跑的命令列在 [CLAUDE.md](../CLAUDE.md#检查)。类型检查用 [ty](https://github.com/astral-sh/ty)，不在项目依赖里，装在本机：`uv tool install ty`。CI 里固定用 0.0.91。
+The commands to run before committing are listed in [CLAUDE.md](../CLAUDE.md#checks). The type checker is [ty](https://github.com/astral-sh/ty). It is not in the project dependencies, and it is installed on this machine with `uv tool install ty`. CI pins it at version 0.0.91.

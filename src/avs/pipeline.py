@@ -218,6 +218,7 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     对上之后的重合度不到 `MIN_AGREEMENT`；或者不到 `MIN_MATCHED` 的片段碰得到台词。
     """
     from avs.app.workspace import subtitle_lines
+    from avs.language import say
     from avs.stages.text_subtitle import (
         MIN_AGREEMENT,
         MIN_MATCHED,
@@ -229,23 +230,38 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
 
     episode, rows = load_episode(directory)
     if not subtitles.is_file():
-        raise ValueError(f"字幕不存在：{subtitles}")
+        raise ValueError(say(f"字幕不存在：{subtitles}", f"subtitles not found: {subtitles}"))
     cut = [(start, end) for start, end, _ in subtitle_lines(episode)]
     if not cut:
-        raise ValueError(f"{episode['name']} 还没记切片段用的字幕，先用 avs set-subtitles 补上")
+        raise ValueError(
+            say(
+                f"{episode['name']} 还没记切片段用的字幕，先用 avs set-subtitles 补上",
+                f"{episode['name']} has no subtitles recorded for cutting; "
+                "add them with avs set-subtitles",
+            )
+        )
     lines = load_text_lines(subtitles)
     if not lines:
-        raise ValueError(f"{subtitles.name} 里没有台词")
+        raise ValueError(say(f"{subtitles.name} 里没有台词", f"{subtitles.name} has no lines"))
     offset, agreement = measure_offset(lines, cut)
     if agreement < MIN_AGREEMENT:
         raise ValueError(
-            f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
-            f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕"
+            say(
+                f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
+                f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕",
+                f"{subtitles.name} overlaps this episode's subtitles by at most {agreement:.0%}, "
+                f"below {MIN_AGREEMENT:.0%}; it is probably for another episode",
+            )
         )
     moved = shifted(lines, offset)
     matched = sum(bool(touching(moved, r["start"], r["end"])) for r in rows) / len(rows)
     if matched < MIN_MATCHED:
-        raise ValueError(f"只有 {matched:.0%} 的片段碰得到 {subtitles.name} 的台词")
+        raise ValueError(
+            say(
+                f"只有 {matched:.0%} 的片段碰得到 {subtitles.name} 的台词",
+                f"only {matched:.0%} of the clips touch a line in {subtitles.name}",
+            )
+        )
     result = {
         "text_subtitles": str(subtitles.resolve()),
         "text_subtitle_offset": offset,

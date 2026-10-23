@@ -1,70 +1,70 @@
-# 已经定下的做法和已经排除的路
+# Settled approaches and ruled-out paths
 
-这里只列结论，每条一句理由，数字和过程点链接去 [EXPERIMENTS.md](EXPERIMENTS.md)。要推翻其中一条，先拿出新数据，再改这里。还没定下的做法不在这里，正在检验的问题在 [STATUS.md](STATUS.md)。
+This page lists only the conclusions. Each one has a one-sentence reason. Numbers and the process are linked to [EXPERIMENTS.md](EXPERIMENTS.md). To overturn one of these, bring new data first, then change it here. Approaches that are not settled yet are not listed here. The questions still being tested are in [STATUS.md](STATUS.md).
 
-## 已经定下的
+## Settled
 
-**目标和范围**
+**Goal and scope**
 
-- 收集单位是**角色**，不是配音演员。允许出现新角色，不把不认识的角色硬塞给已知名字。
-- 先解决身份分类，语气词和噪声以后再说。
-- 字幕只提供时间边界和台词文字。不加语音转文字或文字识别。
-- 不微调声纹模型：现在只有几集的标签，规模不够。什么时候再议见 [ROADMAP.md](ROADMAP.md#方向)。
+- The unit of collection is a **character**, not a voice actor. New characters are allowed. Do not force an unknown character into a known name.
+- Settle identity classification first. Interjections and noise come later.
+- Subtitles give only the time boundaries and the dialogue text. No speech-to-text or text recognition is added.
+- Do not fine-tune the voiceprint models. There are only labels for a few episodes, which is not enough. For when to reconsider this, see [ROADMAP.md](ROADMAP.md#direction).
 
-**切片段**
+**Cutting clips**
 
-- **一律按整条字幕行切。** 旧做法拿语音检测结果和字幕求重叠再切，丢掉四成对白行。[依据](EXPERIMENTS.md#对白覆盖)
-- **语音检测只用来量字幕相对音轨差多少秒**，给了 `--offset` 就完全不跑。不用任何模型判断「片段里有没有人说话」或「这是角色还是环境人声」。
-- 字幕里的电视解说、群体欢呼照样收进片段表，由人在标注时标「其他」。以前有专门的「不是说话」标签，改成只标目标角色和「其他」后去掉了：这类片段当「其他」进训练，正好教机器欢呼、音效不是目标角色。
-- 不按 `\pos` 之类的定位标记过滤字幕行：三集里带定位标记的行绝大多数是真台词。
-- **前两集不重切。** 重切会让 485 条人工标签全部作废。补片段用 `extend`，只增不改。
+- **Always cut along whole subtitle lines.** The old approach overlapped voice-detection results with the subtitles before cutting, and it dropped 40% of the dialogue lines. [Basis](EXPERIMENTS.md#dialogue-coverage)
+- **Voice detection is used only to measure how many seconds the subtitles differ from the audio track.** When `--offset` is given, it does not run at all. No model is used to judge "is someone speaking in this clip" or "is this the character or background voices".
+- TV narration and crowd cheers in the subtitles are still put into the clip table. A person labels them "Other" while labeling. There used to be a separate "not speech" label. It was removed when labeling was reduced to target characters and "Other". Such clips go into training as "Other", which teaches the machine that cheers and sound effects are not the target.
+- Subtitle lines are not filtered by positioning tags such as `\pos`. In the three episodes, most lines with positioning tags are real dialogue.
+- **Episodes 1 and 2 are not re-cut.** Re-cutting would invalidate all 485 manual labels. Clips are added with `extend`, which only adds and never changes existing clips.
 
-**音频**
+**Audio**
 
-- 所有片段走同一套处理，全部抽人声，不逐条挑「这条干净就用原音轨」。
-- 分析用 16 kHz；导出从原采样率人声轨切，不升采样假装补回高频。
-- 不用音质排名或音质配额筛片段，小组保留，不并进一个杂物组。音质排名既保证不了身份也保证不了干净。
+- All clips go through the same processing, and the voices of all of them are separated. No clip is picked case by case as "this one is clean, use the original track".
+- Analysis uses 16 kHz. Export cuts from the vocal track at the original sample rate. It does not upsample to pretend high frequencies were recovered.
+- Do not filter clips by a quality ranking or a quality quota. Small groups are kept, not merged into one leftover group. A quality ranking can guarantee neither identity nor cleanliness.
 
-**声纹和分组**
+**Voiceprints and grouping**
 
-- **短于 0.5 秒的片段不算声纹、不进分组**（排序正确率 0.61，随机是 0.50）。0.5 到 1 秒是 0.81，暂时保留。[依据](EXPERIMENTS.md#片段时长)
-- **模型用 `anime-va`。** [依据](EXPERIMENTS.md#第-3-集独立检验)
-- **每个模型有自己的默认分界线，不能互相照搬**，换模型要重新扫。`anime-va` 是 0.70。[依据](EXPERIMENTS.md#换动画域模型)
-- **合并规则用按整组平均距离合并。** [依据](EXPERIMENTS.md#合并规则)
-- 全部集的片段一起直接分组，不先把每集压成中心点，也不拿机器分出的组当身份。
+- **Clips shorter than 0.5 seconds get no voiceprint and do not take part in grouping** (ranking accuracy 0.61, where chance is 0.50). Clips of 0.5 to 1 second score 0.81, so they are kept for now. [Basis](EXPERIMENTS.md#clip-length)
+- **Use the `anime-va` model.** [Basis](EXPERIMENTS.md#episode-3-held-out-test)
+- **Each model has its own default threshold, and these cannot be copied from one model to another.** Changing models means sweeping again. The `anime-va` threshold is 0.70. [Basis](EXPERIMENTS.md#switch-to-an-anime-model)
+- **The merge rule is average linkage.** [Basis](EXPERIMENTS.md#merge-rules)
+- The clips of all episodes are grouped together directly. Each episode is not first squashed into a center point, and the machine's groups are not used as identities.
 
-**认人和界面**
+**Identity and interface**
 
-- **界面用小分类器把片段分到角色名下，分组只用于起步时给整组起名字。** 三个声纹模型拼在一起，逻辑回归。[依据](EXPERIMENTS.md#按名字分类)。2026-10-23 定下这条路线：七集标下来，改分类器猜错的比给分组起名字省事得多，不再为它另做和分组的数字对比。
-- **只给目标角色起名字，其余标「其他」，每个目标角色一个「是不是 TA」的分类器。** 用户要的通常只是一两个角色，给全集每句起名字是白费力气；目标角色还会中途加减，所以每条「其他」记下当时的目标角色。2026-10-23 起第 1 至 3 集的标签迁移成东海帝皇（标签名 `teo`）和「其他」，原样归档在 `runs/labels/archive-20261023-170304/`。改成这样之后，只量过 `teo` 一个目标角色（[数字](EXPERIMENTS.md#按名字分类)）。
-- **「有把握」要同时满足把握不低于 0.6 和像不像的检查。** 只看把握时，标的角色少，旁白也会被硬说成已知角色。[依据](EXPERIMENTS.md#界面里的有把握)
-- **停用「无法确认」「不止一个人」「不是说话」。** 只问是不是目标角色，这些说不出是不是 TA。2026-10-23 把剩下的 102 条清掉让人重听，没有直接改成「其他」：其中几条机器很像帝皇，多半是帝皇和别人同时说话，该标「TA·质量低」。
-- 只拿人确认过的标签训练，机器的预测不进训练，也不把预测另存一份当标签。
-- **反例不按难易删，但机器有把握的「其他」不必人逐句确认。** 容易的反例对准确度没用，训练时留着也几乎不花时间；真正花力气的是人去确认它们，所以人只看难分的。[依据](EXPERIMENTS.md#只留难分的反例)
-- **短于 1 秒、和前后台词都隔 0.5 秒以上的片段默认跳过**：不算要人处理，不进起步分组和角色视图，也不随「机器有把握」导出。「整集」里默认也不显示，点「显示短句」才列出来，人标了就按人标的算。[依据](EXPERIMENTS.md#短句默认跳过)
-- 每处理一集都要有视频和字幕，缺一样就拒绝：字幕决定怎么切，视频给人认人。
-- 新的标注（第 1、2 集的补片段和第 4 集起）都在修正界面里标，标签存在 `runs/labels/`；第 1 至 3 集的盲标归档仍在 `annotations/`，见 [HISTORY.md](HISTORY.md#标注) 的标注第 3 条。
+- **The interface uses a small classifier to assign clips to character names. Grouping is used only at the start, to give a whole group a name.** The three voiceprint models are joined together and fed into a logistic regression. [Basis](EXPERIMENTS.md#classify-by-name). On 2026-10-23 this route was settled. Once seven episodes are labeled, correcting the classifier's mistakes takes much less work than naming groups, so no more numeric comparisons with grouping are planned for it.
+- **Only target characters get names. Everyone else is labeled "Other". Each target character gets its own classifier that answers "is this the target?"** Users usually want only one or two characters, and naming every line of every episode is wasted effort. Target characters are added and removed partway through, so each "Other" label records the target characters that existed at that time. From 2026-10-23, the labels for episodes 1 to 3 were migrated to Tokai Teio (label name `teo`) and "Other". The original is archived in `runs/labels/archive-20261023-170304/`. Since the change, only one target character, `teo`, has been measured ([numbers](EXPERIMENTS.md#classify-by-name)).
+- **A clip counts as "confident" only if it has a confidence of at least 0.6 and passes the similarity check.** With confidence alone, too few characters get labeled, and narration gets forced into a known character. [Basis](EXPERIMENTS.md#confidence-in-the-interface)
+- **Retire "unclear", "multiple people" and "not speech".** When the only question is whether a clip is the target, these labels cannot say whether it is the target. On 2026-10-23, the remaining 102 clips were cleared and sent back for re-listening, rather than being changed straight to "Other". A few of them looked very much like Teio. Most likely Teio was speaking at the same time as someone else. Those should be labeled "target, low quality".
+- Train only on labels that a person has confirmed. The machine's predictions are not used for training, and they are not saved as a separate copy to serve as labels.
+- **Negative examples are not removed by how easy they are. But clips the machine is confident are "Other" do not need line-by-line checks by a person.** Easy negatives do not help accuracy, and keeping them in training costs almost no time. The real effort is a person confirming them, so a person looks only at the hard ones. [Basis](EXPERIMENTS.md#keep-only-the-hard-negatives)
+- **Clips shorter than 1 second that are at least 0.5 seconds away from the dialogue before and after them are skipped by default.** They do not count as work for a person. They are not in the initial grouping or the Characters view, and they are not exported as "confident". In the "Whole episode" view they are hidden by default. Clicking "Show short lines" lists them. If a person has labeled them, the person's label is used. [Basis](EXPERIMENTS.md#short-lines-skipped-by-default)
+- Every episode processed must have both video and subtitles. If either is missing, the run is refused. The subtitles decide how to cut, and the video lets a person identify the speaker.
+- New labels (the added clips for episodes 1 and 2, and everything from episode 4 on) are made in the correction interface and stored in `runs/labels/`. The blind archives for episodes 1 to 3 remain in `annotations/`. See item 3 under labeling in [HISTORY.md](HISTORY.md#labeling).
 
-**导出**
+**Export**
 
-- **切片段的字幕是译文时，台词文字从每集另配的原文字幕里取**，仍然不加语音转文字。偏移拿两份字幕互相比出来，重合度不到 0.6 就拒绝配上。找不全台词、或者混着别人的话的片段不导出，记进 `rejected.tsv`，不硬配半句。[依据](EXPERIMENTS.md#日文台词)
+- **When the subtitles used for cutting are a translation, the dialogue text is taken from a separate original-language subtitle file for each episode.** This is still done without speech-to-text. The offset is measured by comparing the two subtitle files. If the overlap is below 0.6, attaching is refused. Clips that cannot get complete dialogue, or that mix in someone else's speech, are not exported. They are recorded in `rejected.tsv`, and half-matched text is not forced into a clip. [Basis](EXPERIMENTS.md#japanese-dialogue)
 
-## 已经排除的
+## Ruled out
 
-都试过，数据在链接里。不要重开。
+All of these were tried. The data is behind the links. Do not reopen them.
 
-| 试过什么 | 结果 |
+| What was tried | Result |
 | --- | --- |
-| [换成 WeSpeaker](EXPERIMENTS.md#62-条抽样标签时期) | 没有一个设置能压过 `redimnet2-b6`，更比不上 `anime-va` |
-| [按最近一对 / 按最远一对 / 互相都是对方最近邻合并](EXPERIMENTS.md#合并规则) | 都不如按整组平均距离合并 |
-| [少量身份参考](EXPERIMENTS.md#62-条抽样标签时期) | 收益有限，还会把原组里混进的错人一起传播出去 |
-| [分两步的分组](EXPERIMENTS.md#分两步的分组)（长片段先分组，短片段再挂上去） | 错误合并 1057 对，对照的 68 对 |
-| [分数归一化](EXPERIMENTS.md#分数归一化) | 排序正确率只涨 0.0022，短片段反而更差 |
-| [给短片段补前后相邻音频](EXPERIMENTS.md#补相邻音频) | 补到 1.5 秒只涨 0.0018，补到 3 秒明显变坏 |
-| [把短片段按整句字幕重切](EXPERIMENTS.md#补相邻音频) | 整句只比原片段长约 0.1 秒，短是字幕行本身短 |
-| [按字幕定位标记筛掉招牌和字幕组名](HISTORY.md#过滤和诊断) | 会丢掉正片台词 |
-| 用模型判断有没有人说话 | 旧的重叠切法就是这么做的，[丢了四成对白行](EXPERIMENTS.md#对白覆盖) |
-| 音质排名取前一半 | 仍漏过语气词和音效，还丢掉可用片段，路线和依赖已移除 |
-| 留一集盲标做独立检验 | 2026-10-23 取消：整集盲标太费力，改成在修正界面里改机器的错，标出来的同时就是训练数据。证据停在[第 3 集的结果](EXPERIMENTS.md#按名字分类) |
+| [Switch to WeSpeaker](EXPERIMENTS.md#62-sampled-labels) | No setting beat `redimnet2-b6`, let alone `anime-va` |
+| [Merge by the nearest pair, by the farthest pair, or by mutual nearest neighbors](EXPERIMENTS.md#merge-rules) | All were worse than average linkage |
+| [A few identity references](EXPERIMENTS.md#62-sampled-labels) | The gain was limited, and it also spread the wrong people already mixed into the original group |
+| [Two-step grouping](EXPERIMENTS.md#two-step-grouping) (group the long clips first, then attach the short clips) | 1057 wrong-merge pairs, against 68 in the control |
+| [Score normalization](EXPERIMENTS.md#score-normalization) | Ranking accuracy rose by only 0.0022, and short clips got worse |
+| [Padding short clips with the neighboring audio](EXPERIMENTS.md#padding-with-neighboring-audio) | Padding to 1.5 seconds gained only 0.0018. Padding to 3 seconds clearly got worse |
+| [Re-cutting short clips along the whole subtitle line](EXPERIMENTS.md#padding-with-neighboring-audio) | A whole line is only about 0.1 seconds longer than the clip. The clips are short because the subtitle lines themselves are short |
+| [Filtering out signs and fansub group names with subtitle positioning tags](HISTORY.md#filtering-and-diagnosis) | Drops real dialogue from the main episode |
+| Using a model to judge whether anyone is speaking | The old overlap-based cutting did this, and [it dropped 40% of the dialogue lines](EXPERIMENTS.md#dialogue-coverage) |
+| Keeping the top half by audio quality ranking | Still let through interjections and sound effects, and also dropped usable clips. The route and its dependencies have been removed |
+| Holding out one episode for blind labeling as a held-out test | Cancelled on 2026-10-23. Blind labeling a whole episode takes too much effort. Instead, the machine's mistakes are corrected in the correction interface. The labels made that way are also training data. The evidence stops at [the episode 3 result](EXPERIMENTS.md#classify-by-name) |
 
-对应的命令和参数（`--method single` 等）还留着，只为能复算，不要当成当前做法。
+The matching commands and options (such as `--method single`) are still there, only so that results can be recomputed. Do not treat them as the current approach.
