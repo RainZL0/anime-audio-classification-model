@@ -125,11 +125,12 @@ kbd {
 .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #555; border-top-color: #ddd;
   animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.line-text { font-size: 19px; line-height: 1.5; margin: 14px 2px 4px; min-height: 28px; }
-.line-meta { color: var(--text-3); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap;
+/* 画面正下方一排管怎么放：听哪条声音、放多快。 */
+.player { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.player button { padding: 1px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.line-text { font-size: 19px; line-height: 1.5; margin: 10px 2px 4px; min-height: 28px; }
+.line-meta { color: var(--text-3); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   font-variant-numeric: tabular-nums; }
-.line-meta .sound { margin-left: auto; }
-.line-meta .sound button { padding: 1px 8px; font-size: 12px; }
 .line-meta .context { padding: 1px 8px; font-size: 12px; }
 .line-meta .context.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ask { margin: 18px 0 8px; font-size: 12px; color: var(--text-3); letter-spacing: 0.3px; }
@@ -152,8 +153,6 @@ kbd {
 .confirmed-box { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius);
   background: var(--ok-soft); color: var(--ok); }
 .confirmed-box .who { font-weight: 600; color: var(--text); }
-.specials { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.specials button { font-size: 12px; padding: 4px 9px; color: var(--text-2); }
 .stage .hint { margin-top: 16px; font-size: 12px; color: var(--text-3); line-height: 1.9; }
 
 /* 头像是认人的主要依据，名字是可选的。有截图用截图，没有就用按编号生成的图案。 */

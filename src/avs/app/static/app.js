@@ -20,6 +20,8 @@ const media = (kind, id, context = 0) =>
   `/media/${kind}/${id}.${kind === "audio" ? "wav" : "mp4"}${context ? `?context=${context}` : ""}`;
 /* 按 L 依次切换：平常、前后各多放 5 秒、15 秒。跟服务端 CONTEXT_SECONDS 一致。 */
 const CONTEXTS = [0, 5, 15];
+/* 可选的播放速度，选了记在本机，刷新不变。 */
+const SPEEDS = [1, 1.25, 1.5, 2];
 const stamp = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const pct = (p) => `${Math.round(p * 100)}%`;
 /* 累计时长：不到一分钟写秒，不到一小时写分和秒，再长写小时和分。 */
@@ -144,12 +146,18 @@ function Pill({ clip }) {
 
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
-function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPlayRef, hasVideo, videoRef, onAvatar,
-  onNewRole, context, onContext }) {
+function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssign, onAccept, onPlayRef, hasVideo, videoRef,
+  onAvatar, onNewRole, context, onContext }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   const startVoice = useRef(0);
   useEffect(() => { setLoading(true); return () => clearTimeout(startVoice.current); }, [clip?.id, sound, context]);
+  /* 换了片段，播放器会按 defaultPlaybackRate 重设速度，所以两个都设。 */
+  useEffect(() => {
+    for (const el of [videoRef?.current, audioRef.current]) {
+      if (el) { el.defaultPlaybackRate = speed; el.playbackRate = speed; }
+    }
+  }, [speed, clip?.id, sound, context]);
 
   if (!clip) {
     return html`<aside class="stage"><div class="screen"><div class="wait">在右边选一句台词</div></div></aside>`;
@@ -168,7 +176,7 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
     else if (at >= 0) voice.play().catch(() => {});
     else {
       voice.pause();
-      startVoice.current = setTimeout(() => voice.play().catch(() => {}), -at * 1000);
+      startVoice.current = setTimeout(() => voice.play().catch(() => {}), (-at * 1000) / speed);
     }
   };
   const who = whoOf(clip);
@@ -187,16 +195,21 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
             src=${media("audio", clip.id, context)} autoplay onCanPlay=${() => setLoading(false)}></audio>`}
       <div class="wait ${!hasVideo || !loading ? "hide" : ""}"><div class="spinner"></div></div>
     </div>
+    <div class="player">
+      ${hasVideo && html`<span class="seg">
+        <button class=${sound === "vocals" ? "on" : ""} onClick=${() => setSound("vocals")}>只听人声</button>
+        <button class=${sound === "original" ? "on" : ""} onClick=${() => setSound("original")}>画面原声</button>
+      </span>`}
+      <span class="seg" title="播放速度，参考音也一样快">
+        ${SPEEDS.map((s) => html`<button class=${speed === s ? "on" : ""} onClick=${() => setSpeed(s)}>${s}×</button>`)}
+      </span>
+    </div>
     <div class="line-text">${clip.text || html`<span style="color:var(--text-3)">（字幕里没有这句的文字）</span>`}</div>
     <div class="line-meta">
       <span>${clip.episode}</span><span>${stamp(clip.start)}</span><span>${clip.duration} 秒</span>
       <button class="context ${context ? "on" : ""}" onClick=${onContext}
         title="看不出是谁时，临时前后各多放一些；再按切到 15 秒、再按回到平常。换一句自动回到平常">
         ${context ? `前后多放 ${context} 秒` : "多放前后文"} <kbd>L</kbd></button>
-      ${hasVideo && html`<span class="sound seg">
-        <button class=${sound === "vocals" ? "on" : ""} onClick=${() => setSound("vocals")}>只听人声</button>
-        <button class=${sound === "original" ? "on" : ""} onClick=${() => setSound("original")}>画面原声</button>
-      </span>`}
     </div>
 
     ${clip.label
@@ -233,9 +246,6 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
             新角色 <kbd style="margin-left:4px">N</kbd></button>
           <span style="font-size:12px;color:var(--text-3)">已有的人按数字键，或按 <kbd>/</kbd> 搜索</span></div>`}
 
-    <div class="specials">
-      <button onClick=${() => onAssign(OTHER)} title="不是任何一个目标角色">其他 <kbd>Q</kbd></button>
-    </div>
     ${clip.rejects.length > 0 && html`<div class="note" style="margin-top:8px">你说过这句不是：${clip.rejects.join("、")}</div>`}
     <div class="hint">
       <kbd>J</kbd> <kbd>K</kbd> 上下一句 · <kbd>空格</kbd> 重播 · <kbd>1</kbd>–<kbd>9</kbd> 选下面的角色 ·
@@ -755,6 +765,10 @@ function App() {
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(() => localStorage.getItem("avs-sound") || "vocals");
+  const [speed, setSpeed] = useState(() => {
+    const s = Number(localStorage.getItem("avs-speed"));
+    return SPEEDS.includes(s) ? s : 1;
+  });
   /* 这一句临时多放的前后秒数，见 CONTEXTS。换一句就回到平常。 */
   const [context, setContext] = useState(0);
   const nextContext = () => setContext((c) => CONTEXTS[(CONTEXTS.indexOf(c) + 1) % CONTEXTS.length]);
@@ -792,6 +806,7 @@ function App() {
   }, [theme]);
   useEffect(() => { localStorage.setItem("avs-show-short", showShort ? "1" : "0"); }, [showShort]);
   useEffect(() => { localStorage.setItem("avs-sound", sound); }, [sound]);
+  useEffect(() => { localStorage.setItem("avs-speed", String(speed)); }, [speed]);
   /* 当前在哪写进网址的 # 后面，刷新后回到同一个视图、同一集、同一个角色、同一句。 */
   useEffect(() => {
     if (!state) return;
@@ -1001,6 +1016,8 @@ function App() {
       const pick = refs[Math.floor(Math.random() * refs.length)];
       if (playerRef.current) playerRef.current.pause();
       refAudio.current.src = media("audio", pick.id);
+      refAudio.current.defaultPlaybackRate = speed;
+      refAudio.current.playbackRate = speed;
       refAudio.current.play().catch(() => {});
       showToast(`参考音：${name}「${pick.text || "…"}」`);
     } catch (e) { showToast(e.message, true); }
@@ -1174,6 +1191,7 @@ function App() {
 
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
       ${showStage && html`<${Stage} clip=${current} roles=${roles} special=${special} sound=${sound} setSound=${setSound}
+        speed=${speed} setSpeed=${setSpeed}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
         onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()}
         context=${context} onContext=${nextContext} />`}
@@ -1193,7 +1211,7 @@ function App() {
       </main>
     </div>
 
-    <footer class="dock">
+    ${view !== "export" && html`<footer class="dock">
       ${dock.slice(0, 9).map((name, i) => html`<div class="chip" key=${name}
           title=${`按 ${i + 1} 标成 ${name}`} onClick=${() => assign(name)}>
         <${Avatar} role=${roles[name]} name=${name} size="md" /><${RoleName} role=${roles[name]} name=${name} />
@@ -1202,10 +1220,10 @@ function App() {
           onClick=${(e) => { e.stopPropagation(); assign(name, undefined, true); }}>质量低 <span class="k">⇧${i + 1}</span></button></div>`)}
       <div class="chip" title="不是任何一个目标角色" onClick=${() => assign(OTHER)}>
         <${Avatar} special=${true} size="md" /><span class="rn">其他</span><span class="k">Q</span></div>
-      <button class="ghost" onClick=${() => current && newRole()} disabled=${!current || view === "export"}>新角色 <kbd>N</kbd></button>
+      <button class="ghost" onClick=${() => current && newRole()} disabled=${!current}>新角色 <kbd>N</kbd></button>
       <button class="ghost" onClick=${() => setPalette(true)}>其他角色 <kbd>/</kbd></button>
       <span class="more">${dock.length > 9 ? `另有 ${dock.length - 9} 个目标角色在搜索里` : ""}</span>
-    </footer>
+    </footer>`}
 
     <audio ref=${refAudio} hidden></audio>
     ${palette && html`<${Palette} roles=${roles} onClose=${() => setPalette(false)}
