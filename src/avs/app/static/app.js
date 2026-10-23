@@ -33,7 +33,7 @@ const howLong = (seconds) => {
 };
 const STATUS_TEXT = {
   confirmed: "已确认", auto: "机器有把握", review: "待确认", novoice: "太短，没有声纹",
-  unlabeled: "还没有模型", special: "特殊", skipped: "太短，默认跳过",
+  unlabeled: "还没有模型", skipped: "太短，默认跳过",
 };
 const NEEDS_WORK = new Set(["review", "novoice", "unlabeled"]);
 const VIEWS = ["groups", "scene", "roles", "export"];
@@ -42,10 +42,9 @@ const STALE = new Error("stale");
 /* 打开网页时网址 # 后面记着的位置，见 App 里写回网址的那段。 */
 const saved = new URLSearchParams(location.hash.slice(1));
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
-/* 「其他」：不是任何一个目标角色。它是人下的判断，按 Q 标。 */
+/* 「其他」：不是任何一个目标角色。它是人下的判断，按 Q 标。拿不准是不是目标角色、
+   几个人同时说话但没有目标角色、欢呼音效这类不是说话的，都标「其他」。 */
 const OTHER = "__other__";
-/* 特殊标签（无法确认、不止一个人、不是说话）不再给键：只问是不是目标角色，拿不准、
-   几个人同时说话但没有目标角色、欢呼音效这类不是说话的，都标「其他」；以前标的照样显示。 */
 /* 每个目标角色有两个选项：干净的 TA 和「TA·质量低」，后者按 Shift + 数字。只对目标角色有，
    「其他」本来就不导出。以前还有一个「多人」，已并进「质量低」。 */
 /* 视频片段比台词前后各多切的秒数，跟服务端 avs.labeling.VIDEO_PAD 一致。 */
@@ -116,8 +115,8 @@ function Pattern({ role, name }) {
   </svg>`;
 }
 
-function Avatar({ role, name, size = "", special, onClick, title }) {
-  if (special) return html`<div class="av ${size} unknown">·</div>`;
+function Avatar({ role, name, size = "", blank, onClick, title }) {
+  if (blank) return html`<div class="av ${size} unknown">·</div>`;
   if (!name) return html`<div class="av ${size} unknown">?</div>`;
   const click = onClick ? { onClick, role: "button" } : {};
   if (role?.avatar) {
@@ -146,7 +145,7 @@ function Pill({ clip }) {
 
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
-function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssign, onAccept, onPlayRef, hasVideo, videoRef,
+function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAssign, onAccept, onPlayRef, hasVideo, videoRef,
   onAvatar, onNewRole, context, onContext }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
@@ -180,7 +179,7 @@ function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssig
     }
   };
   const who = whoOf(clip);
-  const isSpecial = clip.label && special[clip.label];
+  const isOther = clip.label && labelText[clip.label];
   return html`<aside class="stage">
     <div class="screen">
       ${hasVideo
@@ -215,12 +214,12 @@ function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssig
     ${clip.label
       ? html`<div class="ask">已经确认</div>
         <div class="confirmed-box">
-          <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} size="lg"
-            onClick=${!isSpecial && hasVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
-          <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
-            ${clip.unusable && !special[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
+          <${Avatar} role=${roles[clip.label]} name=${clip.label} blank=${isOther} size="lg"
+            onClick=${!isOther && hasVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
+          <div><div class="who">${isOther ? labelText[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
+            ${clip.unusable && !labelText[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
-          ${!isSpecial && hasVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
+          ${!isOther && hasVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
             title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
         </div>`
       : html`<div class="ask">${clip.guess.length ? "这是谁？机器的猜测" : clip.voiced ? "这是谁？" : "这句太短，机器听不出来，请直接选人"}</div>
@@ -231,8 +230,8 @@ function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssig
         <div class="cands">
           ${clip.guess.filter((g) => g.p >= 0.02 || g === clip.guess[0]).map((g, i) => html`
             <div class="cand ${i === 0 ? "top" : ""}" onClick=${() => onAssign(g.name)}>
-              <${Avatar} role=${roles[g.name]} name=${g.name} special=${g.name === OTHER} size="md" />
-              <div><div class="name">${g.name === OTHER ? special[OTHER] : html`<${RoleName} role=${roles[g.name]} name=${g.name} />`}</div>
+              <${Avatar} role=${roles[g.name]} name=${g.name} blank=${g.name === OTHER} size="md" />
+              <div><div class="name">${g.name === OTHER ? labelText[OTHER] : html`<${RoleName} role=${roles[g.name]} name=${g.name} />`}</div>
                 <div class="meter"><i style="width:${pct(g.p)}"></i></div></div>
               <span class="pct">${pct(g.p)}</span>
               ${g.name !== OTHER && html`<button class="ref" title="听这个角色确认过的一句" onClick=${(e) => { e.stopPropagation(); onPlayRef(g.name); }}>
@@ -240,7 +239,7 @@ function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssig
             </div>`)}
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${clip.guess.length > 0 && html`<button class="primary" onClick=${onAccept}>是 ${special[clip.guess[0].name] || clip.guess[0].name}
+          ${clip.guess.length > 0 && html`<button class="primary" onClick=${onAccept}>是 ${labelText[clip.guess[0].name] || clip.guess[0].name}
             <kbd style="margin-left:4px">Enter</kbd></button>`}
           <button onClick=${onNewRole} title="新建一个目标角色，名字可以以后再起；有画面时接着截头像">
             新角色 <kbd style="margin-left:4px">N</kbd></button>
@@ -256,25 +255,25 @@ function Stage({ clip, roles, special, sound, setSound, speed, setSpeed, onAssig
 
 /* ───────────── 一句台词 ───────────── */
 
-function Row({ clip, roles, special, selected, marked, onSelect, flash, maybeOf, showTarget }) {
+function Row({ clip, roles, labelText, selected, marked, onSelect, flash, maybeOf, showTarget }) {
   const ref = useRef(null);
   useEffect(() => {
     if (selected && ref.current) ref.current.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const who = whoOf(clip);
-  const isSpecial = who && special[who.name];
+  const isOther = who && labelText[who.name];
   const stranger = !clip.label && clip.familiar === false;
   return html`<div ref=${ref} class="row ${selected ? "sel" : ""} ${marked ? "marked" : ""} ${flash ? "done-flash" : ""}"
       onClick=${onSelect}>
-    <${Avatar} role=${who && !stranger && roles[who.name]} name=${stranger ? null : who?.name} special=${isSpecial} />
+    <${Avatar} role=${who && !stranger && roles[who.name]} name=${stranger ? null : who?.name} blank=${isOther} />
     <div>
       <div class="who">
         <span class="n" style=${who && !who.human ? "color:var(--text-2);font-weight:500" : ""}>
-          ${stranger ? `最像 ${special[who.name] || who.name}` : isSpecial ? special[who.name]
+          ${stranger ? `最像 ${labelText[who.name] || who.name}` : isOther ? labelText[who.name]
             : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : "未知"}</span>
         <${Pill} clip=${clip} />
         ${marked && html`<span class="pill reject">不是这个角色</span>`}
-        ${clip.unusable && !special[clip.label] && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
+        ${clip.unusable && !labelText[clip.label] && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
         ${clip.maybe && html`<span class="pill maybe" title="机器没归给这个角色，但听起来有可能是">可能漏掉 ${pct(chanceOf(clip, maybeOf))}</span>`}
         ${showTarget && bestTarget(clip) && html`<span class="pill maybe" title="机器觉得这句是这个目标角色的概率">
           最像 ${bestTarget(clip).name} ${pct(bestTarget(clip).p)}</span>`}
@@ -287,7 +286,7 @@ function Row({ clip, roles, special, selected, marked, onSelect, flash, maybeOf,
 
 /* ───────────── 场景视图 ───────────── */
 
-function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, setOnlyWork, showShort, setShowShort,
+function SceneView({ clips, order, focus, setFocus, roles, labelText, onlyWork, setOnlyWork, showShort, setShowShort,
   flashes, episode }) {
   const shown = new Set(order);
   const scenes = [];
@@ -318,7 +317,7 @@ function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, se
     ${scenes.map((s) => html`<section>
       <div class="scene-head"><b>第 ${s.scene + 1} 场</b><span>${stamp(s.clips[0].start)}</span>
         <span>· ${s.clips.length} 句</span></div>
-      ${s.clips.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special}
+      ${s.clips.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText}
         selected=${clip.id === focus} flash=${flashes.has(clip.id)} onSelect=${() => setFocus(clip.id)} />`)}
     </section>`)}
   </div>`;
@@ -340,7 +339,7 @@ function Counts({ info }) {
     ${info.seconds > 0 && html`<br /><span title="确认过的台词累计时长">${howLong(info.seconds)}</span>`}</span>`;
 }
 
-function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus, marks, toggleMark, onConfirmRest,
+function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFocus, marks, toggleMark, onConfirmRest,
   onRename, onToggleTarget, onAvatar, canCrop, flashes, playing, setPlaying }) {
   const list = state.roles;
   const other = role === OTHER;
@@ -360,7 +359,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
         <${Counts} info=${r} />
       </div>`)}
       <div class="role-item other ${other ? "on" : ""}" onClick=${() => setRole(OTHER)} title="不是任何一个目标角色">
-        <${Avatar} special=${true} size="md" /><span class="rn nm">其他</span>
+        <${Avatar} blank=${true} size="md" /><span class="rn nm">其他</span>
         <${Counts} info=${state.other} />
       </div>
     </div>
@@ -368,7 +367,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
       ${!current ? html`<div class="empty"><h2>选一个角色</h2><p>左边上面是目标角色，就是你要收集的人；其余的人一律标「其他」。灰色数字是确认过的句数，橙色是机器归给 TA、还没人确认的句数，下面是确认过的台词累计多长。</p></div>`
       : html`
         <div class="role-head">
-          ${other ? html`<${Avatar} special=${true} size="xl" />`
+          ${other ? html`<${Avatar} blank=${true} size="xl" />`
             : html`<${Avatar} role=${current} name=${role} size="xl" onClick=${canCrop ? onAvatar : null}
               title=${canCrop ? "从左边的画面里截一块当头像" : "左边放出画面后，可以从画面里截头像"} />`}
           <div><h2>${other ? name : html`<${RoleName} role=${current} name=${role} />`}</h2>
@@ -392,16 +391,16 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
           <button class="primary" disabled=${rest === 0} onClick=${onConfirmRest}>
             确认其余 ${rest} 句${marks.size ? `，剔除 ${marks.size} 句` : ""} <kbd style="margin-left:4px">Shift+Enter</kbd></button>
         </div>`}
-        ${pending.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special}
+        ${pending.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText}
           selected=${clip.id === focus} marked=${marks.has(clip.id)} flash=${flashes.has(clip.id)} showTarget=${other}
           onSelect=${() => setFocus(clip.id)} />`)}
         ${maybe.length > 0 && html`<div class="section-title">可能漏掉的 ${maybe.length} 句</div>
           <p class="note" style="margin:0 0 8px">机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。</p>
-          ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special} maybeOf=${role}
+          ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText} maybeOf=${role}
             selected=${clip.id === focus} marked=${clip.rejects.includes(role)} flash=${flashes.has(clip.id)}
             onSelect=${() => setFocus(clip.id)} />`)}`}
         ${confirmed.length > 0 && html`<div class="section-title">确认过的 ${confirmed.length} 句${other ? "，最像某个目标角色的排在前面" : ""}</div>
-          ${confirmed.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} special=${special} showTarget=${other}
+          ${confirmed.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText} showTarget=${other}
             selected=${clip.id === focus} flash=${flashes.has(clip.id)} onSelect=${() => setFocus(clip.id)} />`)}`}
       `}
     </div>
@@ -410,7 +409,7 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
 
 /* ───────────── 起步分组：给声音相近的一组起名字 ───────────── */
 
-function GroupsView({ groups, loading, roles, special, onName, onNew, focus, setFocus, firstRun }) {
+function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, setFocus, firstRun }) {
   const [out, setOut] = useState({});
   const [names, setNames] = useState({});
   if (loading) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>正在把声音相近的台词分组…</p></div>`;
@@ -448,8 +447,8 @@ function GroupsView({ groups, loading, roles, special, onName, onNew, focus, set
             ${g.clips.map((c) => html`<div class="member ${excluded.has(c.id) ? "out" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
               <span>${c.text || "（没有字幕文字）"}</span>
-              ${c.label && html`<span class="pill special" title="已经标了；按 Z 撤销，或在左边改">
-                ${special[c.label] || c.label}${c.unusable ? "·质量低" : ""}</span>`}
+              ${c.label && html`<span class="pill done" title="已经标了；按 Z 撤销，或在左边改">
+                ${labelText[c.label] || c.label}${c.unusable ? "·质量低" : ""}</span>`}
               <span class="t">${c.episode} ${stamp(c.start)}</span>
               ${!c.label && html`<button class="x" title=${excluded.has(c.id) ? "放回这一组" : "这句不是这组的人"}
                 onClick=${(e) => { e.stopPropagation(); const next = new Set(excluded); next.has(c.id) ? next.delete(c.id) : next.add(c.id); setOut({ ...out, [g.key]: next }); }}>
@@ -784,8 +783,8 @@ function App() {
   const loadSeq = useRef(0);
 
   const roles = useMemo(() => Object.fromEntries((state?.roles || []).map((r) => [r.name, r])), [state]);
-  /* 显示用：特殊标签加上「其他」。 */
-  const special = useMemo(() => (state ? { ...state.special, [OTHER]: "其他" } : {}), [state]);
+  /* 显示用：不是角色名的标签怎么写，现在只有「其他」。 */
+  const labelText = useMemo(() => ({ [OTHER]: "其他" }), []);
   const episodeInfo = state?.episodes.find((e) => e.name === episode);
   /* 角色栏的顺序在一次会话里固定不动，新角色排到最后：数字键不会在手底下跳。
      在渲染时就补上，新角色当场出现在栏里，不用等下一次刷新。已经没有的名字留在顺序里不碍事，
@@ -995,7 +994,7 @@ function App() {
   const assign = (name, ids = current ? [current.id] : [], low = false) => {
     if (!ids.length || !name) return;
     const from = focus;
-    const label = special[name] ? `已标为「${special[name]}」` : `已标为 ${name}${low ? "·质量低，导出时跳过" : ""}`;
+    const label = labelText[name] ? `已标为「${labelText[name]}」` : `已标为 ${name}${low ? "·质量低，导出时跳过" : ""}`;
     send("/api/label", { clips: ids, label: name, unusable: low }, ids.length > 1 ? `${ids.length} 句${label}` : label,
       () => setFocus(from));
     if (view === "groups") setFocus(nextUnlabeled(ids));
@@ -1158,7 +1157,7 @@ function App() {
   const targetCount = state.roles.filter((r) => r.target).length;
   /* 默认跳过的短句不要人标，不算进进度。 */
   const total = Object.values(counts).reduce((a, b) => a + b, 0) - (counts.skipped || 0) || 1;
-  const done = (counts.confirmed || 0) + (counts.special || 0);
+  const done = counts.confirmed || 0;
   const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
   const showStage = view !== "export";
 
@@ -1190,21 +1189,21 @@ function App() {
     </header>
 
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
-      ${showStage && html`<${Stage} clip=${current} roles=${roles} special=${special} sound=${sound} setSound=${setSound}
+      ${showStage && html`<${Stage} clip=${current} roles=${roles} labelText=${labelText} sound=${sound} setSound=${setSound}
         speed=${speed} setSpeed=${setSpeed}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
         onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()}
         context=${context} onContext=${nextContext} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
-          roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${toggleOnlyWork}
+          roles=${roles} labelText=${labelText} onlyWork=${onlyWork} setOnlyWork=${toggleOnlyWork}
           showShort=${showShort} setShowShort=${setShowShort} flashes=${flashes} episode=${episode} />`}
-        ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} special=${special} role=${role} setRole=${setRole}
+        ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} labelText=${labelText} role=${role} setRole=${setRole}
           clips=${clips} focus=${focus} setFocus=${pick} marks=${marks} toggleMark=${toggleMark}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
-        ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} special=${special}
+        ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} labelText=${labelText}
           focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}
@@ -1219,7 +1218,7 @@ function App() {
         <button class="low" title=${`按 Shift + ${i + 1} 标成 ${name}·质量低：${LOW_TIP}`}
           onClick=${(e) => { e.stopPropagation(); assign(name, undefined, true); }}>质量低 <span class="k">⇧${i + 1}</span></button></div>`)}
       <div class="chip" title="不是任何一个目标角色" onClick=${() => assign(OTHER)}>
-        <${Avatar} special=${true} size="md" /><span class="rn">其他</span><span class="k">Q</span></div>
+        <${Avatar} blank=${true} size="md" /><span class="rn">其他</span><span class="k">Q</span></div>
       <button class="ghost" onClick=${() => current && newRole()} disabled=${!current}>新角色 <kbd>N</kbd></button>
       <button class="ghost" onClick=${() => setPalette(true)}>其他角色 <kbd>/</kbd></button>
       <span class="more">${dock.length > 9 ? `另有 ${dock.length - 9} 个目标角色在搜索里` : ""}</span>

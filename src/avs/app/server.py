@@ -17,10 +17,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of, is_special
+from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
-from avs.labeling import SPECIAL, VIDEO_PAD, cut_video
+from avs.labeling import VIDEO_PAD, cut_video
 
 STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
@@ -60,18 +60,13 @@ class AppState:
 
     def retrain(self) -> None:
         """每个目标角色的正例是标成 TA 的片段；反例是标成别的名字的、标「其他」时 TA 已经是
-        目标的，以及人说过不是 TA 的。听不清之类的特殊标签和标了「质量低」的不进训练。"""
+        目标的，以及人说过不是 TA 的。标了「质量低」的不进训练。"""
         targets = self.store.targets()
         examples: dict[str, tuple[list[int], list[int]]] = {t: ([], []) for t in targets}
         used: set[int] = set()
         for clip_id, name in self.store.labels.items():
             clip = self.workspace.by_id.get(clip_id)
-            if (
-                clip is None
-                or clip.row is None
-                or is_special(name)
-                or clip_id in self.store.unusable
-            ):
+            if clip is None or clip.row is None or clip_id in self.store.unusable:
                 continue
             against = self.store.against.get(clip_id, set())
             for target in targets:
@@ -107,9 +102,8 @@ class AppState:
     # 视图
 
     def status(self, clip: Clip) -> str:
-        label = self.store.labels.get(clip.id)
-        if label is not None:
-            return "special" if is_special(label) else "confirmed"
+        if clip.id in self.store.labels:
+            return "confirmed"
         if clip.skipped:
             return "skipped"
         if clip.row is None:
@@ -191,7 +185,6 @@ class AppState:
             ],
             "roles": roles,
             "other": counts(OTHER),
-            "special": SPECIAL,
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
         }
@@ -512,7 +505,7 @@ class AppState:
 class LabelBody(BaseModel):
     clips: list[str]
     label: str | None = None
-    """角色名或特殊标签；空表示清掉标签。"""
+    """角色名或「其他」；空表示清掉标签。"""
     new_role: bool = False
     """标成一个新建的、还没起名字的角色，这时 `label` 不用给。"""
     unusable: bool = False
@@ -644,7 +637,6 @@ def create_app(state: AppState) -> Any:
                 body.unusable
                 and label is not None
                 and label != OTHER
-                and not is_special(label)
                 and (role is None or bool(role.get("target")))
             )
             changes += [{"clip": c, "unusable": unusable} for c in body.clips]

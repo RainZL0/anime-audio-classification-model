@@ -41,8 +41,32 @@ def test_rename_into_an_existing_role_merges_them(tmp_path: Path) -> None:
     store.rename_role("红毛", "Nice Nature")
     assert set(store.labels.values()) == {"Nice Nature"}
     assert [r["name"] for r in LabelStore(tmp_path / "labels").roles] == ["Nice Nature"]
-    with pytest.raises(ValueError, match="特殊标签"):
+    with pytest.raises(ValueError, match="不能为空"):
         store.rename_role("Nice Nature", "__unclear__")
+
+
+def test_retired_labels_count_as_unlabeled(tmp_path: Path) -> None:
+    """停用的旧标签（无法确认之类）回放、导入、撤销时都当没标，撤销也不会卡住。"""
+    folder = tmp_path / "labels"
+    folder.mkdir()
+    lines = [
+        {"batch": 1, "time": "t", "source": "human", "undo_of": None,
+         "changes": [{"clip": "b", "before": None, "after": "teo"}]},
+        {"batch": 2, "time": "t", "source": "human", "undo_of": None,
+         "changes": [{"clip": "a", "before": None, "after": "__multiple__"}]},
+    ]  # fmt: skip
+    (folder / "events.jsonl").write_text(
+        "".join(json.dumps(line) + "\n" for line in lines), encoding="utf-8"
+    )
+    store = LabelStore(folder)
+    assert store.labels == {"b": "teo"}
+    assert [r["name"] for r in store.roles] == ["teo"]
+    assert store.apply([{"clip": "c", "label": "__unclear__"}]) is None
+    # 撤回只动过停用标签的那批：没有实际变化，但照样记下已撤，接着能撤更早的。
+    store.undo()
+    assert store.labels == {"b": "teo"}
+    store.undo()
+    assert store.labels == {}
 
 
 def test_a_role_can_start_without_a_name_and_keeps_its_pattern(tmp_path: Path) -> None:
@@ -142,7 +166,7 @@ def test_migration_keeps_targets_and_archives_the_rest(tmp_path: Path) -> None:
     )
     archive = tmp_path / "labels" / "archive"
     assert migrate_to_targets(store, ["teo"], archive) == 1
-    assert store.labels == {"a": "teo", "b": OTHER, "c": "__unclear__"}
+    assert store.labels == {"a": "teo", "b": OTHER}
     assert store.against["b"] == {"teo"}
     assert store.targets() == ["teo"]
     assert not store.can_undo()

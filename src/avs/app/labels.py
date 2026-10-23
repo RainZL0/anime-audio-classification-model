@@ -24,7 +24,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from avs.labeling import SPECIAL
 from avs.project import read_json, write_json
 
 PALETTE = (
@@ -51,7 +50,11 @@ UNNAMED = "角色 {}"
 """用户还没起名字的角色先叫这个。名字只是标签记录里的键，起名字就是改名。"""
 
 OTHER = "__other__"
-"""「其他」：不是当时任何一个目标角色。它是人下的判断，不算特殊标签。"""
+"""「其他」：不是当时任何一个目标角色。拿不准、几个人同时说话但没有目标角色、欢呼音效，都标它。"""
+
+RETIRED = frozenset({"__unclear__", "__multiple__", "__not_speech__"})
+"""停用的旧标签：无法确认、不止一个人、不是说话。只问是不是目标角色之后不再用，2026-10-23
+已全部清掉，让人按新规矩重听。旧记录回放、撤销或导入旧归档时碰到它们，一律当没标。"""
 
 FLAGS = ("unusable",)
 """标成目标角色之后还能打开的开关，跟名字分开记，名字照常是 TA。
@@ -73,9 +76,10 @@ def flag_of(change: dict[str, Any]) -> str | None:
     return None
 
 
-def is_special(name: str | None) -> bool:
-    """听不清、不止一个人、不是说话这类标签：不说明是谁，不进训练。"""
-    return name is not None and name in SPECIAL
+def current(name: str | None) -> str | None:
+    """去掉首尾空白；空的和停用的旧标签都算没标。"""
+    name = (name or "").strip()
+    return None if not name or name in RETIRED else name
 
 
 class LabelStore:
@@ -111,9 +115,7 @@ class LabelStore:
                     self.batches.append(batch)
         # 角色表以 cast.json 为准；回放历史时不建角色，否则改过名的旧名字会复活。
         # 只给当前还有片段、却不在表里的名字补上。
-        missing = {
-            n for n in self.labels.values() if not is_special(n) and n != OTHER and not self.role(n)
-        }
+        missing = {n for n in self.labels.values() if n != OTHER and not self.role(n)}
         for name in sorted(missing):
             self._ensure_role(name, save=False)
         if missing:
@@ -175,11 +177,7 @@ class LabelStore:
                             }
                         )
                     continue
-                label = change.get("label") or None
-                if label is not None:
-                    label = label.strip()
-                    if not label:
-                        label = None
+                label = current(change.get("label"))
                 previous = self.labels.get(clip)
                 old = sorted(self.against.get(clip, ())) if previous == OTHER else None
                 new = sorted(change.get("against", targets)) if label == OTHER else None
@@ -190,11 +188,13 @@ class LabelStore:
                     if new is not None:
                         entry["against"] = new
                     effective.append(entry)
-                    if label is not None and label != OTHER and not is_special(label):
+                    if label is not None and label != OTHER:
                         if self.role(label) is None:
                             created.append(label)
                         self._ensure_role(label)
-            if not effective:
+            # 撤销哪怕没有实际变化也要记一笔（比如撤回的是清掉停用旧标签那批），
+            # 否则这批一直算没撤过，再按撤销永远卡在它上面。
+            if not effective and undo_of is None:
                 return None
             batch: dict[str, Any] = {
                 "batch": (self.batches[-1]["batch"] + 1) if self.batches else 1,
@@ -272,8 +272,8 @@ class LabelStore:
         with self._lock:
             if self.role(old) is None:
                 raise ValueError(f"没有这个角色：{old}")
-            if not new or is_special(new) or new == OTHER:
-                raise ValueError("新名字不能为空，也不能是特殊标签")
+            if current(new) is None or new == OTHER:
+                raise ValueError("新名字不能为空，也不能是「其他」")
             if new == old:
                 return None
             moved: list[dict[str, Any]] = [
@@ -355,11 +355,12 @@ class LabelStore:
                     flagged.discard(clip)
             else:
                 self.against.pop(clip, None)
-                if change["after"] is None:
+                after = current(change["after"])
+                if after is None:
                     self.labels.pop(clip, None)
                 else:
-                    self.labels[clip] = change["after"]
-                    if change["after"] == OTHER:
+                    self.labels[clip] = after
+                    if after == OTHER:
                         self.against[clip] = set(change.get("against", ()))
 
     def _ensure_role(self, name: str, save: bool = True, named: bool = True) -> None:
@@ -433,7 +434,7 @@ def migrate_to_targets(store: LabelStore, targets: list[str], archive: Path) -> 
         changes = [
             {"clip": clip, "label": OTHER, "against": sorted(targets)}
             for clip, name in store.labels.items()
-            if name not in targets and not is_special(name) and name != OTHER
+            if name not in targets and name != OTHER
         ]
         batch = store.apply(changes, source="import:migrate-to-targets")
         return len(batch["changes"]) if batch else 0

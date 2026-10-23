@@ -202,7 +202,7 @@ kbd {
 .pill.stranger { color: var(--text-2); background: transparent; border: 1px dashed var(--text-3); line-height: 16px; }
 .pill.novoice, .pill.unlabeled { color: var(--text-2); background: var(--line); }
 .pill.skipped { color: var(--text-3); background: transparent; border: 1px solid var(--line); line-height: 16px; }
-.pill.special { color: var(--text-2); background: var(--line); }
+.pill.done { color: var(--text-2); background: var(--line); }
 .pill.reject { color: var(--bad); background: var(--bad-soft); }
 .pill.unusable { color: var(--bad); background: transparent; border: 1px solid var(--bad); line-height: 16px; }
 .pill.maybe { color: var(--warn); background: transparent; border: 1px dashed var(--warn); line-height: 16px; }
