@@ -96,7 +96,7 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
     chose them, then the cutting subtitles if they are in that language. A missing or unreadable
     file is reported, not raised, so the interface still opens."""
     from avoc.pipeline import spoken_language
-    from avoc.stages.text_subtitle import load_text_lines, shifted, subtitle_languages
+    from avoc.stages.text_subtitle import load_text_lines, shifted, subtitle_languages, turn_lines
 
     spoken = spoken_language(episode)
     assumed = not episode.get("spoken_language") or episode.get("spoken_from") == "assumed"
@@ -125,10 +125,14 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
     if not path.is_file():
         return failed("没记切片段用的字幕", "no subtitles are recorded for cutting")
     styles = episode.get("subtitle_styles")
+    offset = float(episode.get("subtitle_offset") or 0.0)
     try:
+        if episode.get("segmentation") == "speaker_turns":
+            # Cut one person at a time, so each clip's text is its own line; see `turn_lines`.
+            lines = turn_lines(path, styles)
+            return SpokenText(spoken, assumed, "cut", None, tuple(shifted(lines, offset)))
         if spoken in subtitle_languages(path, styles):
             lines = load_text_lines(path, styles, spoken)
-            offset = float(episode.get("subtitle_offset") or 0.0)
             return SpokenText(spoken, assumed, "cut", None, tuple(shifted(lines, offset)))
     except ValueError as exc:
         return failed(str(exc), str(exc))
@@ -201,12 +205,29 @@ def subtitle_lines(episode: dict[str, Any]) -> list[tuple[float, float, str]]:
     audio-track time. They come from the styles recorded when the episode was cut. Episodes cut
     before styles were recorded pick them again, which gives the same lines."""
     from avoc.stages.subtitle import load_dialogue
+    from avoc.stages.text_subtitle import turn_lines
 
     path = Path(episode.get("subtitles") or "")
     if not path.is_file():
         return []
     offset = float(episode.get("subtitle_offset") or 0.0)
-    lines = load_dialogue(path, episode.get("subtitle_styles"))
+    styles = episode.get("subtitle_styles")
+    if episode.get("segmentation") == "speaker_turns":
+        return [(x.start + offset, x.end + offset, x.text) for x in turn_lines(path, styles)]
+    lines = load_dialogue(path, styles)
+    return [(line["start"] + offset, line["end"] + offset, line["text"]) for line in lines]
+
+
+def display_lines(episode: dict[str, Any]) -> list[tuple[float, float, str]]:
+    """The lines of the display subtitles (see `attach_display_subtitles` in pipeline.py), in
+    audio-track time. Empty when there are none or the file is gone."""
+    from avoc.stages.subtitle import load_dialogue
+
+    path = Path(episode.get("display_subtitles") or "")
+    if not path.is_file():
+        return []
+    offset = float(episode.get("display_subtitle_offset") or 0.0)
+    lines = load_dialogue(path, episode.get("display_subtitle_styles"))
     return [(line["start"] + offset, line["end"] + offset, line["text"]) for line in lines]
 
 
@@ -300,6 +321,9 @@ def load_workspace(
         reach = max((x.end - x.start for x in said.lines), default=0.0)
         lines = subtitle_lines(episode)
         starts = [line[0] for line in lines]
+        # With display subtitles, the line shown is theirs; the spoken text is shown under it.
+        shown = display_lines(episode)
+        shown_starts = [line[0] for line in shown]
         spans = sorted((float(row["start"]), float(row["end"])) for row in rows)
         gaps = {spans[k]: neighbor_gap(spans, k, lines, starts) for k in range(len(spans))}
         scene, previous_end = 0, None
@@ -313,7 +337,8 @@ def load_workspace(
                     episode=episode["name"],
                     start=float(row["start"]),
                     end=float(row["end"]),
-                    text=text_for(lines, starts, float(row["start"]), float(row["end"])),
+                    text=text_for(shown, shown_starts, float(row["start"]), float(row["end"]))
+                    or text_for(lines, starts, float(row["start"]), float(row["end"])),
                     scene=scene,
                     row=position.get(row["id"]),
                     gap=gaps[(float(row["start"]), float(row["end"]))],

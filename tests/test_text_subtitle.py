@@ -8,6 +8,7 @@ import soundfile as sf
 from fastapi.testclient import TestClient
 
 from avoc.app.server import AppState, create_app
+from avoc.pipeline import attach_display_subtitles
 from avoc.project import read_json, write_json
 from avoc.stages.text_subtitle import (
     TextLine,
@@ -16,6 +17,7 @@ from avoc.stages.text_subtitle import (
     measure_offset,
     own_tag,
     subtitle_languages,
+    turn_lines,
 )
 from tests.fixtures import episode
 
@@ -198,6 +200,57 @@ def test_cutting_subtitles_in_the_spoken_language_give_the_text(tmp_path: Path) 
     result = client.post("/api/export", json={"roles": ["A"], "out": str(out)}).json()
     assert result["rejected"] == {"台词里有别人的话": 1}
     assert _texts(out / "train.list")[:3] == ["ボクだよ", "いくよ", "はちみー"]
+
+
+def test_cutting_lines_are_one_person_each_and_repeats_are_one_entry(tmp_path: Path) -> None:
+    """One line broken into three entries in a row is one entry. Another entry shown at the same
+    time stays its own. An entry with two named people is split by character count."""
+    path = _srt(
+        tmp_path / "ja.srt",
+        [
+            (0.0, 0.8, "わあ～！"),
+            (0.8, 1.0, "わあ～！"),
+            (1.0, 3.0, "わあ～！"),
+            (1.0, 3.0, "ものすごい脚で"),
+            (4.0, 5.0, r"（マルゼン）ん？\N（記者）あれは"),
+            (6.0, 7.0, "わあ～！"),
+        ],
+    )
+    lines = turn_lines(path)
+    assert [(x.start, round(x.end, 6), x.text, x.speaker) for x in lines] == [
+        (0.0, 3.0, "わあ～！", ""),
+        (1.0, 3.0, "ものすごい脚で", ""),
+        (4.0, 4.4, "ん？", "マルゼン"),
+        (4.4, 5.0, "あれは", "記者"),
+        (6.0, 7.0, "わあ～！", ""),
+    ]
+
+
+def test_display_subtitles_are_shown_and_the_spoken_text_comes_from_the_clip(
+    tmp_path: Path,
+) -> None:
+    """Cut from Japanese, one person at a time: each clip's own line is its text, with nothing to
+    match. Chinese display subtitles give the line shown above it."""
+    root = _workspace(tmp_path)
+    directory = root / "episodes/ep1"
+    lines = [(i, i + 0.9, t) for i, (_, _, t) in enumerate(JA[:4])] + [(7.3, 9.8, JA[6][2])]
+    _srt(directory / "ja.srt", lines)
+    meta = read_json(directory / "episode.json")
+    write_json(
+        directory / "episode.json",
+        {**meta, "subtitles": str(directory / "ja.srt"), "segmentation": "speaker_turns"},
+    )
+    shown = attach_display_subtitles(directory, directory / "cut.ass")
+    assert shown["display_subtitle_offset"] == 0.0
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    clips = TestClient(create_app(state)).get("/api/clips").json()
+    assert [(c["text"], c["spoken"]) for c in clips[:4]] == [
+        ("中文0", "ボクだよ"),
+        ("中文1", "いくよ"),
+        ("中文2", "はちみー"),
+        ("中文3", "よし がんばる"),
+    ]
+    assert all(c["spoken_problem"] is None for c in clips[:4])
 
 
 def test_a_bilingual_file_keeps_only_the_spoken_lines(tmp_path: Path) -> None:

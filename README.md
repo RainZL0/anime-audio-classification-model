@@ -45,17 +45,18 @@ uv run avoc doctor
 
 `doctor` checks the GPU, FFmpeg, the voice separation model, your Hugging Face token and free disk space. Fix anything it marks as missing.
 
-**1. Add an episode** to a workspace folder. You need its video and a subtitle file (`.ass` or `.srt`) whose lines match the dialogue. One command separates the voices, cuts the clips and computes everything the labeling app needs:
+**1. Add an episode** to a workspace folder. You need its video and a subtitle file (`.ass` or `.srt`) whose lines match the dialogue, best in the language spoken. One command separates the voices, cuts the clips and computes everything the labeling app needs:
 
 ```bash
-uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
+uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt" --offset 0
 ```
 
 | Option | What it does |
 | --- | --- |
 | `--offset` | Seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and subtitle group almost always share one offset: find it once, then reuse it. |
 | *(no `--offset`)* | The offset is measured with [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1). That model is gated: accept its terms on Hugging Face, then run `uv run hf auth login`. |
-| `--text-subs "Episode 01.ja.ass"` | When the subtitles are a translation, attach subtitles in the language spoken. The exported text is taken from them. You can also attach them later in the app. |
+| `--display-subs "Episode 01.zh.ass"` | A translation you can read, shown above each line while labeling. Nothing is exported from it. |
+| `--text-subs "Episode 01.ja.ass"` | Only when `--subs` is a translation: attach subtitles in the language spoken, and the exported text is taken from them. Many clips get no text this way, so prefer `--subs` in the spoken language. |
 | `--spoken ja` | The language spoken (`ja`, `zh`, `en`, `ko`). By default it is read from the audio track, and the matching track of a dual-audio video is used. |
 
 If a run stops halfway (out of GPU memory, for example), run the same command again. It continues where it stopped. You can also add episodes from inside the app.

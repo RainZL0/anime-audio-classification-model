@@ -83,6 +83,7 @@ class Adding:
         name: str | None = None,
         styles: list[str] | None = None,
         spoken: str | None = None,
+        display_subtitles: Path | None = None,
     ) -> dict[str, Any]:
         """Check what can be checked at once, then start `avoc add` in the background. Raises
         ValueError with a reason the person can act on. `styles` are the subtitle styles that hold
@@ -112,6 +113,13 @@ class Adding:
                     f"cannot find the text subtitles: {text_subtitles}",
                 )
             )
+        if display_subtitles is not None and not display_subtitles.is_file():
+            raise ValueError(
+                say(
+                    f"找不到显示用字幕文件：{display_subtitles}",
+                    f"cannot find the display subtitles: {display_subtitles}",
+                )
+            )
         from avoc.stages.subtitle import load_dialogue
 
         if not load_dialogue(subtitles, styles):
@@ -135,6 +143,8 @@ class Adding:
                    "--subs", str(subtitles), "--name", name]  # fmt: skip
         if text_subtitles is not None:
             command += ["--text-subs", str(text_subtitles)]
+        if display_subtitles is not None:
+            command += ["--display-subs", str(display_subtitles)]
         if offset is not None:
             command += ["--offset", str(offset)]
         if styles is not None:

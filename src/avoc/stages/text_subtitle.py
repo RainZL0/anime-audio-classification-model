@@ -9,7 +9,9 @@ shifted to line up with the audio. Then find the dialogue for each clip, one cli
 whose dialogue cannot be found in full is not exported, and the reason is recorded.
 
 Several lines in one subtitle entry are often two people each saying one sentence. So the entry is
-split into lines, and its time is shared among the lines by character count. Speaker names, sound
+split into lines, and its time is shared among the lines by character count. When the subtitles
+used for cutting are themselves in the spoken language, each clip is one person's part of an entry
+(see `turn_lines`), and its text is that part. Speaker names, sound
 notes and other marks are removed by the rules in captions.py. A speaker name, where the subtitles
 give one, is used to spot other people's lines that got mixed in.
 """
@@ -120,6 +122,44 @@ def load_text_lines(
         for text, speaker in kept:
             length = span * len(text) / total
             lines.append(TextLine(at, at + length, text, speaker))
+            at += length
+    return sorted(lines, key=lambda line: (line.start, line.end))
+
+
+SAME_ENTRY_GAP = 0.05
+"""Two entries with the same text, the second starting at most this many seconds after the first
+ends, are one entry. Some subtitles break an entry wherever another entry starts or ends on screen,
+so one line shows up as several entries in a row."""
+
+
+def turn_lines(path: Path, styles: list[str] | None = None) -> list[TextLine]:
+    """The lines of subtitles in the language spoken, one for each person in each entry, sorted by
+    time. Clips are cut from them when the subtitles are in the spoken language; see
+    `speaker_turns` in captions.py for where an entry is split. An entry's time is shared among its
+    people by character count, as in `load_text_lines`. The times are the subtitle file's own."""
+    from avoc.stages.captions import speaker_turns
+
+    found = sorted(
+        (e.start / 1000.0, e.end / 1000.0, e.plaintext) for e, _ in _entries(path, styles)
+    )
+    entries: list[list[Any]] = []
+    last: dict[str, list[Any]] = {}
+    for start, end, text in found:
+        before = last.get(text)
+        if before is not None and start <= before[1] + SAME_ENTRY_GAP:
+            before[1] = max(before[1], end)
+            continue
+        last[text] = [start, end, text]
+        entries.append(last[text])
+    lines: list[TextLine] = []
+    for start, end, text in entries:
+        turns = speaker_turns(text)
+        total = sum(len(words) for turn in turns for words, _ in turn)
+        at = start
+        for turn in turns:
+            length = (end - start) * sum(len(words) for words, _ in turn) / total
+            speaker = next((name for _, name in turn if name), "")
+            lines.append(TextLine(at, at + length, " ".join(w for w, _ in turn), speaker))
             at += length
     return sorted(lines, key=lambda line: (line.start, line.end))
 

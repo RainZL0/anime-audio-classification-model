@@ -130,8 +130,10 @@ def prepare(
     styles: list[str] | None = None,
     spoken: str | None = None,
 ) -> dict[str, Any]:
-    """Each subtitle line is a clip. The offset can be given directly, or measured automatically if
-    it is not given. `styles` are the subtitle styles that hold the dialogue; if None, they are
+    """Each subtitle line is a clip. When the subtitles are in the spoken language alone, an entry
+    where two people speak becomes one clip per person (see `turn_lines` in
+    stages/text_subtitle.py). The offset can be given directly, or measured automatically if it is
+    not given. `styles` are the subtitle styles that hold the dialogue; if None, they are
     picked automatically (see `stages/subtitle.py`). The styles used are kept in episode.json, so
     the interface reads the same lines later.
 
@@ -167,6 +169,7 @@ def prepare(
         read_subtitles,
     )
     from avoc.stages.text_language import ASSUMED
+    from avoc.stages.text_subtitle import subtitle_languages, turn_lines
 
     validate_name(name)
     if out.exists():
@@ -250,6 +253,11 @@ def prepare(
                     "Check the subtitles against the source",
                 )
             )
+    # Subtitles in the spoken language alone are cut one person at a time, so each clip's text is
+    # exactly what is said in it. Others are cut one entry at a time, as before.
+    by_turns = list(subtitle_languages(subtitles, styles)) == [spoken]
+    if by_turns:
+        lines = [(x.start, x.end) for x in turn_lines(subtitles, styles)]
     # Remove duplicate times from bilingual subtitles. Do not join adjacent lines, and do not shrink
     # the boundaries based on audio quality or speaker labels.
     spans = sorted({(max(0.0, a + offset), min(source.duration, b + offset)) for a, b in lines})
@@ -268,14 +276,20 @@ def prepare(
         "subtitle_offset": offset,
         "alignment_overlap": overlap,
         "sample_rate": source.sample_rate,
-        "segmentation": "subtitle_lines",
+        "segmentation": "speaker_turns" if by_turns else "subtitle_lines",
         "audio_track": track,
         "spoken_language": spoken,
         "spoken_from": how,
     }
     write_json(out / "segments.json", rows)
     write_json(out / "episode.json", episode)
-    return {"episode": name, "segments": len(rows), "offset": offset, "overlap": overlap}
+    return {
+        "episode": name,
+        "segments": len(rows),
+        "offset": offset,
+        "overlap": overlap,
+        "by_turns": by_turns,
+    }
 
 
 VIDEO_TOLERANCE = 0.5
@@ -446,6 +460,53 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     return {"episode": episode["name"], **result, "matched": round(matched, 4)}
 
 
+def attach_display_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
+    """Attach subtitles in a language the person reads, usually a translation, to an episode cut
+    from subtitles in the spoken language. They are only shown while labeling; export never takes
+    text from them. The dialogue styles are picked as for cutting, and the time offset is found by
+    comparing them with the subtitles used for cutting. Refused when after lining up the overlap
+    is below `MIN_AGREEMENT`."""
+    from avoc.app.workspace import subtitle_lines
+    from avoc.stages.subtitle import find_offset, load_dialogue, pick_styles, read_subtitles
+    from avoc.stages.text_subtitle import MIN_AGREEMENT
+
+    episode, _ = load_episode(directory)
+    if not subtitles.is_file():
+        raise ValueError(say(f"字幕不存在：{subtitles}", f"subtitles not found: {subtitles}"))
+    cut = [(start, end) for start, end, _ in subtitle_lines(episode)]
+    if not cut:
+        raise ValueError(
+            say(
+                f"{episode['name']} 还没记切片段用的字幕，先用 avoc set-subtitles 补上",
+                f"{episode['name']} has no subtitles recorded for cutting; "
+                "add them with avoc set-subtitles",
+            )
+        )
+    styles = pick_styles(read_subtitles(subtitles))
+    lines = [(d["start"], d["end"]) for d in load_dialogue(subtitles, styles)]
+    if not lines:
+        raise ValueError(say(f"{subtitles.name} 里没有台词", f"{subtitles.name} has no lines"))
+    duration = max(max(end for _, end in lines), max(end for _, end in cut))
+    offset, agreement = find_offset(lines, cut, duration)
+    if agreement < MIN_AGREEMENT:
+        raise ValueError(
+            say(
+                f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
+                f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕",
+                f"{subtitles.name} overlaps this episode's subtitles by at most {agreement:.0%}, "
+                f"below {MIN_AGREEMENT:.0%}; it is probably for another episode",
+            )
+        )
+    result = {
+        "display_subtitles": str(subtitles.resolve()),
+        "display_subtitle_styles": styles,
+        "display_subtitle_offset": offset,
+        "display_subtitle_agreement": agreement,
+    }
+    write_json(directory / "episode.json", {**episode, **result})
+    return {"episode": episode["name"], **result}
+
+
 def check_text_language(subtitles: Path, spoken: str) -> None:
     """Refuse text subtitles that have no lines in the language spoken."""
     from avoc.stages.text_language import languages_note
@@ -544,11 +605,14 @@ def add_episode(
     report: Callable[[str], None] = lambda _: None,
     styles: list[str] | None = None,
     spoken: str | None = None,
+    display_subtitles: Path | None = None,
 ) -> dict[str, Any]:
     """One command adds one episode: `prepare`, the few voiceprints the interface needs, and, if
     there are text subtitles in the spoken language, attaches them too. `report` gets one line for
     each step. `styles` are the subtitle styles that hold the dialogue; None picks them
     automatically. `spoken` is the language spoken; None takes it from the audio track.
+    `display_subtitles` are shown while labeling; see `attach_display_subtitles`. When they are
+    refused, the episode is still added, with a warning.
 
     When no subtitles in the spoken language are given, the episode is still added, with a
     warning: audio-only export does not need text, and the subtitles can be attached later.
@@ -648,6 +712,35 @@ def add_episode(
                 f"Cut {result['segments']} clips, subtitle offset {result['offset']:+.2f} seconds",
             )
         )
+        if result["by_turns"]:
+            report(
+                say(
+                    "字幕是这一集说的语言：一条字幕里有两个人说话的，按人分开切",
+                    "The subtitles are in the language spoken: an entry where two people speak "
+                    "is cut into one clip per person",
+                )
+            )
+
+    if display_subtitles is not None:
+        report(say("配显示用字幕", "Attaching display subtitles"))
+        try:
+            shown = attach_display_subtitles(out, display_subtitles)
+            report(
+                say(
+                    f"偏移 {shown['display_subtitle_offset']:+.2f} 秒，"
+                    f"和切片段用的字幕重合 {shown['display_subtitle_agreement']:.0%}",
+                    f"Offset {shown['display_subtitle_offset']:+.2f} seconds, overlap with the "
+                    f"subtitles used for cutting {shown['display_subtitle_agreement']:.0%}",
+                )
+            )
+        except ValueError as exc:
+            report(
+                say(
+                    f"注意：显示用字幕没配上：{exc}。以后可以用 avoc set-display-subtitles 再配",
+                    f"Note: the display subtitles were not attached: {exc}. Attach them later "
+                    "with avoc set-display-subtitles",
+                )
+            )
 
     # The text subtitles are attached last. Note them down now, so a run that stops before then
     # still attaches them when it carries on, even without --text-subs.

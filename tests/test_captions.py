@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from avoc.stages.captions import marked, spoken, spoken_lines
+from avoc.stages.captions import marked, speaker_turns, spoken, spoken_lines
 from avoc.stages.text_subtitle import same_name
 
 
@@ -70,6 +70,34 @@ def test_unknown_marks_are_reported() -> None:
     assert marked(["ふつうの台詞", "ふつうの台詞"]) is None
     found = marked(["〈ナレーター〉昔々", "「ok」", "【回想", "【回想"])
     assert found == {"lines": 2, "examples": ["〈ナレーター〉昔々", "【回想"]}
+
+
+@pytest.mark.parametrize(
+    ("entry", "expected"),
+    [
+        # A long sentence wrapped onto a second line is one person.
+        (
+            "ルドルフちゃんみたいになるには\n才能と努力と運",
+            [["ルドルフちゃんみたいになるには", "才能と努力と運"]],
+        ),
+        # A name opens the first line; the line after it has no mark and goes on with her.
+        (
+            "（テイオー）ボクは\nシンボリルドルフさんみたいな",
+            [["ボクは", "シンボリルドルフさんみたいな"]],
+        ),
+        ("（マルゼン）ん？\n（記者）あれ？", [["ん？"], ["あれ？"]]),
+        ("（テイオー）ボクは\n（トウカイテイオー）がんばる", [["ボクは", "がんばる"]]),
+        ("あれ？\n（記者）君 ここは…", [["あれ？"], ["君 ここは…"]]),
+        ("－あっ\n－うん", [["あっ"], ["うん"]]),
+        ("－（女性）\nあっ\n－うん", [["あっ"], ["うん"]]),
+        # Two people with no mark cannot be told apart.
+        ("わあ～！\nフフッ… わっ", [["わあ～！", "フフッ… わっ"]]),
+    ],
+)
+def test_an_entry_is_split_where_another_person_starts(
+    entry: str, expected: list[list[str]]
+) -> None:
+    assert [[words for words, _ in turn] for turn in speaker_turns(entry)] == expected
 
 
 def test_full_and_short_names_are_the_same_person() -> None:

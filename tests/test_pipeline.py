@@ -103,6 +103,31 @@ def test_prepare_uses_subtitle_boundaries_keeps_short_lines(
     assert read_json(out / "episode.json")["video"] == str(video.resolve())
 
 
+def test_prepare_cuts_subtitles_in_the_spoken_language_one_person_at_a_time(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from avoc import audio
+
+    directory = episode(tmp_path, "ep1")
+    source = directory / "ep1.wav"
+    subtitles = tmp_path / "ja.srt"
+    subtitles.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\n（マルゼン）ん？\n（記者）あれは\n\n"
+        "2\n00:00:03,000 --> 00:00:04,000\nよかった\n思ったより元気そうね\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(audio, "make_analysis_copy", lambda src, dst: dst.write_bytes(b"analysis"))
+    video = tmp_path / "ep1.mp4"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(pipeline, "video_seconds", lambda path: audio.audio_info(source).duration)
+    out = tmp_path / "prepared"
+    result = pipeline.prepare(video, subtitles, out, "new", source, 0.0, audio=source, spoken="ja")
+    rows = read_json(out / "segments.json")
+    assert [(r["start"], round(r["end"], 3)) for r in rows] == [(1.0, 1.4), (1.4, 2.0), (3.0, 4.0)]
+    assert result["by_turns"]
+    assert read_json(out / "episode.json")["segmentation"] == "speaker_turns"
+
+
 def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: Any) -> None:
     directory = episode(tmp_path, "ep1")
     subtitles = tmp_path / "test.srt"
@@ -135,7 +160,7 @@ def _fake_prepare(calls: list[str]) -> Any:
         episode(out.parent, name)
         meta = read_json(out / "episode.json")
         write_json(out / "episode.json", {**meta, "video": str(video.resolve())})
-        return {"episode": name, "segments": 3, "offset": -0.9, "overlap": None}
+        return {"episode": name, "segments": 3, "offset": -0.9, "overlap": None, "by_turns": False}
 
     return prepare
 

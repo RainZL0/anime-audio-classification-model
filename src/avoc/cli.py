@@ -72,7 +72,11 @@ def add(
     ],
     video: Annotated[Path, typer.Argument(help="Video of this episode")],
     subs: Annotated[
-        Path, typer.Option(help="Dialogue subtitles of this episode; clips are cut from them")
+        Path,
+        typer.Option(
+            help="Dialogue subtitles of this episode; clips are cut from them. Best in the "
+            "language spoken (usually Japanese)"
+        ),
     ],
     name: Annotated[
         str | None,
@@ -84,7 +88,14 @@ def add(
         Path | None,
         typer.Option(
             help="Separate text subtitles (usually the Japanese original); export takes the text "
-            "from them"
+            "from them. Only needed when --subs is a translation"
+        ),
+    ] = None,
+    display_subs: Annotated[
+        Path | None,
+        typer.Option(
+            help="Subtitles in a language you read (usually a translation), shown while labeling; "
+            "export never takes text from them"
         ),
     ] = None,
     audio: Annotated[
@@ -126,6 +137,7 @@ def add(
             report=report,
             styles=style_list(styles),
             spoken=spoken,
+            display_subtitles=display_subs,
         )
     except ValueError as exc:
         typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
@@ -266,6 +278,24 @@ def set_text_subtitles(
     )
     if result["text_subtitle_marked"]:
         typer.echo(marked_note(result["text_subtitle_marked"]))
+
+
+@app.command("set-display-subtitles")
+def set_display_subtitles(
+    episode: Path,
+    subtitles: Annotated[
+        Path,
+        typer.Argument(help="Subtitles in a language you read, usually a translation"),
+    ],
+) -> None:
+    """Add subtitles that are only shown while labeling, for an episode cut from subtitles in a
+    language you do not read. The offset is measured automatically, and the command refuses if the
+    two do not line up."""
+    result = pipeline.attach_display_subtitles(episode, subtitles)
+    typer.echo(
+        f"{result['episode']}: offset {result['display_subtitle_offset']} seconds, "
+        f"overlap with the clip subtitles {result['display_subtitle_agreement']:.0%}"
+    )
 
 
 @app.command("set-spoken-language")

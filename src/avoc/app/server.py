@@ -692,6 +692,7 @@ class AddBody(BaseModel):
     video: str = ""
     subtitles: str = ""
     text_subtitles: str = ""
+    display_subtitles: str = ""
     offset: float | None = None
     styles: list[str] | None = None
     """The subtitle styles that hold the dialogue. None picks them automatically."""
@@ -982,6 +983,7 @@ def create_app(state: AppState) -> Any:
                     say("视频和字幕都要填", "both the video and the subtitles are needed")
                 )
             text = clean_path(body.text_subtitles) if body.text_subtitles.strip() else None
+            shown = clean_path(body.display_subtitles) if body.display_subtitles.strip() else None
             return state.adding.start(
                 clean_path(body.video),
                 clean_path(body.subtitles),
@@ -989,6 +991,7 @@ def create_app(state: AppState) -> Any:
                 body.offset,
                 styles=body.styles,
                 spoken=body.spoken or None,
+                display_subtitles=shown,
             )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc

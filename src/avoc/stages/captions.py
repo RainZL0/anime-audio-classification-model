@@ -93,6 +93,10 @@ def _join(lines: list[str]) -> list[str]:
     return joined
 
 
+DASH = re.compile(r"^[-‐－]")
+"""A dash at the start of a line: a second person starts speaking (see `CLEANUP`)."""
+
+
 def spoken_lines(entry: str) -> list[tuple[str, str]]:
     """(words, speaker) for each line of one subtitle entry. The speaker is empty if no name is
     given. Lines with no spoken words, such as a lone sound note or a song lyric, are left out.
@@ -101,12 +105,38 @@ def spoken_lines(entry: str) -> list[tuple[str, str]]:
     note alone on its line, such as （歓声）, looks the same and is taken as a name too. That only
     makes the check for someone else's speech stricter: fewer clips are exported, but no wrong text
     is."""
-    found: list[tuple[str, str]] = []
+    return [(words, speaker) for words, speaker, _ in _marked_lines(entry)]
+
+
+def speaker_turns(entry: str) -> list[list[tuple[str, str]]]:
+    """The lines of one subtitle entry, grouped by who says them, in order. A new person starts at
+    a line opened by a dash, or at a line with a name other than the name of the person before (a
+    person with no name counts as another). A line with no mark goes on with the person before:
+    subtitles wrap a long sentence onto a second line, as in ルドルフちゃんみたいになるには then
+    才能と努力と運. Two people with no mark at all stay in one group; nothing in the text tells
+    them apart."""
+    turns: list[list[tuple[str, str]]] = []
+    name = ""
+    for words, speaker, dash in _marked_lines(entry):
+        same = bool(name) and (speaker.endswith(name) or name.endswith(speaker))
+        if not turns or dash or (speaker and not same):
+            turns.append([])
+            name = speaker
+        turns[-1].append((words, speaker))
+    return turns
+
+
+def _marked_lines(entry: str) -> list[tuple[str, str, bool]]:
+    """(words, speaker, opened by a dash) for each line; see `spoken_lines`."""
+    found: list[tuple[str, str, bool]] = []
     waiting = ""
+    dash_waiting = False
     for line in _join([VOICE_MARKS.sub("", raw).strip() for raw in entry.split("\n")]):
         if line[:1] in MUSIC:
             continue
         line = READING.sub("", "".join(c for c in line if not _symbol(c))).strip()
+        dash = bool(DASH.match(line)) or dash_waiting
+        dash_waiting = False
         for pattern, replacement, _ in CLEANUP:
             line = pattern.sub(replacement, line)
         speaker, waiting = waiting, ""
@@ -117,14 +147,14 @@ def spoken_lines(entry: str) -> list[tuple[str, str]]:
         ):
             speaker, line = name, line[tag.end() :]
             if not line.strip():
-                waiting = name
+                waiting, dash_waiting = name, dash
                 continue
         while (lighter := NOTE.sub("", line)) != line:
             line = lighter
         line = re.sub(r"[｡-ﾟ]+", lambda m: unicodedata.normalize("NFKC", m[0]), line)
         line = " ".join(line.split())  # Also turns full-width spaces into plain ones.
         if any(c.isalnum() for c in line):  # Not just a wave dash or … left from a lyric or sigh.
-            found.append((line, speaker))
+            found.append((line, speaker, dash))
     return found
 
 
