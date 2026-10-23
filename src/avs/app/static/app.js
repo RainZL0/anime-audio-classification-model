@@ -28,6 +28,8 @@ const STATUS_TEXT = {
 };
 const NEEDS_WORK = new Set(["review", "novoice", "unlabeled"]);
 const VIEWS = ["groups", "scene", "roles", "export"];
+/* 取列表时被后发的请求取代了，结果丢掉，不算出错。 */
+const STALE = new Error("stale");
 /* 打开网页时网址 # 后面记着的位置，见 App 里写回网址的那段。 */
 const saved = new URLSearchParams(location.hash.slice(1));
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
@@ -194,7 +196,7 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
           <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} size="lg"
             onClick=${!isSpecial && hasVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
           <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
-            ${roles[clip.label]?.target && clip.unusable && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
+            ${clip.unusable && !special[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
           ${!isSpecial && hasVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
             title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
@@ -253,7 +255,7 @@ function Row({ clip, roles, special, selected, marked, onSelect, flash, maybeOf 
             : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : "未知"}</span>
         <${Pill} clip=${clip} />
         ${marked && html`<span class="pill reject">不是这个角色</span>`}
-        ${roles[clip.label]?.target && clip.unusable && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
+        ${clip.unusable && !special[clip.label] && html`<span class="pill unusable" title=${LOW_TIP}>质量低</span>`}
         ${clip.maybe && html`<span class="pill maybe" title="机器没归给这个角色，但听起来有可能是">可能漏掉 ${pct(chanceOf(clip, maybeOf))}</span>`}
       </div>
       <div class="say ${clip.text ? "" : "empty"}">${clip.text || "（没有字幕文字）"}</div>
@@ -590,13 +592,13 @@ function Help({ onClose }) {
     ["/", "搜索角色，或者敲名字新建"],
     ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"],
     ["L", "看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常"], ["Z", "撤销上一步（可以一直往回撤）"],
-    ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
+    ["F", "场景视图里只看要处理的"], ["角色视图里机器归给 TA 的句子按 X", "标出不是 TA 的，Shift+Enter 时记成不是 TA"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
     ["截头像时 Enter / Esc", "保存 / 放弃"],
   ];
   return html`<div class="overlay" onClick=${onClose}><div class="help" onClick=${(e) => e.stopPropagation()}>
     <h2>快捷键</h2><table>${rows.map(([k, v]) => html`<tr><td><kbd>${k}</kbd></td><td>${v}</td></tr>`)}</table>
-    <p class="note" style="margin-top:12px">每次标注都立刻保存，并让机器重新学一次。所有操作都能撤销。</p>
+    <p class="note" style="margin-top:12px">每次标注都立刻保存，并让机器重新学一次。标注、新建、改名和合并角色都能撤销；头像和设不设目标角色不算标注，直接改回去就行。</p>
   </div></div>`;
 }
 
@@ -741,11 +743,19 @@ function App() {
   const refAudio = useRef(null);
   const toastTimer = useRef(null);
   const stableOrder = useRef(null);
+  const loadSeq = useRef(0);
 
   const roles = useMemo(() => Object.fromEntries((state?.roles || []).map((r) => [r.name, r])), [state]);
-  /* 显示用：特殊标签加上「其他」。X / C / V 只对应真正的特殊标签。 */
+  /* 显示用：特殊标签加上「其他」。 */
   const special = useMemo(() => (state ? { ...state.special, [OTHER]: "其他" } : {}), [state]);
   const episodeInfo = state?.episodes.find((e) => e.name === episode);
+  /* 角色栏的顺序在一次会话里固定不动，新角色排到最后：数字键不会在手底下跳。
+     在渲染时就补上，新角色当场出现在栏里，不用等下一次刷新。已经没有的名字留在顺序里不碍事，
+     改名时新名字先占在旧名字后面，见 renameRole。 */
+  if (state) {
+    const known = new Set(dockOrder.current);
+    for (const r of state.roles) if (!known.has(r.name)) dockOrder.current.push(r.name);
+  }
   /* 底部角色栏只放目标角色，数字键按这个顺序。 */
   const dock = dockOrder.current.filter((n) => roles[n]?.target);
   const totalConfirmed = state ? state.roles.reduce((s, r) => s + r.confirmed, 0) : 0;
@@ -771,14 +781,6 @@ function App() {
     toastTimer.current = setTimeout(() => setToast(null), isError ? 6000 : 3800);
   }, []);
 
-  /* 角色栏的顺序在一次会话里固定不动，新角色排到最后：数字键不会在手底下跳。 */
-  useEffect(() => {
-    if (!state) return;
-    const known = new Set(dockOrder.current);
-    for (const r of state.roles) if (!known.has(r.name)) dockOrder.current.push(r.name);
-    dockOrder.current = dockOrder.current.filter((n) => roles[n]);
-  }, [state]);
-
   useEffect(() => {
     call("/api/state").then((s) => {
       setState(s);
@@ -793,26 +795,39 @@ function App() {
   /* 换集、换视图、换角色时重新取列表。列表取来后顺序固定，标完的句子留在原处，不会突然跳走。 */
   const load = useCallback(async () => {
     if (!state) return;
+    /* 只用最后一次取的结果：先发的请求后回来时，不能盖掉已经换了的集、视图或角色。 */
+    const seq = ++loadSeq.current;
+    const get = async (url) => {
+      const result = await call(url);
+      if (seq !== loadSeq.current) throw STALE;
+      return result;
+    };
     if (view === "scene" && episode) {
-      const list = await call(`/api/clips?episode=${encodeURIComponent(episode)}`);
+      const list = await get(`/api/clips?episode=${encodeURIComponent(episode)}`);
       setClips(list);
       stableOrder.current = null;
       setFocus((f) => (list.some((c) => c.id === f) ? f : (list.find((c) => NEEDS_WORK.has(c.status)) || list[0])?.id));
     } else if (view === "roles" && role) {
-      const list = await call(`/api/clips?role=${encodeURIComponent(role)}`);
+      const list = await get(`/api/clips?role=${encodeURIComponent(role)}`);
       setClips(list); setMarks(new Set());
       setFocus((f) => (list.some((c) => c.id === f) ? f : (pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id));
     } else if (view === "groups" && episode) {
       setGroupsLoading(true);
-      const found = (await call(`/api/groups?episode=${encodeURIComponent(episode)}`)).map((g, i) => ({ ...g, key: i }));
-      setGroups(found); setGroupsLoading(false);
+      let found;
+      try {
+        found = (await get(`/api/groups?episode=${encodeURIComponent(episode)}`)).map((g, i) => ({ ...g, key: i }));
+      } finally {
+        if (seq === loadSeq.current) setGroupsLoading(false);
+      }
+      setGroups(found);
       setClips(found.flatMap((g) => g.clips));
       setFocus((f) => (found.some((g) => g.clips.some((c) => c.id === f)) ? f : found[0]?.clips[0]?.id));
     }
   }, [view, episode, role, !!state]);
+  const reload = () => load().catch((e) => e !== STALE && showToast(e.message, true));
   /* 换视图时先清空旧列表：旧列表里的句子不一定适合新视图（比如没有预测的句子进了角色视图）。 */
   useEffect(() => { setClips([]); setGroups([]); }, [view]);
-  useEffect(() => { load().catch((e) => showToast(e.message, true)); }, [load]);
+  useEffect(() => { reload(); }, [load]);
   useEffect(() => {
     if (view === "roles" && !role && state?.roles.length) setRole(state.roles[0].name);
   }, [view, state]);
@@ -830,7 +845,9 @@ function App() {
     if (view === "groups") return groups.flatMap((g) => g.clips.filter((c) => !c.label).map((c) => c.id));
     return [];
   }, [view, clips, onlyWork, showShort, role, groups]);
-  useEffect(() => { stableOrder.current = null; }, [onlyWork, episode]);
+  /* 切换时就清掉旧顺序，让下一次算出的顺序固定下来；放进 effect 会在算完之后才清，
+     标第一句时顺序重算，刚标的那句就从列表里消失了。 */
+  const toggleOnlyWork = (on) => { stableOrder.current = null; setOnlyWork(on); };
 
   const byId = useMemo(() => Object.fromEntries(clips.map((c) => [c.id, c])), [clips]);
   /* 场景视图筛掉了这一句时舞台留空，免得快捷键改到列表里看不见的句子。 */
@@ -849,8 +866,20 @@ function App() {
 
   useEffect(() => { setContext(0); }, [focus]);
 
+  /* 起步分组的顺序只有没标的句子；点开的是一句标过的，就按它在组里的位置找前后。 */
+  const groupIds = useMemo(() => groups.flatMap((g) => g.clips.map((c) => c.id)), [groups]);
+  const besides = (id) => {
+    const at = groupIds.indexOf(id);
+    return { after: order.filter((o) => groupIds.indexOf(o) > at), before: order.filter((o) => groupIds.indexOf(o) < at) };
+  };
   const move = (step) => {
     const at = order.indexOf(focus);
+    if (at < 0 && view === "groups" && groupIds.includes(focus)) {
+      const { after, before } = besides(focus);
+      const next = step > 0 ? after[0] ?? before.at(-1) : before.at(-1) ?? after[0];
+      if (next) setFocus(next);
+      return;
+    }
     const next = order[Math.min(Math.max(at + step, 0), order.length - 1)];
     if (next) setFocus(next);
   };
@@ -868,8 +897,8 @@ function App() {
   /* 起步分组里标完一批往下走：这批后面第一句没标的，后面没有了再从头找。 */
   const nextUnlabeled = (ids) => {
     const rest = (id) => !ids.includes(id);
-    const at = Math.max(0, ...ids.map((id) => order.indexOf(id)));
-    return order.slice(at + 1).find(rest) ?? order.find(rest);
+    const last = ids.reduce((a, id) => (groupIds.indexOf(id) > groupIds.indexOf(a) ? id : a), ids[0]);
+    return besides(last).after.find(rest) ?? order.find(rest);
   };
 
   const applyResult = (result, label) => {
@@ -959,7 +988,7 @@ function App() {
     if (!changes.length) return;
     const result = await send("/api/changes", { changes },
       `确认了 ${pending.length - marks.size} 句是 ${role}${marks.size ? `，${marks.size} 句退回待确认` : ""}`);
-    if (result) { setMarks(new Set()); setPlaying(false); load(); }
+    if (result) { setMarks(new Set()); setPlaying(false); reload(); }
   };
   const toggleMark = (id) => {
     const next = new Set(marks);
@@ -972,14 +1001,18 @@ function App() {
       ? prompt(`给「${role}」起个名字。填一个已有的名字就是把两个角色合并。`, "")
       : prompt(`把「${role}」改成什么名字？填一个已有的名字就是把两个角色合并。`, role);
     if (!next || next.trim() === role) return;
+    /* 改名不换数字键：新名字接在旧名字的位置上。合并时旧名字从栏里拿掉。 */
+    const renamed = !roles[next.trim()];
+    if (renamed) dockOrder.current = dockOrder.current.flatMap((n) => (n === role ? [n, next.trim()] : [n]));
     const result = await send("/api/roles", { name: role, new_name: next.trim() },
       roles[next.trim()] ? `已并进 ${next.trim()}` : `已改名为 ${next.trim()}`);
     if (result) { setRole(next.trim()); }
   };
   const toggleTarget = async () => {
-    const result = await send("/api/roles", { name: role, target: !roles[role].target },
-      roles[role].target ? `${role} 不再是目标角色，已标的留着` : `${role} 设为目标角色了`);
-    if (result) load();
+    const message = roles[role].target ? `${role} 不再是目标角色，已标的留着` : `${role} 设为目标角色了`;
+    /* 设不设目标角色不改标签，服务端不记批次，提示要自己弹。 */
+    const result = await send("/api/roles", { name: role, target: !roles[role].target }, message);
+    if (result) { showToast(message); reload(); }
   };
   /* 截头像要用舞台上正在放的视频。`then` 在截完或放弃之后执行，比如标完新角色再往下走。 */
   const hasFrame = () => !!playerRef.current?.videoWidth;
@@ -1057,9 +1090,9 @@ function App() {
       else if (k === "z") { handled(); undo(); }
       else if (k === "x" && view === "roles" && current && !current.label && !current.maybe) { handled(); toggleMark(current.id); move(1); }
       else if (e.key === "Backspace") { handled(); clear(); }
-      else if (k === "r" && current?.guess.length) { handled(); playRef(current.guess[0].name); }
+      else if (k === "r" && current?.guess.length && current.guess[0].name !== OTHER) { handled(); playRef(current.guess[0].name); }
       else if (k === "l" && current) { handled(); nextContext(); }
-      else if (k === "f" && view === "scene") { handled(); setOnlyWork(!onlyWork); }
+      else if (k === "f" && view === "scene") { handled(); toggleOnlyWork(!onlyWork); }
       else if (k === "p" && view === "roles") { handled(); setPlaying(!playing); }
       else if (k === "g") { handled(); setView("groups"); }
       else if (k === "s") { handled(); setView("scene"); }
@@ -1119,14 +1152,14 @@ function App() {
         context=${context} onContext=${nextContext} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
-          roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork}
+          roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${toggleOnlyWork}
           showShort=${showShort} setShowShort=${setShowShort} flashes=${flashes} episode=${episode} />`}
         ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} special=${special} role=${role} setRole=${setRole}
           clips=${clips} focus=${focus} setFocus=${pick} marks=${marks} toggleMark=${toggleMark}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTarget=${toggleTarget} flashes=${flashes}
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
-        ${view === "groups" && html`<${GroupsView} groups=${groups} loading=${groupsLoading} roles=${roles} special=${special}
+        ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} special=${special}
           focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}

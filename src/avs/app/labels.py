@@ -138,15 +138,19 @@ class LabelStore:
         changes: list[dict[str, Any]],
         source: str = "human",
         undo_of: int | None = None,
+        cast: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """写一批改动。每条改动是 `{"clip", "label"}`（`label` 为空表示清除），
         `{"clip", "reject", "on"}`（这条片段不是某个角色），或 `{"clip", 开关名: 开或关}`
         （见 `FLAGS`）。没有实际变化的改动会被丢掉。
 
-        标成「其他」时记下当前的目标角色；改动里给了 `against` 就用给的（撤销和迁移用）。"""
+        标成「其他」时记下当前的目标角色；改动里给了 `against` 就用给的（撤销和迁移用）。
+        这批顺带新建的角色记在批次的 `cast.created` 里，`cast` 里另给的改名、合并也一起记下，
+        撤销时角色表跟着改回去，见 `_undo_cast`。"""
         with self._lock:
             targets = self.targets()
             effective: list[dict[str, Any]] = []
+            created: list[str] = []
             for change in changes:
                 clip = change["clip"]
                 if "reject" in change:
@@ -187,16 +191,20 @@ class LabelStore:
                         entry["against"] = new
                     effective.append(entry)
                     if label is not None and label != OTHER and not is_special(label):
+                        if self.role(label) is None:
+                            created.append(label)
                         self._ensure_role(label)
             if not effective:
                 return None
-            batch = {
+            batch: dict[str, Any] = {
                 "batch": (self.batches[-1]["batch"] + 1) if self.batches else 1,
                 "time": datetime.now(UTC).isoformat(timespec="seconds"),
                 "source": source,
                 "undo_of": undo_of,
                 "changes": effective,
             }
+            if created or cast:
+                batch["cast"] = {**(cast or {}), **({"created": created} if created else {})}
             with self.events_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(batch, ensure_ascii=False) + "\n")
             self._replay(batch)
@@ -222,7 +230,16 @@ class LabelStore:
                     if "before_against" in change:
                         back["against"] = change["before_against"]
                     inverse.append(back)
-            return self.apply(inverse, source="undo", undo_of=target["batch"])
+            cast = target.get("cast", {})
+            self._undo_cast(cast)
+            batch = self.apply(inverse, source="undo", undo_of=target["batch"])
+            # 这批建出来的角色撤销后没有片段了，就一起去掉：按 N 再按 Z 不留下空角色。
+            created = {*cast.get("created", ()), *cast.get("unnamed", ())}
+            leftover = created - set(self.labels.values())
+            if leftover:
+                self.roles = [r for r in self.roles if r["name"] not in leftover]
+                self._save_cast()
+            return batch
 
     def update_role(self, name: str, **fields: Any) -> dict[str, Any]:
         """改颜色、头像、是不是目标角色。改名走 `rename_role`。
@@ -239,7 +256,8 @@ class LabelStore:
             return role
 
     def new_role(self) -> str:
-        """建一个还没起名字的角色，返回它的临时名字。"""
+        """建一个还没起名字的角色，返回它的临时名字。标签要接着用 `apply` 写，并在 `cast` 里
+        给 `{"unnamed": [名字]}`，撤销那批时这个角色才会一起去掉。"""
         with self._lock:
             number = 1
             while self.role(UNNAMED.format(number)) is not None:
@@ -261,15 +279,25 @@ class LabelStore:
             moved: list[dict[str, Any]] = [
                 {"clip": c, "label": new} for c, n in self.labels.items() if n == old
             ]
+            cast: dict[str, Any]
             if self.role(new) is None:
                 role = self.role(old)
                 assert role is not None
+                cast = {"renamed": {"from": old, "to": new, "named": role["named"]}}
                 role["name"] = new
                 role["named"] = True
             else:
                 merged = self.role(old)
                 kept = self.role(new)
                 assert merged is not None and kept is not None
+                cast = {
+                    "merged": {
+                        "role": dict(merged),
+                        "at": self.roles.index(merged),
+                        "into": new,
+                        "target": bool(kept.get("target")),
+                    }
+                }
                 kept["target"] = bool(kept.get("target")) or bool(merged.get("target"))
                 self.roles = [r for r in self.roles if r["name"] != old]
             self._save_cast()
@@ -281,9 +309,25 @@ class LabelStore:
                 if old in names and self.labels.get(clip) == OTHER:
                     renamed = (names - {old}) | {new}
                     moved.append({"clip": clip, "label": OTHER, "against": sorted(renamed)})
-            return self.apply(moved) if moved else None
+            return self.apply(moved, cast=cast) if moved else None
 
     # 内部
+
+    def _undo_cast(self, cast: dict[str, Any]) -> None:
+        """撤销一批时，先把这批对角色表的改名、合并改回去，标签再按原名放回。"""
+        if renamed := cast.get("renamed"):
+            role = self.role(renamed["to"])
+            if role is not None and self.role(renamed["from"]) is None:
+                role["name"] = renamed["from"]
+                role["named"] = renamed["named"]
+                self._save_cast()
+        if merged := cast.get("merged"):
+            kept = self.role(merged["into"])
+            if kept is not None:
+                kept["target"] = merged["target"]
+            if self.role(merged["role"]["name"]) is None:
+                self.roles.insert(min(merged["at"], len(self.roles)), dict(merged["role"]))
+            self._save_cast()
 
     def _undoable(self) -> dict[str, Any] | None:
         undone = {b["undo_of"] for b in self.batches if b.get("undo_of") is not None}

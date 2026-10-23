@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from avs.app.labels import FLAGS, OTHER, LabelStore, is_special
+from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of, is_special
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avs.labeling import SPECIAL, VIDEO_PAD, cut_video
@@ -88,6 +88,8 @@ class AppState:
             if clip is None or clip.row is None or not rejected:
                 continue
             rejects[clip.row] = set(rejected)
+            if clip_id in self.store.unusable:
+                continue
             for target in rejected & set(targets):
                 if self.store.labels.get(clip_id) != target:
                     examples[target][1].append(clip.row)
@@ -602,7 +604,8 @@ def create_app(state: AppState) -> Any:
         if unknown or not body.clips:
             raise HTTPException(400, "片段不存在")
         with state.lock:
-            label = state.store.new_role() if body.new_role else body.label
+            label = state.store.new_role() if body.new_role else (body.label or "").strip() or None
+            cast = {"unnamed": [label]} if body.new_role else None
             # 一次选择就定下「是谁」和「质量低」：标成干净的就把以前的「质量低」关掉。
             changes: list[dict[str, Any]] = [{"clip": c, "label": label} for c in body.clips]
             role = state.store.role(label) if label else None
@@ -615,7 +618,7 @@ def create_app(state: AppState) -> Any:
                 and (role is None or bool(role.get("target")))
             )
             changes += [{"clip": c, "unusable": unusable} for c in body.clips]
-            return {"role": label, **state.change(lambda: state.store.apply(changes))}
+            return {"role": label, **state.change(lambda: state.store.apply(changes, cast=cast))}
 
     @app.post("/api/changes")
     def post_changes(body: ChangesBody) -> dict[str, Any]:
@@ -633,11 +636,13 @@ def create_app(state: AppState) -> Any:
                         "on": bool(change["on"]),
                     }
                 )
-            elif any(flag in change for flag in FLAGS):
-                flag = next(f for f in FLAGS if f in change)
-                clean.append({"clip": change["clip"], flag: bool(change[flag])})
+            elif (flag := flag_of(change)) is not None:
+                on = next(v for k, v in change.items() if OLD_FLAGS.get(k, k) == flag)
+                clean.append({"clip": change["clip"], flag: bool(on)})
+            elif "label" in change:
+                clean.append({"clip": change["clip"], "label": change["label"]})
             else:
-                clean.append({"clip": change["clip"], "label": change.get("label")})
+                raise HTTPException(400, "不认识的改动")
         return state.change(lambda: state.store.apply(clean))
 
     @app.post("/api/undo")

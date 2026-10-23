@@ -31,7 +31,8 @@ def test_store_keeps_every_step_and_undoes_whole_batches(tmp_path: Path) -> None
 
     again = LabelStore(tmp_path / "labels")
     assert again.labels == store.labels
-    assert [r["name"] for r in again.roles] == ["A", "B"]
+    # B 是撤掉的那批建的，撤完没有片段了，跟着去掉。
+    assert [r["name"] for r in again.roles] == ["A"]
 
 
 def test_rename_into_an_existing_role_merges_them(tmp_path: Path) -> None:
@@ -62,6 +63,39 @@ def test_a_role_can_start_without_a_name_and_keeps_its_pattern(tmp_path: Path) -
     # 合并掉的角色，它的图案编号不会被下一个新角色接着用。
     store.rename_role("麦昆", "A")
     assert store.role(store.new_role())["pattern"] == 3  # type: ignore[index]
+
+
+def test_undo_puts_the_role_list_back_too(tmp_path: Path) -> None:
+    """撤销一批时，这批顺带新建、改名、合并的角色也改回去，不留空角色。"""
+    store = LabelStore(tmp_path / "labels")
+    store.apply([{"clip": "a", "label": "A"}])
+    store.update_role("A", target=False)
+
+    # 敲一个新名字建的角色，撤销后没有片段了，就一起去掉。
+    store.apply([{"clip": "b", "label": "B"}])
+    store.undo()
+    assert [r["name"] for r in store.roles] == ["A"]
+
+    # 按 N 建的还没起名字的角色也一样。
+    fresh = store.new_role()
+    store.apply([{"clip": "b", "label": fresh}], cast={"unnamed": [fresh]})
+    store.rename_role(fresh, "麦昆")
+    store.undo()
+    role = store.role(fresh)
+    assert role is not None and role["named"] is False and store.role("麦昆") is None
+    assert store.labels["b"] == fresh
+    store.undo()
+    assert [r["name"] for r in store.roles] == ["A"]
+
+    # 合并撤销后，被并掉的角色原样回来，留下的那个也恢复原来是不是目标。
+    store.apply([{"clip": "c", "label": "C"}])
+    store.rename_role("C", "A")
+    assert store.role("A")["target"] is True  # type: ignore[index]
+    store.undo()
+    assert [r["name"] for r in store.roles] == ["A", "C"]
+    assert store.role("A")["target"] is False  # type: ignore[index]
+    assert store.labels == {"a": "A", "c": "C"}
+    assert [r["name"] for r in LabelStore(tmp_path / "labels").roles] == ["A", "C"]
 
 
 def test_an_old_cast_without_patterns_gets_them_in_order(tmp_path: Path) -> None:
@@ -349,6 +383,24 @@ def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
     assert label(None)["unusable"] is False
     client.post("/api/undo")
     assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
+
+    # 名字只有空格等于清掉标签，不能顺带留下「质量低」。
+    assert label("  ", unusable=True)["unusable"] is False
+    assert clip not in state.store.labels
+
+
+def test_changes_api_rejects_unknown_entries_and_reads_old_flag_names(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clip = state.workspace.clips[0].id
+    client.post("/api/label", json={"clips": [clip], "label": "A"})
+    # 旧的「多人」开关名照样认成「质量低」，不会被当成清掉标签。
+    client.post("/api/changes", json={"changes": [{"clip": clip, "overlap": True}]})
+    assert state.store.labels[clip] == "A" and state.store.unusable == {clip}
+    bad = client.post("/api/changes", json={"changes": [{"clip": clip}]})
+    assert bad.status_code == 400
+    assert state.store.labels[clip] == "A"
 
 
 def test_prefetch_cuts_nearby_clips_in_the_background(tmp_path: Path) -> None:
