@@ -594,3 +594,20 @@ def test_old_overlap_records_count_as_unusable(tmp_path: Path) -> None:
     store.undo()
     assert store.unusable == set()
     assert LabelStore(folder).unusable == set()
+
+
+def test_audio_cut_does_not_share_its_unfinished_file_with_another_app(tmp_path: Path) -> None:
+    import soundfile as sf
+
+    from avoc.app.server import _cut_audio
+
+    vocals = tmp_path / "vocals.wav"
+    sf.write(str(vocals), np.zeros(16000, dtype=np.float32), 16000)
+    target = tmp_path / "cut.wav"
+    # An unfinished file left by another app open on the same project.
+    other = target.with_suffix(".1.part.wav")
+    other.write_bytes(b"half")
+    _cut_audio(vocals, 0.25, 0.75, target)
+    assert sf.info(str(target)).frames == 8000
+    assert other.read_bytes() == b"half"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["cut.1.part.wav", "cut.wav", "vocals.wav"]

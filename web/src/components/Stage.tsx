@@ -51,7 +51,12 @@ export function Stage({
   onContext,
   dock,
 }: StageProps) {
-  const [loading, setLoading] = useState(true);
+  /* Which player can play, named by what it plays. "Loading" is worked out from it while drawing. It used to be
+     switched on when the line changed, but a clip already cut could be ready before that ran, and then the
+     spinner covered the picture for good. */
+  const [ready, setReady] = useState<string | null>(null);
+  const shown = `${clip?.id}-${sound}-${context}`;
+  const loading = ready !== shown;
   /* The number key of each of the first 9 characters in the bottom bar; Shift + it is that character, low quality. */
   const slot = (name: string) => {
     const i = dock.indexOf(name);
@@ -59,10 +64,7 @@ export function Stage({
   };
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startVoice = useRef(0);
-  useEffect(() => {
-    setLoading(true);
-    return () => clearTimeout(startVoice.current);
-  }, [clip?.id, sound, context]);
+  useEffect(() => () => clearTimeout(startVoice.current), [clip?.id, sound, context]);
   /* On a new clip the player resets its speed to defaultPlaybackRate, so set both. */
   useEffect(() => {
     for (const el of [videoRef.current, audioRef.current]) {
@@ -116,7 +118,7 @@ export function Stage({
               autoPlay
               playsInline
               muted={vocals}
-              onCanPlay={() => setLoading(false)}
+              onCanPlay={() => setReady(shown)}
               onClick={(e) => {
                 e.currentTarget.currentTime = 0;
                 e.currentTarget.play();
@@ -147,7 +149,7 @@ export function Stage({
               key={`${clip.id}-${context}`}
               src={media("audio", clip.id, context)}
               autoPlay
-              onCanPlay={() => setLoading(false)}
+              onCanPlay={() => setReady(shown)}
             ></audio>
           </>
         )}

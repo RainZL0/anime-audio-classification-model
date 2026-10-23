@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -24,7 +25,8 @@ def cut_video(video: Path, start: float, end: float, out: Path) -> None:
     `-ss` goes before `-i` for fast seeking. Without this, every cut would decode from the start.
     """
     out.parent.mkdir(parents=True, exist_ok=True)
-    temporary = out.with_suffix(".part.mp4")
+    # The process number keeps two apps open on the same project from writing into one file.
+    temporary = out.with_suffix(f".{os.getpid()}.part.mp4")
     command = [
         "ffmpeg", "-v", "error", "-nostdin",
         "-ss", f"{max(0.0, start):.3f}", "-t", f"{max(0.05, end - start):.3f}",

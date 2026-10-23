@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import hashlib
+import os
 import re
 import threading
 import time
@@ -690,7 +691,8 @@ def _cut_audio(vocals: Path, start: float, end: float, target: Path) -> None:
 
     rate = sf.info(str(vocals)).samplerate
     wave, _ = sf.read(str(vocals), start=int(start * rate), stop=int(end * rate), always_2d=True)
-    temporary = target.with_suffix(".part.wav")
+    # The process number keeps two apps open on the same project from writing into one file.
+    temporary = target.with_suffix(f".{os.getpid()}.part.wav")
     sf.write(str(temporary), wave, rate, subtype="PCM_16")
     temporary.replace(target)
 
