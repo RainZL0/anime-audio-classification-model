@@ -27,6 +27,8 @@ GROUP_THRESHOLD = 0.70
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]+")
 MAYBE_FLOOR = 0.05
 """角色视图「可能漏掉的」只列「是 TA」的概率不低于这个数的片段。"""
+UNUSABLE = "人标了质量低"
+"""导出时跳过人标了「质量低」的片段，在 rejected.tsv 里写的原因。"""
 MAYBE_LIMIT = 100
 """「可能漏掉的」最多列这么多条，从最像的往下排。"""
 
@@ -115,6 +117,7 @@ class AppState:
             "voiced": clip.row is not None,
             "label": self.store.labels.get(clip.id),
             "rejects": sorted(self.store.rejects.get(clip.id, ())),
+            "unusable": clip.id in self.store.unusable,
             "guess": [
                 {"name": n, "p": p} for n, p in zip(guess.names, guess.probabilities, strict=True)
             ]
@@ -368,21 +371,34 @@ class AppState:
         if out.exists() and any(out.iterdir()):
             raise ValueError(f"{out} 已存在且不是空的，换一个目录")
         assigned: dict[str, list[Clip]] = {name: [] for name in roles}
+        rejected: list[dict[str, Any]] = []
         for clip in self.workspace.clips:
             label = self.store.labels.get(clip.id)
             state = self.status(clip)
+            role = None
             if state == "confirmed" and label in assigned:
-                assigned[label].append(clip)
+                role = label
             elif include_auto and state == "auto" and clip.row is not None:
                 top = self.guesses[clip.row].names[0]
-                if top in assigned:
-                    assigned[top].append(clip)
+                role = top if top in assigned else None
+            if role is None:
+                continue
+            if clip.id in self.store.unusable:
+                rejected.append({"role": role, "clip": clip, "reason": UNUSABLE, "text": ""})
+            else:
+                assigned[role].append(clip)
+        if not any(assigned.values()):
+            raise ValueError(
+                f"没有可导出的片段：{len(rejected)} 条都标了质量低"
+                if rejected
+                else "没有可导出的片段"
+            )
         texts = {c.id: c.text for c in self.workspace.clips}
-        rejected: list[dict[str, Any]] = []
         if text_subtitles and form != "folder":
-            texts, rejected = self._retext(assigned)
+            texts, unmatched = self._retext(assigned)
+            rejected += unmatched
             if not any(assigned.values()):
-                raise ValueError(f"{len(rejected)} 条片段全都对不上台词字幕，一条也没导出")
+                raise ValueError(f"{len(unmatched)} 条片段全都对不上台词字幕，一条也没导出")
         vocals = {name: Path(meta["vocals"]) for name, meta in self.workspace.episodes.items()}
         written = export({k: v for k, v in assigned.items() if v}, vocals, out)
         by_span = {
@@ -523,7 +539,8 @@ def create_app(state: AppState) -> Any:
 
     @app.post("/api/changes")
     def post_changes(body: ChangesBody) -> dict[str, Any]:
-        """一批混合的改动，整批记一次、整批撤销。角色视图「确认其余、剔除标出的」用它。"""
+        """一批混合的改动，整批记一次、整批撤销。角色视图「确认其余、剔除标出的」、
+        「不是这个角色」和「质量低」都走这里。"""
         clean = []
         for change in body.changes:
             if change.get("clip") not in state.workspace.by_id:
@@ -536,6 +553,8 @@ def create_app(state: AppState) -> Any:
                         "on": bool(change["on"]),
                     }
                 )
+            elif "unusable" in change:
+                clean.append({"clip": change["clip"], "unusable": bool(change["unusable"])})
             else:
                 clean.append({"clip": change["clip"], "label": change.get("label")})
         return state.change(lambda: state.store.apply(clean))

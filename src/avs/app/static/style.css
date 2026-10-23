@@ -203,6 +203,8 @@ kbd {
 .pill.skipped { color: var(--text-3); background: transparent; border: 1px solid var(--line); line-height: 16px; }
 .pill.special { color: var(--text-2); background: var(--line); }
 .pill.reject { color: var(--bad); background: var(--bad-soft); }
+.pill.unusable { color: var(--bad); background: transparent; border: 1px solid var(--bad); line-height: 16px; }
+.specials button.on { border-color: var(--bad); color: var(--bad); }
 .pill.maybe { color: var(--warn); background: transparent; border: 1px dashed var(--warn); line-height: 16px; }
 
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 4px 4px; flex-wrap: wrap; }

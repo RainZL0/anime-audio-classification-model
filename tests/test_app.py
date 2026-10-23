@@ -291,3 +291,36 @@ def test_an_added_target_lists_old_others_that_may_be_it(tmp_path: Path) -> None
     }
     assert all(g["name"] != "A" for g in guesses[ids[1]])
     assert state.store.labels[ids[0]] == "A"
+
+
+def test_unusable_clips_still_teach_the_model_but_are_not_exported(tmp_path: Path) -> None:
+    store = LabelStore(tmp_path / "labels")
+    store.apply([{"clip": "a", "unusable": True}])
+    assert store.unusable == {"a"}
+    assert store.apply([{"clip": "a", "unusable": True}]) is None
+    store.undo()
+    assert store.unusable == set()
+    store.apply([{"clip": "a", "unusable": True}])
+    assert LabelStore(tmp_path / "labels").unusable == {"a"}
+
+    import soundfile as sf
+
+    root = _workspace(tmp_path)
+    # 导出要从原采样率的人声轨切，测试集自带的是 16 kHz、1 秒，换一条够长的。
+    sf.write(root / "episodes/ep1/ep1.wav", np.zeros(44100 * 10), 44100)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    first, second = (c.id for c in state.workspace.clips[:2])
+    client.post("/api/label", json={"clips": [first, second], "label": "A"})
+    marked = client.post("/api/changes", json={"changes": [{"clip": first, "unusable": True}]})
+    assert marked.json()["updated"][0]["unusable"] is True
+    assert state.trained["labels"] == 2
+
+    body = {"roles": ["A"], "form": "folder"}
+    part = client.post("/api/export", json={**body, "out": str(tmp_path / "part")}).json()
+    assert part["files"] == 1 and part["rejected"] == {"人标了质量低": 1}
+    assert "人标了质量低" in (tmp_path / "part" / "rejected.tsv").read_text("utf-8")
+
+    client.post("/api/changes", json={"changes": [{"clip": second, "unusable": True}]})
+    none = client.post("/api/export", json={**body, "out": str(tmp_path / "none")})
+    assert none.status_code == 400 and "2 条都标了质量低" in none.json()["detail"]

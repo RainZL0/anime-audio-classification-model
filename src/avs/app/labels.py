@@ -70,6 +70,9 @@ class LabelStore:
         self.against: dict[str, set[str]] = {}
         """标成「其他」的片段，标的时候有哪些目标角色。"""
         self.rejects: dict[str, set[str]] = {}
+        self.unusable: set[str] = set()
+        """人标了「质量低」的片段：认得出是谁，但背景音太重之类，不拿去训练语音合成。
+        它跟名字分开记，照样参与认人的训练。"""
         self.batches: list[dict[str, Any]] = []
         self.roles: list[dict[str, Any]] = []
         self._lock = threading.RLock()
@@ -118,7 +121,8 @@ class LabelStore:
         undo_of: int | None = None,
     ) -> dict[str, Any] | None:
         """写一批改动。每条改动是 `{"clip", "label"}`（`label` 为空表示清除），
-        或 `{"clip", "reject", "on"}`（这条片段不是某个角色）。没有实际变化的改动会被丢掉。
+        `{"clip", "reject", "on"}`（这条片段不是某个角色），或 `{"clip", "unusable"}`
+        （开关「质量低」）。没有实际变化的改动会被丢掉。
 
         标成「其他」时记下当前的目标角色；改动里给了 `against` 就用给的（撤销和迁移用）。"""
         with self._lock:
@@ -132,6 +136,14 @@ class LabelStore:
                         effective.append(
                             {"clip": clip, "reject": change["reject"], "before": before,
                              "after": bool(change["on"])}
+                        )  # fmt: skip
+                    continue
+                if "unusable" in change:
+                    before = clip in self.unusable
+                    if before != bool(change["unusable"]):
+                        effective.append(
+                            {"clip": clip, "unusable": True, "before": before,
+                             "after": bool(change["unusable"])}
                         )  # fmt: skip
                     continue
                 label = change.get("label") or None
@@ -178,6 +190,8 @@ class LabelStore:
                     inverse.append(
                         {"clip": change["clip"], "reject": change["reject"], "on": change["before"]}
                     )
+                elif "unusable" in change:
+                    inverse.append({"clip": change["clip"], "unusable": change["before"]})
                 else:
                     back: dict[str, Any] = {"clip": change["clip"], "label": change["before"]}
                     if "before_against" in change:
@@ -264,6 +278,11 @@ class LabelStore:
                     names.add(change["reject"])
                 else:
                     names.discard(change["reject"])
+            elif "unusable" in change:
+                if change["after"]:
+                    self.unusable.add(clip)
+                else:
+                    self.unusable.discard(clip)
             else:
                 self.against.pop(clip, None)
                 if change["after"] is None:
