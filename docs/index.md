@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Where things stand now, and what comes next | [STATUS.md](STATUS.md) | [Questions being tested](STATUS.md#questions-being-tested), [Next steps](STATUS.md#next-steps), [Where the files are](STATUS.md#where-the-files-are) |
 | Goals, direction and standards up to the first release | [ROADMAP.md](ROADMAP.md) | [Direction](ROADMAP.md#direction), [Labeling interface](ROADMAP.md#labeling-interface), [First release standard](ROADMAP.md#first-release-standard) |
+| How the web app moves to React + TypeScript + Vite (temporary, deleted when done) | [FRONTEND_MIGRATION.md](FRONTEND_MIGRATION.md) | [How the built files reach users](FRONTEND_MIGRATION.md#how-the-built-files-reach-users), [Checks](FRONTEND_MIGRATION.md#checks), [Order of work](FRONTEND_MIGRATION.md#order-of-work) |
 | Similar tools, and what they lack | [COMPETITORS.md](COMPETITORS.md) | [Bottom line first](COMPETITORS.md#0-bottom-line-first), [Dataset format expected by training](COMPETITORS.md#2-dataset-format-expected-by-training) |
 
 ## Usage and how it works
@@ -32,6 +33,7 @@ One fact is written in one place only. Elsewhere, only a link.
 | --- | --- | --- |
 | STATUS | Current numbers, questions being tested, next steps, files in use now | Settled approaches, experiment process, long-term route |
 | ROADMAP | Goals, users, direction, interface plans, release standards and how to release, all for the first release | Next steps for now, experiment numbers, interface design rules |
+| FRONTEND_MIGRATION | The plan for moving the web app: folder layout, how built files are shipped, checks, order of work, doc changes | Why it was chosen (DECISIONS), the current front end's tools (TOOLS) |
 | COMPETITORS | Similar tools, training-side formats, survey date, and what was not verified | Our own plans |
 | USAGE | Commands and options | Why these were chosen |
 | HOW_IT_WORKS | Terms, flow, data formats | Rules, experiment numbers |
