@@ -74,12 +74,12 @@ The small classifier only picks among the characters it already knows, so the se
 
 **Picture and sound.** ffmpeg cuts one clip at a time. The picture is 360p H.264 with 0.5 seconds of extra padding before and after. The sound is the same span of the vocal track. Both are cached in each episode's `app_media/`. Cutting one picture takes more than half a second. So when a person looks at a line, the server first cuts, in the background, the lines within 60 seconds before and after it in the same episode. Nearer lines go first, and the cutting then continues forward in time to the end of the episode. Two threads run in parallel. When the person moves to another line, the whole queue is replaced. Measured on episode 3: a line that was not cut in advance takes 0.8 to 1.1 seconds to open. A line cut in advance takes about 0.1 seconds. When the person presses L to hear More context, a separate copy with 5 or 15 seconds of extra time on each side is cut. Picture and sound start at the same moment. Their file names carry `.ctx5` or `.ctx15`. These are not cut in advance. The first time, they take about 0.6 and 1.1 seconds.
 
-**Export.** Cuts from the vocal track at the original sample rate, and evens out the loudness without clipping peaks. The formats are GPT-SoVITS `train.list` (each line is `path|character|language|text`), Style-Bert-VITS2 `esd.list`, or just one folder per character.
+**Export.** Cuts from the vocal track at the original sample rate, and evens out the loudness without clipping peaks. The formats are GPT-SoVITS `train.list` (each line is `path|character|language|text`), Style-Bert-VITS2 `esd.list`, or just one folder per character. The text, from either subtitle file, is cleaned of caption marks first ([what is removed](SUBTITLES.md#what-is-cleaned-automatically)).
 
 **Separate text subtitles.** When the subtitles used for the clips are a translation, you can attach a separate original-language subtitle file to each episode. On export, the text is taken from that file. The clips themselves do not change:
 
 - When attaching, the offset is measured. The display times of both subtitle files are drawn as timelines with 10 ms cells. One is slid against the other, and the shift with the most overlap is taken. If the overlap is below 0.6, or fewer than 95% of the clips touch any dialogue, the attach is refused.
-- When subtitles are read, the lines inside one entry are split apart, and the entry's time is shared among the lines by character count. A name at the start of a line becomes the speaker. Other sound notes in brackets are removed.
+- When subtitles are read, the lines inside one entry are split apart, and the entry's time is shared among the lines by character count. Speaker names, sound notes and other caption marks are removed, and a speaker name is kept apart ([what is removed](SUBTITLES.md#what-is-cleaned-automatically)). Two names count as the same person when one ends with the other, such as トウカイテイオー and テイオー.
 - For a clip, every line that overlaps it by more than 0.1 seconds must mostly fall inside the clip: 70% or more of it, or extending less than 0.8 seconds past each end. Together the lines must cover more than half of the clip. Only then is the text counted as complete.
 - A character's name in the subtitles is the most common name among the named lines that overlap her clips. It must make up more than half of them. A line with a different name that overlaps a clip by more than 0.2 seconds marks that clip as mixed with someone else's speech. When the character's name cannot be found, two or more different names touching a clip also count as mixed.
 - Clips whose text is incomplete, or that are mixed with someone else's speech, are not exported. They are written to `rejected.tsv` in the export folder, with the character, episode, start and end times, the reason, the original text and the attached text.
@@ -88,7 +88,7 @@ The small classifier only picks among the characters it already knows, so the se
 
 Each episode has a folder `runs/episodes/<episode>/`:
 
-- `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds) and `text_subtitle_agreement` (the overlap).
+- `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds), `text_subtitle_agreement` (the overlap) and `text_subtitle_marked` (how many lines still carry marks the cleaning does not know, with a few examples, or null).
 - Voiceprints are stored in `embeddings/<model name>/`. The matrix and its metadata line up row by row. The cache is tied to the content of the clip files, the content of the analysis audio, the model name and the minimum length. If any of these changes, the cache must be recomputed. An old cache raises an error. It is never used silently.
 - `app_media/` holds the picture and sound pieces the interface cuts.
 
@@ -110,7 +110,8 @@ src/avoc/
   audio.py                 voice separation, making the analysis copy, the speech timeline used to measure subtitle offset
   language.py              picks Chinese or English for messages the web page shows
   embeddings/extract.py    four voiceprint models and the minimum clip length
-  stages/subtitle.py       read subtitles, measure offset
+  stages/subtitle.py       read subtitles, pick dialogue styles, measure offset
+  stages/captions.py       every rule for caption marks: take the spoken words and speaker out of a line
   stages/text_subtitle.py  attached text subtitles: split lines, measure offset, give clips their text
   stages/export.py         export at the original sample rate
   app/workspace.py         read the workspace: episodes, clips, text, scenes, assembled voiceprints

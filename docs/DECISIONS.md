@@ -17,7 +17,8 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 - **Voice detection is used only to measure how many seconds the subtitles differ from the audio track.** When `--offset` is given, it does not run at all. No model is used to judge "is someone speaking in this clip" or "is this the character or background voices".
 - TV narration and crowd cheers in the subtitles are still put into the clip table. A person labels them "Other". Such clips go into training as "Other", which teaches the machine that cheers and sound effects are not the target.
 - Subtitle lines are not filtered by positioning tags such as `\pos`. Most lines with positioning tags are real dialogue.
-- **Subtitle files are read by fixed rules, with no AI model and no editing by hand.** The format is fixed; what varies by subtitle group is the text encoding and the style names, and both are worked out from the file itself. The dialogue styles are picked by how widely their lines are spread through the episode and how many there are. Names are not matched against a list of words such as "OP" or "sign", which would differ from group to group and language to language. The person can see the choice and override it.
+- **Subtitle files are read by fixed rules, with no AI model and no editing by hand.** The format is fixed; what varies by subtitle group is the text encoding, the style names and the caption marks. All three are worked out from the file itself. The dialogue styles are picked by how widely their lines are spread through the episode and how many there are. Names are not matched against a list of words such as "OP" or "sign", which would differ from group to group and language to language. The person can see the choice and override it.
+- **Caption marks are removed by rules kept in one file, and marks the rules do not know are reported, never passed on silently.** No set of rules covers every subtitle maker. The way to handle a file the rules miss is a documented plain subtitle format that any script, editor or AI agent can produce, or a new rule in that one file ([SUBTITLES.md](SUBTITLES.md)). The program does not load code written by the user, which would break when its own code changes.
 - Clip IDs depend only on the episode name and the time range, so labels stay valid as long as the clips are not re-cut.
 
 **Audio**
@@ -61,6 +62,7 @@ All of these were tried. Do not reopen them.
 | Score normalization (rescaling similarities by how close each clip is to everything else) | Almost no gain, and short clips got worse |
 | Padding short clips with the neighboring audio | Little gain at 1.5 seconds, clearly worse at 3 seconds |
 | Filtering out signs and fansub group names with subtitle positioning tags | Drops real dialogue |
+| Cleaning caption marks with an existing tool (Subtitle Edit, subtitle-filter), checked 2026-10 | They only know half-width brackets and English habits, and they throw away speaker names, which export needs |
 | Using a model to judge whether anyone is speaking | Dropped 40% of the dialogue lines |
 | Keeping the top half by audio quality ranking | Still let through interjections and sound effects, and also dropped usable clips |
 | Holding out one episode for blind labeling as a test | Blind labeling a whole episode takes too much effort. The machine's mistakes are corrected in the interface instead, and those labels are also training data |

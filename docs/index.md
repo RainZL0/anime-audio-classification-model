@@ -14,6 +14,7 @@
 | --- | --- | --- |
 | How to type the commands | [USAGE.md](USAGE.md) | [Processing a new episode](USAGE.md#processing-a-new-episode), [Labeling and correction interface](USAGE.md#labeling-and-correction-interface) |
 | How things work, and what the terms mean | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [Glossary](HOW_IT_WORKS.md#glossary), [Flow](HOW_IT_WORKS.md#flow), [Labeling and correction interface](HOW_IT_WORKS.md#labeling-and-correction-interface), [Data files](HOW_IT_WORKS.md#data-files) |
+| What is cleaned from subtitle text, and what to do when it warns about marks | [SUBTITLES.md](SUBTITLES.md) | [Way 1: convert the file to the plain subtitle format](SUBTITLES.md#way-1-convert-the-file-to-the-plain-subtitle-format), [Way 2: add a rule](SUBTITLES.md#way-2-add-a-rule) |
 | Dependencies, models, runtime environment | [TOOLS.md](TOOLS.md) | |
 | How the web app must look and behave, so each thing is learned once | [UI_DESIGN.md](UI_DESIGN.md) | [The same thing looks the same everywhere](UI_DESIGN.md#the-same-thing-looks-the-same-everywhere), [Color](UI_DESIGN.md#color), [Typing](UI_DESIGN.md#typing) |
 
@@ -35,6 +36,7 @@ One fact is written in one place only. Elsewhere, only a link.
 | USAGE | Commands and options | Why these were chosen |
 | HOW_IT_WORKS | Terms, flow, data formats | Rules, experiment numbers |
 | DECISIONS | Settled and ruled-out technical choices, each with one reason | Numeric details, approaches not fully tested yet |
+| SUBTITLES | The caption habits removed from subtitle text, the warning about unknown marks, the plain subtitle format | Reading encodings and picking styles (HOW_IT_WORKS), command options (USAGE) |
 | TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
 | UI_DESIGN | Design rules of the web app: what looks the same, colors, when to type, layout | How to use each view (USAGE), how it works inside (HOW_IT_WORKS) |
 
