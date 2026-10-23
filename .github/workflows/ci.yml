@@ -15,9 +15,9 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          # 默认会删掉从网上下载的轮子再存缓存，那样 CUDA 版 torch 每次都要重下几个 GB。
+          prune-cache: false
 
-      # Linux 上 torch/torchaudio 走 CPU index（见 pyproject 的 tool.uv.sources），
-      # 避免 CI 每次下载 2.6 GB 的 CUDA 轮子。
       - name: Sync
         run: uv sync --locked
 

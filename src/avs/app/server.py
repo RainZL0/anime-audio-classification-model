@@ -183,6 +183,8 @@ class AppState:
                 }
                 for name, meta in self.workspace.episodes.items()
             ],
+            "workspace": str(self.workspace.root.resolve()),
+            "skipped": self.workspace.skipped,
             "roles": roles,
             "other": counts(OTHER),
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},

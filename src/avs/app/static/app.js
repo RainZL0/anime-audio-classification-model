@@ -1144,8 +1144,13 @@ function App() {
   if (error) return html`<div class="empty"><h2>连不上本地服务</h2><p>${error}</p></div>`;
   if (!state) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>正在载入…</p></div>`;
   if (!state.episodes.length) {
-    return html`<div class="empty"><h2>工作区里还没有任何一集</h2>
-      <p>先用 <code>avs prepare</code> 处理一集（视频和字幕都要有），再重新打开这个页面。</p></div>`;
+    const skipped = Object.entries(state.skipped || {});
+    return html`<div class="empty"><h2>工作区里还没有能用的一集</h2>
+      <p>每集要有视频和对白字幕。在命令行里运行下面这条，处理完刷新这个页面：</p>
+      <pre class="command">uv run avs add "${state.workspace}" 视频文件 --subs 字幕文件</pre>
+      <p>要导出日文台词，再加 <code>--text-subs 日文字幕</code>。</p>
+      ${skipped.length ? html`<p>没载入的集：</p><ul>${skipped.map(([name, why]) => html`<li><b>${name}</b>：${why}</li>`)}</ul>` : ""}
+    </div>`;
   }
 
   const counts = episodeInfo?.counts || {};

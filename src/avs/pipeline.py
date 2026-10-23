@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import math
+import re
+import shutil
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,11 +18,27 @@ from avs.project import (
     digest,
     load_episode,
     read_json,
+    resolve_device,
     segment_rows,
     time_key,
     validate_name,
     write_json,
 )
+
+TOKEN_HOWTO = (
+    "在 https://huggingface.co/pyannote/speaker-diarization-community-1 接受使用条款，"
+    "再运行 uv run hf auth login 登录"
+)
+NO_TOKEN_HINT = (
+    "没给 --offset，要用 pyannote 自动量字幕偏移，但本机没有 Hugging Face 令牌。"
+    "二选一：给 --offset（同一片源同一字幕组各集一样，填上一集量到的值）；或者" + TOKEN_HOWTO
+)
+
+
+def has_hf_token() -> bool:
+    from huggingface_hub import get_token
+
+    return get_token() is not None
 
 
 def prepare(
@@ -29,7 +48,7 @@ def prepare(
     name: str,
     vocals: Path | None = None,
     offset: float | None = None,
-    device: str = "cuda",
+    device: str = "auto",
     audio: Path | None = None,
 ) -> dict[str, Any]:
     """片段就是字幕行本身。偏移可以直接给，不给就自动量。
@@ -57,6 +76,9 @@ def prepare(
     lines = load_lines(subtitles)
     if not lines:
         raise ValueError("字幕中没有对白行")
+    if offset is None and not has_hf_token():
+        raise ValueError(NO_TOKEN_HINT)
+    device = resolve_device(device)
     picture = video_seconds(video)
     if audio is not None and abs(audio_info(audio).duration - picture) > VIDEO_TOLERANCE:
         raise ValueError("音轨和视频的时长对不上，多半不是同一个片源")
@@ -72,7 +94,11 @@ def prepare(
         if info.sample_rate != source.sample_rate or abs(info.duration - source.duration) > 0.1:
             raise ValueError("复用人声轨的采样率或时长与原始音轨不一致")
     if vocals is None:
-        vocals = separate_vocals(audio, out / "separated", Path("models"), source.sample_rate)
+        # 半精度只在显卡上快，CPU 上用全精度。
+        precision = "fp16" if device == "cuda" else "fp32"
+        vocals = separate_vocals(
+            audio, out / "separated", Path("models"), source.sample_rate, precision=precision
+        )
     analysis = out / "analysis_16k.wav"
     make_analysis_copy(vocals, analysis)
     overlap = None
@@ -229,6 +255,83 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     return {"episode": episode["name"], **result, "matched": round(matched, 4)}
 
 
+def next_episode_name(workspace: Path) -> str:
+    """工作区里下一个没用过的 `epNN`。"""
+    folder = workspace / "episodes"
+    names = [p.name for p in folder.iterdir()] if folder.is_dir() else []
+    numbers = [int(m.group(1)) for n in names if (m := re.fullmatch(r"ep(\d+)", n))]
+    return f"ep{max(numbers, default=0) + 1:02d}"
+
+
+def find_episode_by_video(workspace: Path, video: Path) -> str | None:
+    """工作区里已经用这个视频处理过的那一集；没有就是 None。"""
+    from avs.app.workspace import episode_dirs
+
+    wanted = str(video.resolve())
+    for directory in episode_dirs(workspace):
+        episode = read_json(directory / "episode.json")
+        if episode.get("video") == wanted:
+            return str(episode["name"])
+    return None
+
+
+def add_episode(
+    workspace: Path,
+    video: Path,
+    subtitles: Path,
+    name: str | None = None,
+    text_subtitles: Path | None = None,
+    audio: Path | None = None,
+    offset: float | None = None,
+    device: str = "auto",
+    say: Callable[[str], None] = lambda _: None,
+) -> dict[str, Any]:
+    """一条命令加一集：`prepare`、界面要用的几个声纹，有日文字幕就顺手配上。
+
+    中途出错时，做完的步骤留着，再跑同一条命令从断的地方接着做：`prepare` 写出 episode.json
+    才算做完，声纹有缓存。`prepare` 自己失败时，删掉它建了一半的目录，免得下次被
+    「输出目录已存在」挡住。没给集名时，先找用同一个视频处理过的集，找不到再取下一个 `epNN`。
+    """
+    from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL
+
+    if name is None:
+        name = find_episode_by_video(workspace, video) or next_episode_name(workspace)
+    validate_name(name)
+    out = workspace / "episodes" / name
+    device = resolve_device(device)
+    say(f"{name}：用 {device} 计算，目录 {out}")
+
+    if (out / "episode.json").exists():
+        episode, rows = load_episode(out)
+        if episode.get("video") != str(video.resolve()):
+            raise ValueError(f"{name} 已经用另一个视频处理过：{episode.get('video')}")
+        say(f"已经切好 {len(rows)} 条片段，接着往下做")
+    else:
+        if out.exists():
+            raise ValueError(f"{out} 已存在但不是处理好的一集，确认没用后删掉再试")
+        say("抽音轨、抠人声、按字幕切片段（这一步最慢）")
+        try:
+            result = prepare(video, subtitles, out, name, None, offset, device, audio)
+        except BaseException:
+            if out.exists():
+                shutil.rmtree(out)
+            raise
+        say(f"切出 {result['segments']} 条片段，字幕偏移 {result['offset']:+.2f} 秒")
+
+    models = list(dict.fromkeys((*DEFAULT_MODELS, GROUPING_MODEL)))
+    for model in models:
+        say(f"算声纹：{model}")
+        embed(out, model, device)
+
+    if text_subtitles is not None:
+        say("配台词字幕")
+        own = attach_text_subtitles(out, text_subtitles)
+        say(f"偏移 {own['text_subtitle_offset']:+.2f} 秒，{own['matched']:.1%} 的片段碰得到台词")
+
+    _, rows = load_episode(out)
+    return {"episode": name, "directory": str(out), "segments": len(rows), "models": models}
+
+
 def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS) -> dict[str, Any]:
     """把字幕里没有对应片段的对白行补进这一集的片段表，已有片段一个不动。
 
@@ -281,7 +384,7 @@ def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS)
 
 
 def embed(
-    directory: Path, model: str = FRONTIER, device: str = "cuda", window: float = 0.0
+    directory: Path, model: str = FRONTIER, device: str = "auto", window: float = 0.0
 ) -> dict[str, Any]:
     """声纹与输入绑定；已有完整缓存直接复用。短片段保留在片段表中。"""
     import numpy as np
@@ -296,7 +399,7 @@ def embed(
     eligible = [dict(r, speaker="") for r in rows if r["end"] - r["start"] >= MIN_SECONDS]
     if eligible:
         metadata, vectors = embed_segments(
-            Path(episode["analysis"]), eligible, model, device, window
+            Path(episode["analysis"]), eligible, model, resolve_device(device), window
         )
         by_time = {time_key(r): r for r in rows}
         records = [by_time[(round(m.start, 3), round(m.end, 3))] for m in metadata]

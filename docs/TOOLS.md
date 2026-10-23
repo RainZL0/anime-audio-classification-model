@@ -30,7 +30,7 @@
 
 ## 运行环境
 
-Windows 上 torch/torchaudio 用 CUDA 12.8，Linux CI 用 CPU 轮子，由锁文件选择。
+Windows 和 Linux 上 torch/torchaudio 都装 CUDA 12.8 轮子，没有 NVIDIA 显卡时同一份轮子用 CPU 跑；macOS 走 PyPI 的默认轮子，只能用 CPU。由锁文件选择。CI 在 Linux 上也装 CUDA 轮子，下载的轮子存进缓存（`prune-cache: false`），不用每次重下。只在 Windows 加 RTX 4060 上实际跑过，Linux 和 macOS 还没试过。
 
 ## 以后可能用的线索
 

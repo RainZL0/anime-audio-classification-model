@@ -179,10 +179,78 @@ def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: 
         pipeline.prepare(tmp_path / "none.mp4", subtitles, tmp_path / "y", "new")
 
 
+def test_prepare_without_offset_or_token_stops_before_writing(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    subtitles = tmp_path / "test.srt"
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
+    video = tmp_path / "ep1.mp4"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(pipeline, "has_hf_token", lambda: False)
+    with pytest.raises(ValueError, match="--offset"):
+        pipeline.prepare(video, subtitles, tmp_path / "out", "new")
+    assert not (tmp_path / "out").exists()
+
+
+def _fake_prepare(calls: list[str]) -> Any:
+    def prepare(video: Path, subtitles: Path, out: Path, name: str, *args: Any) -> Any:
+        calls.append(name)
+        episode(out.parent, name)
+        meta = read_json(out / "episode.json")
+        write_json(out / "episode.json", {**meta, "video": str(video.resolve())})
+        return {"episode": name, "segments": 3, "offset": -0.9, "overlap": None}
+
+    return prepare
+
+
+def test_add_names_the_next_episode_and_resumes_after_a_failure(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    workspace = tmp_path / "ws"
+    (workspace / "episodes" / "ep03").mkdir(parents=True)
+    video, subtitles = tmp_path / "a.mp4", tmp_path / "a.ass"
+    video.write_bytes(b"video")
+    prepared: list[str] = []
+    monkeypatch.setattr(pipeline, "prepare", _fake_prepare(prepared))
+    embedded: list[str] = []
+
+    def embed_then_fail(directory: Path, model: str, device: str) -> Any:
+        if model == "anime-char" and "anime-char" not in embedded:
+            embedded.append(model)
+            raise RuntimeError("显存不够")
+        embedded.append(model)
+
+    monkeypatch.setattr(pipeline, "embed", embed_then_fail)
+    with pytest.raises(RuntimeError):
+        pipeline.add_episode(workspace, video, subtitles, device="cpu")
+    result = pipeline.add_episode(workspace, video, subtitles, device="cpu")
+    assert result["episode"] == "ep04"
+    assert prepared == ["ep04"]
+    assert embedded == ["anime-va", "anime-char", "anime-va", "anime-char", "redimnet2-b6"]
+
+    other = tmp_path / "b.mp4"
+    other.write_bytes(b"video")
+    with pytest.raises(ValueError, match="另一个视频"):
+        pipeline.add_episode(workspace, other, subtitles, name="ep04", device="cpu")
+
+
+def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -> None:
+    def broken(video: Path, subtitles: Path, out: Path, *args: Any) -> Any:
+        out.mkdir(parents=True)
+        (out / "source.flac").write_bytes(b"half")
+        raise ValueError("字幕对齐重合度太低")
+
+    monkeypatch.setattr(pipeline, "prepare", broken)
+    workspace = tmp_path / "ws"
+    with pytest.raises(ValueError, match="重合度"):
+        pipeline.add_episode(workspace, tmp_path / "a.mp4", tmp_path / "a.ass", device="cpu")
+    assert not (workspace / "episodes" / "ep01").exists()
+
+
 def test_cli_has_one_route() -> None:
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
-    for command in ("prepare", "embed", "group", "evaluate", "export", "label"):
+    for command in ("add", "prepare", "embed", "group", "evaluate", "export", "label"):
         assert command in result.stdout
     for old in ("probe", "propose", "audit", "multi"):
         assert old not in result.stdout

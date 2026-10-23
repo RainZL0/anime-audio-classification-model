@@ -22,19 +22,34 @@ uv sync --locked
 uv run avs doctor
 ```
 
+`doctor` 逐项列出显卡、FFmpeg、抠人声模型、Hugging Face 令牌和磁盘空间，标「缺」的要先处理，标「可选」的不处理也能用。
+
 ## 处理新的一集
 
 ```powershell
-uv run avs prepare "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --name ep04 --out runs/episodes/ep04 --offset -0.96
-uv run avs embed runs/episodes/ep04 --model anime-va
-uv run avs embed runs/episodes/ep04 --model anime-char
-uv run avs embed runs/episodes/ep04 --model redimnet2-b6
-uv run avs coverage runs/episodes/ep04 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][04][HEVC_FLAC][BDRIP].chs.ass" --out runs/coverage/ep04
+uv run avs add runs "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
 ```
 
-视频和字幕都必需。音轨默认从视频里抽；另有同一时间线的无损音轨就用 `--audio` 给，时长和视频差超过 0.5 秒会拒绝。界面默认把三个声纹模型拼在一起用，所以三个都要算。
+`add` 一条命令做完：抽音轨、抠人声、按字幕切片段，再算界面要用的三个声纹。集名省略时取工作区里下一个没用过的 `epNN`，也可以用 `--name` 指定。给了 `--text-subs 日文字幕` 就顺手配上导出用的台词字幕（同下面的 `set-text-subtitles`）。中途出错（比如显存不够），改好后再跑同一条命令，从断的地方接着做：已经切好的片段和算好的声纹不重算。切片段那一步自己失败时，建了一半的目录会删掉。
 
-**建议直接给 `--offset`。** 同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测。
+视频和字幕都必需。音轨默认从视频里抽；另有同一时间线的无损音轨就用 `--audio` 给，时长和视频差超过 0.5 秒会拒绝。`--device` 默认 `auto`：有 NVIDIA 显卡就用显卡，没有就用 CPU，CPU 上抠人声改用全精度。`prepare` 和 `embed` 的 `--device` 也一样。
+
+**建议直接给 `--offset`。** 同一片源同一字幕组的偏移是稳定的（第 1 至 3 集实测 -0.95、-0.96、-0.96），给了就完全不跑语音检测。不给时要用 pyannote 量偏移，它要求先在 [模型页面](https://huggingface.co/pyannote/speaker-diarization-community-1) 接受使用条款，再用 `uv run hf auth login` 登录 Hugging Face；没有令牌时 `add` 和 `prepare` 一开始就报错，不会做到一半才停。
+
+想分步做时，`add` 等于下面几条：
+
+```powershell
+uv run avs prepare "视频" --subs "字幕" --name ep08 --out runs/episodes/ep08 --offset -0.95
+uv run avs embed runs/episodes/ep08 --model anime-va
+uv run avs embed runs/episodes/ep08 --model anime-char
+uv run avs embed runs/episodes/ep08 --model redimnet2-b6
+```
+
+切完可以核对覆盖：
+
+```powershell
+uv run avs coverage runs/episodes/ep08 --subtitle "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --out runs/coverage/ep08
+```
 
 `coverage` 验收切得对不对：「有片段的对白行」应该等于对白行总数（第 3 集是 375/375）。它顺便把没有片段的台词切成音频，放在 `below_floor`（行本身太短）和 `no_speech_found`（行够长却没切出）两个目录，另出 `lines.txt` 和 `report.json`。
 
@@ -49,13 +64,13 @@ uv run avs embed runs/episodes/ep02
 
 ## 标注与修正界面
 
-工作区是一个目录，下面的 `episodes/` 放各集（`prepare` 的输出），标签自动存在 `labels/`。本仓库用 `runs/` 当工作区。
+工作区是一个目录，下面的 `episodes/` 放各集（`add` 或 `prepare` 的输出），标签自动存在 `labels/`。本仓库用 `runs/` 当工作区。
 
 ```powershell
 uv run avs app runs
 ```
 
-在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。网址 `#` 后面记着当前的视图、集、角色和选中的句子，刷新后回到原处。
+在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。网址 `#` 后面记着当前的视图、集、角色和选中的句子，刷新后回到原处。声纹没算全的集（多半是 `add` 中途断了）不载入，启动时在命令行里列出来，其余各集照常能用。工作区里一集都没有时，页面上给出可以直接复制的 `add` 命令。
 
 只给要收集的人（目标角色）起名字，别的人一律按 Q 标「其他」，拿不准是不是目标角色的也标「其他」。几个人同时说话、里面没有目标角色的，欢呼、音效这类不是说话的，也标「其他」。目标角色自己的笑声、叹气算 TA 的声音，标成 TA。每个目标角色有两个选项，一次选好：数字键是干净的 TA，Shift + 同一个数字是「TA·质量低」，给背景音太重或有人同时出声的，不拿来认人，导出时跳过、写进 `rejected.tsv`。两个目标角色时底部一共 5 个选项（再加「其他」）；左边机器猜测的每个目标角色旁边也有「质量低」按钮。改标成干净的 TA 或「其他」时，「质量低」自动去掉。目标角色可以有好几个，在「角色」视图里随时加减，加减时已有的标签怎么算见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。
 

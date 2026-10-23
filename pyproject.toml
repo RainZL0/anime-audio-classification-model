@@ -1,7 +1,7 @@
 [project]
 name = "avs"
 version = "0.1.0"
-description = "Group subtitle-aligned anime voice clips by speaker"
+description = "Collect an anime character's lines: label a few, the model sorts the rest, export for voice training"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -30,27 +30,20 @@ avs = "avs.cli:app"
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
 
-# torch / torchaudio 从 PyTorch 官方 index 装，不走 PyPI 默认轮子。
-# 开发机（Windows，RTX 4060 Laptop 8 GB，driver 616.56）用 CUDA 12.8 轮子；
-# CI（Linux）用 CPU 轮子，否则每次跑都要下载 2.6 GB。
+# Windows 和 Linux 的 torch / torchaudio 从 PyTorch 官方 index 装 CUDA 12.8 轮子，
+# 没有 NVIDIA 显卡时同一份轮子照样用 CPU 跑（开发机：Windows，RTX 4060 Laptop 8 GB）。
+# macOS 没有 CUDA，走 PyPI 默认轮子。CI 在 Linux 上也装 CUDA 轮子，靠缓存免得每次重下。
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-cpu", marker = "sys_platform != 'win32'" },
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
 torchaudio = [
-    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-cpu", marker = "sys_platform != 'win32'" },
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
 
 [dependency-groups]

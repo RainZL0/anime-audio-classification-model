@@ -22,15 +22,79 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
+DEVICE_HELP = "cuda、cpu 或 auto（有 NVIDIA 显卡就用 cuda）"
+
+
 @app.command()
 def doctor() -> None:
-    """检查显卡与音频运行环境。"""
+    """检查运行环境：显卡、FFmpeg、模型文件、Hugging Face 令牌。"""
     import shutil
 
     import torch
 
-    typer.echo(f"torch {torch.__version__}; CUDA {torch.cuda.is_available()}")
-    typer.echo(f"ffmpeg: {shutil.which('ffmpeg') or '未安装'}")
+    from avs.audio import SEPARATION_MODEL
+
+    problems = 0
+
+    def report(ok: bool, text: str, fix: str = "", required: bool = True) -> None:
+        nonlocal problems
+        problems += required and not ok
+        mark = "[好]" if ok else "[缺]" if required else "[可选]"
+        typer.echo(f"{mark} {text}" + (f"\n     {fix}" if fix and not ok else ""))
+
+    cuda = torch.cuda.is_available()
+    gpu = f"，{torch.cuda.get_device_name(0)}" if cuda else ""
+    report(
+        cuda,
+        f"torch {torch.__version__}，CUDA {'可用' if cuda else '不可用'}{gpu}",
+        "没有可用的 NVIDIA 显卡，会用 CPU 计算。能用，但抠人声一集要慢很多",
+        required=False,
+    )
+    for tool in ("ffmpeg", "ffprobe"):
+        found = shutil.which(tool)
+        report(bool(found), f"{tool}：{found or '找不到'}", "装 FFmpeg，并把它的 bin 目录加进 PATH")
+    model = Path("models") / SEPARATION_MODEL
+    report(True, f"抠人声模型：{model}" if model.exists() else "抠人声模型：第一次处理时自动下载")
+    token = pipeline.has_hf_token()
+    report(
+        token,
+        f"Hugging Face 令牌：{'有' if token else '没有'}",
+        "只在不给 --offset、要自动量字幕偏移时需要：" + pipeline.TOKEN_HOWTO,
+        required=False,
+    )
+    free = shutil.disk_usage(Path.cwd()).free / 2**30
+    report(free >= 5, f"当前磁盘剩余 {free:.0f} GB", "处理好的一集约占 0.5 GB，留足空间")
+    typer.echo("都齐了" if problems == 0 else f"有 {problems} 项要处理")
+
+
+@app.command()
+def add(
+    workspace: Annotated[Path, typer.Argument(help="工作区目录，各集放在它的 episodes/ 下")],
+    video: Annotated[Path, typer.Argument(help="这一集的视频")],
+    subs: Annotated[Path, typer.Option(help="这一集的对白字幕，按它切片段")],
+    name: Annotated[
+        str | None, typer.Option(help="集名，例如 ep03；省略就取下一个没用过的 epNN")
+    ] = None,
+    text_subs: Annotated[
+        Path | None, typer.Option(help="另配的台词字幕（通常是日文原文），导出时文字从它取")
+    ] = None,
+    audio: Annotated[Path | None, typer.Option(help="另给的原始音轨；省略就从视频里抽")] = None,
+    offset: Annotated[
+        float | None,
+        typer.Option(help="字幕加上的秒数；省略则自动量，要 Hugging Face 令牌"),
+    ] = None,
+    device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
+) -> None:
+    """加一集：切片段、算界面要用的声纹，给了台词字幕就一起配上。中途出错，再跑同一条命令接着做。"""
+    try:
+        result = pipeline.add_episode(
+            workspace, video, subs, name, text_subs, audio, offset, device, say=typer.echo
+        )
+    except ValueError as exc:
+        typer.echo(f"出错：{exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"{result['episode']} 加好了，{result['segments']} 条片段。打开界面：")
+    typer.echo(f"  uv run avs app {workspace}")
 
 
 @app.command()
@@ -42,7 +106,7 @@ def prepare(
     audio: Annotated[Path | None, typer.Option(help="另给的原始音轨；省略就从视频里抽")] = None,
     vocals: Annotated[Path | None, typer.Option(help="复用已有的原采样率人声轨")] = None,
     offset: Annotated[float | None, typer.Option(help="字幕加上的秒数，省略则自动对齐")] = None,
-    device: str = "cuda",
+    device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
 ) -> None:
     """准备一集：抽音轨、抠人声、对齐字幕，每行对白一个片段。"""
     typer.echo(pipeline.prepare(video, subs, out, name, vocals, offset, device, audio))
@@ -68,7 +132,7 @@ def extend(
 def embed(
     episodes: Annotated[list[Path], typer.Argument(help="一集或多集目录")],
     model: str = "redimnet2-b6",
-    device: str = "cuda",
+    device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
     window: Annotated[
         float, typer.Option(help="最小听音窗口秒数；短片段向两侧借相邻音频补足，0 表示不补")
     ] = 0.0,
@@ -185,6 +249,12 @@ def run_app(
         f"{len(state.workspace.episodes)} 集、{len(state.workspace.clips)} 条片段、"
         f"{state.trained['labels']} 条标签参与训练"
     )
+    for name, reason in state.workspace.skipped.items():
+        typer.echo(f"没载入 {name}：{reason}")
+    if not state.workspace.episodes:
+        typer.echo(
+            f"工作区里还没有能用的一集，先加一集：uv run avs add {workspace} 视频 --subs 字幕"
+        )
     url = f"http://127.0.0.1:{port}/"
     typer.echo(f"打开 {url}")
     if open_browser:

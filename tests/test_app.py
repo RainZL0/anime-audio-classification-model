@@ -251,6 +251,19 @@ def _workspace(tmp_path: Path) -> Path:
     return root
 
 
+def test_an_episode_without_voiceprints_is_skipped_not_fatal(tmp_path: Path) -> None:
+    import shutil
+
+    root = _workspace(tmp_path)
+    half = episode(root / "episodes", "ep2", np.array([[1.0, 0.0, 0.0]] * 6, dtype=float))
+    shutil.rmtree(half / "embeddings")
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    summary = TestClient(create_app(state)).get("/api/state").json()
+    assert [e["name"] for e in summary["episodes"]] == ["ep1"]
+    assert "avs add" in summary["skipped"]["ep2"]
+    assert {c.episode for c in state.workspace.clips} == {"ep1"}
+
+
 def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")

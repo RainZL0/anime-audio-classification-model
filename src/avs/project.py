@@ -26,6 +26,15 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
+def resolve_device(device: str) -> str:
+    """`auto` 有 NVIDIA 显卡就用 `cuda`，没有就用 `cpu`；别的值原样返回。"""
+    if device != "auto":
+        return device
+    import torch
+
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def time_key(row: dict[str, Any]) -> tuple[float, float]:
     return round(float(row["start"]), 3), round(float(row["end"]), 3)
 

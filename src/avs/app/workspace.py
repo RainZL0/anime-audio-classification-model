@@ -67,6 +67,8 @@ class Workspace:
     features: Any
     grouping: Any
     models: tuple[str, ...]
+    skipped: dict[str, str] = field(default_factory=dict)
+    """没载入的集名到原因，多半是声纹没算全。"""
     by_id: dict[str, Clip] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -156,20 +158,20 @@ def load_workspace(
     clips: list[Clip] = []
     feature_rows: list[Any] = []
     grouping_rows: list[Any] = []
+    skipped: dict[str, str] = {}
     for directory in episode_dirs(root):
         episode, rows = load_episode(directory)
+        try:
+            ids, parts = _aligned_vectors(directory, (*models, grouping))
+        except (FileNotFoundError, ValueError) as exc:
+            # 多半是 avs add 中途断了。跳过这一集，别让整个界面打不开。
+            skipped[episode["name"]] = (
+                "声纹没算全，再运行一遍加这一集的 avs add 命令会接着算"
+                if isinstance(exc, FileNotFoundError)
+                else str(exc)
+            )
+            continue
         episodes[episode["name"]] = {**episode, "directory": str(directory)}
-        parts = []
-        ids: list[str] | None = None
-        for model in (*models, grouping):
-            records, vectors = load_embeddings(directory, model)
-            order = {r["id"]: i for i, r in enumerate(records)}
-            if ids is None:
-                ids = [r["id"] for r in records]
-            elif set(order) != set(ids):
-                raise ValueError(f"{directory} 各声纹模型覆盖的片段不同，重跑 avs embed")
-            parts.append(vectors[[order[i] for i in ids]])
-        assert ids is not None
         joined = np.concatenate(parts[: len(models)], axis=1)
         joined /= np.linalg.norm(joined, axis=1, keepdims=True)
         position = {clip_id: len(feature_rows) + k for k, clip_id in enumerate(ids)}
@@ -205,4 +207,21 @@ def load_workspace(
         features=np.stack(feature_rows) if feature_rows else np.empty((0, width)),
         grouping=np.stack(grouping_rows) if grouping_rows else np.empty((0, 0)),
         models=models,
+        skipped=skipped,
     )
+
+
+def _aligned_vectors(directory: Path, models: tuple[str, ...]) -> tuple[list[str], list[Any]]:
+    """各模型的声纹按同一个片段顺序排好。缓存缺了或过期时抛错。"""
+    parts = []
+    ids: list[str] | None = None
+    for model in models:
+        records, vectors = load_embeddings(directory, model)
+        order = {r["id"]: i for i, r in enumerate(records)}
+        if ids is None:
+            ids = [r["id"] for r in records]
+        elif set(order) != set(ids):
+            raise ValueError(f"{directory} 各声纹模型覆盖的片段不同，重跑 avs embed")
+        parts.append(vectors[[order[i] for i in ids]])
+    assert ids is not None
+    return ids, parts
