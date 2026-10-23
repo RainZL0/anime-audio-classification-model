@@ -403,7 +403,7 @@ def test_changes_api_rejects_unknown_entries_and_reads_old_flag_names(tmp_path: 
     assert state.store.labels[clip] == "A"
 
 
-def test_prefetch_cuts_nearby_clips_in_the_background(tmp_path: Path) -> None:
+def test_prefetch_cuts_nearby_and_later_clips_in_the_background(tmp_path: Path) -> None:
     import time
 
     root = _workspace(tmp_path)
@@ -412,7 +412,7 @@ def test_prefetch_cuts_nearby_clips_in_the_background(tmp_path: Path) -> None:
     first = state.workspace.clips[0]
     near = [
         c for c in state.workspace.clips
-        if c.episode == first.episode and c.start <= first.end + 60
+        if c.episode == first.episode and (c.start >= first.start or c.end >= first.start - 60)
     ]  # fmt: skip
     episode = state.workspace.episodes[first.episode]
     assert not episode.get("video")

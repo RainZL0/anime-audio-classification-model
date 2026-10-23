@@ -860,7 +860,7 @@ function App() {
     const next = order.slice(at + 1, at + 4).map((id) => byId[id]).filter(Boolean);
     if (episodeInfo?.video) warm(next, "video");
     if (!episodeInfo?.video || sound === "vocals") warm(next, "audio");
-    /* 服务端在后台切好这句前后一分钟的片段；按住 J/K 快速翻时只发停下来的那句。 */
+    /* 服务端在后台先切这句前后一分钟的片段，再切到这一集结束；按住 J/K 快速翻时只发停下来的那句。 */
     const wait = setTimeout(() => call("/api/prefetch", { clip: focus }).catch(() => {}), 300);
     return () => clearTimeout(wait);
   }, [focus, order]);

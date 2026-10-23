@@ -35,7 +35,7 @@ MAYBE_LIMIT = 100
 CONTEXT_SECONDS = (5, 15)
 """看不出是谁时，可以临时前后各多放这么多秒（按 L 依次切换），只在人要的时候切。"""
 PREFETCH_SECONDS = 60.0
-"""看到一句时，在后台把前后这么多秒内的台词片段先切好，往附近跳就不用等。"""
+"""看到一句时，在后台先把前后这么多秒内的台词片段切好，往附近跳就不用等，再接着切后面的。"""
 PREFETCH_WORKERS = 2
 """后台同时切几段。一段画面要切半秒多，两个并行，前后一分钟三十来句十秒左右切完。"""
 
@@ -327,25 +327,25 @@ class AppState:
         return target
 
     def prefetch(self, clip_id: str, seconds: float = PREFETCH_SECONDS) -> int:
-        """把这句前后 `seconds` 秒内同一集的台词排进后台去切，离这句近的先切；视频和人声都切。
-        已经切好的不排。换一句就换掉整个队列，所以快速翻过去的那些句不会白占时间。返回排了几段。"""
+        """把同一集的台词排进后台去切，视频和人声都切：先切这句前后 `seconds` 秒内的，离这句近的
+        先切，再按时间往后切到这一集结束。已经切好的不排。换一句就换掉整个队列，所以快速翻过去的
+        那些句不会白占时间。返回排了几段。"""
         clip = self.workspace.by_id.get(clip_id)
         if clip is None:
             raise KeyError(clip_id)
         episode = self.workspace.episodes[clip.episode]
         kinds = ("video", "audio") if episode.get("video") else ("audio",)
         folder = Path(episode["directory"]) / "app_media"
-        near = [
-            c
-            for c in self.workspace.clips
-            if c.episode == clip.episode
-            and c.end >= clip.start - seconds
-            and c.start <= clip.end + seconds
-        ]
+        same = [c for c in self.workspace.clips if c.episode == clip.episode]
+        near = [c for c in same if c.end >= clip.start - seconds and c.start <= clip.end + seconds]
         near.sort(key=lambda c: abs(c.start - clip.start))
+        taken = {c.id for c in near}
+        later = sorted(
+            (c for c in same if c.start > clip.start and c.id not in taken), key=lambda c: c.start
+        )
         jobs = [
             (kind, c.id)
-            for c in near
+            for c in near + later
             for kind in kinds
             if not (folder / kind / f"{c.id}.{'wav' if kind == 'audio' else 'mp4'}").exists()
         ]
