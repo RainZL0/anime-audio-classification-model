@@ -27,6 +27,9 @@ const STATUS_TEXT = {
   unlabeled: "还没有模型", special: "特殊", skipped: "太短，默认跳过",
 };
 const NEEDS_WORK = new Set(["review", "novoice", "unlabeled"]);
+const VIEWS = ["groups", "scene", "roles", "export"];
+/* 打开网页时网址 # 后面记着的位置，见 App 里写回网址的那段。 */
+const saved = new URLSearchParams(location.hash.slice(1));
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
 /* 「其他」：不是任何一个目标角色。它是人下的判断，按 Q 标。 */
 const OTHER = "__other__";
@@ -714,8 +717,8 @@ function App() {
   const [view, setView] = useState("scene");
   const [episode, setEpisode] = useState(null);
   const [clips, setClips] = useState([]);
-  const [focus, setFocus] = useState(null);
-  const [onlyWork, setOnlyWork] = useState(false);
+  const [focus, setFocus] = useState(() => saved.get("clip"));
+  const [onlyWork, setOnlyWork] = useState(() => saved.get("only") === "1");
   /* 「整集」里是否列出默认跳过的短句（status 为 skipped）；标过的短句总是列出。 */
   const [showShort, setShowShort] = useState(() => localStorage.getItem("avs-show-short") === "1");
   const [role, setRole] = useState(null);
@@ -755,6 +758,13 @@ function App() {
     localStorage.setItem("avs-theme", theme);
   }, [theme]);
   useEffect(() => { localStorage.setItem("avs-show-short", showShort ? "1" : "0"); }, [showShort]);
+  /* 当前在哪写进网址的 # 后面，刷新后回到同一个视图、同一集、同一个角色、同一句。 */
+  useEffect(() => {
+    if (!state) return;
+    const at = new URLSearchParams({ view, ep: episode || "", role: role || "", clip: focus || "", only: onlyWork ? "1" : "" });
+    for (const [k, v] of [...at]) if (!v) at.delete(k);
+    history.replaceState(null, "", `#${at}`);
+  }, [state, view, episode, role, focus, onlyWork]);
 
   const showToast = useCallback((message, isError = false, extra = null) => {
     clearTimeout(toastTimer.current);
@@ -773,8 +783,11 @@ function App() {
   useEffect(() => {
     call("/api/state").then((s) => {
       setState(s);
-      if (s.episodes.length) setEpisode(s.episodes[0].name);
-      if (!s.roles.some((r) => r.confirmed > 0)) setView("groups");
+      const ep = saved.get("ep");
+      if (s.episodes.length) setEpisode(s.episodes.some((e) => e.name === ep) ? ep : s.episodes[0].name);
+      if (s.roles.some((r) => r.name === saved.get("role"))) setRole(saved.get("role"));
+      if (VIEWS.includes(saved.get("view"))) setView(saved.get("view"));
+      else if (!s.roles.some((r) => r.confirmed > 0)) setView("groups");
     }).catch((e) => setError(e.message));
   }, []);
 
@@ -789,13 +802,13 @@ function App() {
     } else if (view === "roles" && role) {
       const list = await call(`/api/clips?role=${encodeURIComponent(role)}`);
       setClips(list); setMarks(new Set());
-      setFocus((pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id);
+      setFocus((f) => (list.some((c) => c.id === f) ? f : (pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id));
     } else if (view === "groups" && episode) {
       setGroupsLoading(true);
       const found = (await call(`/api/groups?episode=${encodeURIComponent(episode)}`)).map((g, i) => ({ ...g, key: i }));
       setGroups(found); setGroupsLoading(false);
       setClips(found.flatMap((g) => g.clips));
-      setFocus(found[0]?.clips[0]?.id);
+      setFocus((f) => (found.some((g) => g.clips.some((c) => c.id === f)) ? f : found[0]?.clips[0]?.id));
     }
   }, [view, episode, role, !!state]);
   /* 换视图时先清空旧列表：旧列表里的句子不一定适合新视图（比如没有预测的句子进了角色视图）。 */
