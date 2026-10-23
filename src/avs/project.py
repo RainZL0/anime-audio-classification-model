@@ -1,4 +1,5 @@
-"""当前数据格式：一集一份说明和片段表，缓存由输入内容校验。"""
+"""Current data format: one description file and one clip table per episode. The cache is checked
+against the input content."""
 
 from __future__ import annotations
 
@@ -27,7 +28,8 @@ def digest(path: Path) -> str:
 
 
 def resolve_device(device: str) -> str:
-    """`auto` 有 NVIDIA 显卡就用 `cuda`，没有就用 `cpu`；别的值原样返回。"""
+    """`auto` uses `cuda` if there is an NVIDIA GPU, otherwise `cpu`. Other values are returned as
+    they are."""
     if device != "auto":
         return device
     import torch
@@ -41,22 +43,25 @@ def time_key(row: dict[str, Any]) -> tuple[float, float]:
 
 def validate_name(name: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name):
-        raise ValueError("集名只能含英文字母、数字、下划线和连字符")
+        raise ValueError(
+            "Episode name may only contain English letters, digits, underscores and hyphens"
+        )
     return name
 
 
 def segment_rows(episode: str, spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """片段不按音质筛；ID 绑定集名和时间，重排或重新分组不变。"""
+    """Clips are not filtered by audio quality. The ID is tied to the episode name and time, so
+    reordering or regrouping does not change it."""
     validate_name(episode)
     rows = []
     seen = set()
     for row in sorted(spans, key=lambda r: (float(r["start"]), float(r["end"]))):
         start, end = float(row["start"]), float(row["end"])
         if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
-            raise ValueError("片段时间必须有限，且 0 <= start < end")
+            raise ValueError("Clip times must be finite, and 0 <= start < end")
         key = time_key(row)
         if key in seen:
-            raise ValueError("片段有重复的毫秒时间范围")
+            raise ValueError("Clip has a duplicate time range (in milliseconds)")
         seen.add(key)
         identity = f"{episode}:{key[0]:.3f}:{key[1]:.3f}"
         rows.append(
@@ -73,19 +78,21 @@ def segment_rows(episode: str, spans: list[dict[str, Any]]) -> list[dict[str, An
 def load_episode(directory: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     episode = read_json(directory / "episode.json")
     if episode.get("schema") != "avs.episode.v1":
-        raise ValueError(f"不是当前的一集目录：{directory}")
+        raise ValueError(f"Not a current episode directory: {directory}")
     validate_name(episode["name"])
     rows = read_json(directory / "segments.json")
     if segment_rows(episode["name"], rows) != rows:
-        raise ValueError(f"{directory} 的片段 ID、集名或顺序不一致")
+        raise ValueError(f"{directory}: clip IDs, episode name, or order do not match")
     return episode, rows
 
 
 def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[str, str]:
-    """声纹缓存的指纹。改了其中任何一项，旧缓存就该作废重算。
+    """Fingerprint of the voiceprint cache. If any of these items changes, the old cache must be
+    thrown away and recomputed.
 
-    时长下限也要记进来：它决定哪些片段有声纹。少了这一项，调高下限之后旧缓存照样通过校验，
-    分组会继续用上本该被丢掉的短片段，而且没有任何报错。
+    The minimum duration must also be recorded, because it decides which clips get a voiceprint.
+    Without this item, after raising the minimum, the old cache would still pass the check, grouping
+    would keep using short clips that should have been dropped, and there would be no error.
     """
     from avs.embeddings.extract import MIN_SECONDS
 
@@ -102,7 +109,8 @@ def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[st
 
 
 def cache_dir(directory: Path, model: str, window: float = 0.0) -> Path:
-    """不同听音窗口算出来的是不同的声纹，分开放，免得互相顶掉。"""
+    """Different listening windows give different voiceprints, so store them in separate folders to
+    keep them from overwriting each other."""
     validate_name(model)
     name = model if not window else f"{model}@w{window:g}"
     return directory / "embeddings" / name

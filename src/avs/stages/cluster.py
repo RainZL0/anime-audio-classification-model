@@ -1,11 +1,18 @@
-"""全局片段分组，不预先把一集压成不可拆的中心点。
+"""Global clip grouping. Clips are not first squeezed into one unsplittable center point per
+episode.
 
-连接规则只改变“哪些距离算连上”，不改变声纹和距离本身：
-average / single / complete 是层次聚类的三种连接；mutual_knn 只在两条片段互为对方
-的 k 近邻且距离不超过阈值时连边，再取连通分量；two_stage 先只用不短于 SHORT_SECONDS
-的片段做按整组平均距离合并，再把短片段挂到最近成员距离不超过阈值、且领先第二个组至少
-ATTACH_MARGIN 的组；挂不上的短片段之间再做一次按整组平均距离合并，让只有短片段的角色也能成组。
-诊断显示该合没合全部含短片段，所以单独处理。
+The linking rule only changes which distances count as "linked". It does not change the voiceprints
+or the distances themselves.
+average / single / complete are the three linkages of hierarchical clustering. mutual_knn links two
+clips only when each one is among the other's k nearest neighbours
+and their distance is within the threshold, then takes the connected groups. two_stage first groups
+only the clips at least SHORT_SECONDS long, using average linkage,
+then attaches each short clip to the nearest group whose nearest member is within the threshold and
+whose lead over the second group is at least ATTACH_MARGIN.
+Short clips that cannot be attached get one more round of average linkage among themselves, so
+characters that only have short clips can still form groups.
+The diagnostics showed that all the missed merges involve short clips, so they are handled
+separately.
 """
 
 from __future__ import annotations
@@ -14,51 +21,66 @@ from typing import Any
 
 METHODS = ("average", "single", "complete", "mutual_knn", "two_stage")
 MUTUAL_K = 3
-"""互相都是对方最近邻规则里每条片段考虑的近邻数；固定为常量，避免和阈值一起扫出过拟合的组合。"""
+"""Number of nearest neighbours each clip considers under the mutual nearest-neighbour rule. It is a
+fixed constant, so it cannot be tuned together with the threshold to overfit the groups."""
 SHORT_SECONDS = 1.5
-"""two_stage 里算作短片段的时长上限，取自诊断中该合没合配对的时长分层。"""
+"""Upper duration limit for a clip to count as short in two_stage. Taken from the duration breakdown
+of the missed-merge pairs in the diagnostics."""
 ATTACH_MARGIN = 0.05
-"""短片段挂组时最近组必须领先第二近的组的余弦距离；与参考实验的领先幅度一致。"""
+"""Cosine distance by which the nearest group must lead the second-nearest group before a short clip
+is attached to it. Matches the lead used in the reference experiment."""
 
 POOL_QUANTILE = 0.01
-"""按池子定分界线时取的分位：池子里全部配对距离由近到远排开，取第 1% 那个距离。
+"""Quantile used to set the threshold from the pool: all pairwise distances in the pool are sorted
+from near to far, and the one at the 1% mark is taken.
 
-取这么低的分位是因为它跟着「同一角色的配对占全部配对的比例」走。池子里角色越多，
-靠得很近的那一小撮配对就越稀，这个距离就越大，方向正好和分界线需要挪动的方向一致。
-中位数之类的高分位几乎全是不同角色的配对，池子变大也不动，用不上。"""
+This low a quantile is used because it follows the share of pairs from the same character among all
+pairs. The more characters there are in the pool, the sparser the very close pairs become, and this
+distance grows, which moves the threshold in the direction it needs to go.
+High quantiles such as the median are almost all pairs from different characters. They do not change
+as the pool grows, so they are of no use here."""
 
 POOL_MULTIPLIERS = {"anime-va": 1.275}
-"""按池子定分界线时乘的倍数，一个模型一个。乘出来的值就是分界线。
+"""Multiplier used to set the threshold from the pool, one per model. The product is the threshold.
 
-1.275 是这样定出来的：现在三集 1176 条片段拼成的池子上，它正好乘出 anime-va 现用的 0.70。
-**所以今天这条规则和固定 0.70 分组结果一样，语料继续长大才开始分岔**，分岔的方向是分界线
-跟着池子往外挪，抵消掉「池子越大合并越保守」。
+1.275 was set like this: on the pool of 1176 clips from the three episodes so far, it gives the 0.70
+that anime-va currently uses.
+**So today this rule groups exactly like a fixed 0.70. It only starts to diverge as the corpus keeps
+growing.** When it diverges, the threshold moves outward as the pool grows, which offsets the fact
+that bigger pools merge more conservatively.
 
-倍数决定的是松紧，跟能不能稳住是两回事。倍数取 1.38（在只有第 3 集时乘出 0.70）也一样稳，
-但那是个松得多的位置：第 3 集连上的从 2095 涨到 3075，第 1 集的错误合并却从 11 涨到 155。
-错误合并是这个项目里更贵的那种错，所以取保守的那个。
+The multiplier sets how loose or tight the grouping is. That is a separate question from whether the
+result is stable. A multiplier of 1.38 (which gives 0.70 when only episode 3 is in the pool) is just
+as stable, but it is a much looser setting: links in episode 3 rise from 2095 to 3075, and wrong
+merges in episode 1 rise from 11 to 155.
+Wrong merges are the more costly kind of error in this project, so the conservative value was
+chosen.
 
-**这个倍数是在已有三集的标签上挑的，还没有独立检验。** 见 EXPERIMENTS.md。"""
+**This multiplier was picked on the labels from the three episodes so far, and it has not been
+independently tested.** See EXPERIMENTS.md."""
 
 MAX_QUANTILE_PAIRS = 20_000_000
-"""算分位时最多用多少对距离。再多就随机抽这么多对，免得整张距离表撑爆内存。
-13 集大约 5000 条片段、1250 万对，还在这个数以内。"""
+"""Maximum number of distance pairs used to compute a quantile. Beyond this, that many pairs are
+sampled at random, so the full distance table does not run out of memory.
+13 episodes give about 5000 clips and 12.5 million pairs, which is still within this limit."""
 
 
 def pool_threshold(vectors: Any, multiplier: float, quantile: float = POOL_QUANTILE) -> float:
-    """按池子自己的距离定分界线，而不是记死一个数。
+    """Set the threshold from the pool's own distances, instead of hard-coding one number.
 
-    固定分界线会随片段池变大而失准：同一个数，池子越大合并越保守（见 HISTORY.md）。
-    这里改成先看这个池子内部的距离长什么样，再按同一个比例定分界线。
+    A fixed threshold drifts out of place as the clip pool grows: with the same number, the bigger
+    the pool, the more conservative the merging (see HISTORY.md).
+    Here the distances inside this pool are looked at first, and then the threshold is set with the
+    same ratio.
     """
     import numpy as np
 
     if not 0 < quantile < 1:
-        raise ValueError("分位必须在 0 和 1 之间")
+        raise ValueError("The quantile must be between 0 and 1")
     if not multiplier > 0:
-        raise ValueError("倍数必须大于 0")
+        raise ValueError("The multiplier must be greater than 0")
     if len(vectors) < 2:
-        raise ValueError("至少要两条片段才能量池子内部的距离")
+        raise ValueError("At least two clips are needed to measure the distances inside the pool")
     total = len(vectors) * (len(vectors) - 1) // 2
     if total <= MAX_QUANTILE_PAIRS:
         from scipy.spatial.distance import pdist
@@ -68,7 +90,7 @@ def pool_threshold(vectors: Any, multiplier: float, quantile: float = POOL_QUANT
         rng = np.random.default_rng(0)
         rows = rng.integers(0, len(vectors), MAX_QUANTILE_PAIRS)
         cols = rng.integers(0, len(vectors) - 1, MAX_QUANTILE_PAIRS)
-        cols += cols >= rows  # 不要拿片段和自己配对，那个距离恒为 0
+        cols += cols >= rows  # Do not pair a clip with itself. That distance is always 0.
         distances = 1 - np.einsum("ij,ij->i", vectors[rows], vectors[cols])
     return float(np.quantile(distances, quantile) * multiplier)
 
@@ -76,14 +98,15 @@ def pool_threshold(vectors: Any, multiplier: float, quantile: float = POOL_QUANT
 def cluster(
     vectors: Any, threshold: float = 0.5, method: str = "average", durations: Any = None
 ) -> Any:
-    """直接比较全系列片段声纹；0.5 是待独立验证的起点。返回每条片段的组号。"""
+    """Compare the voiceprints of all clips directly. 0.5 is a starting point that still needs
+    independent verification. Returns the group number of each clip."""
     import numpy as np
 
     if method not in METHODS:
-        raise ValueError(f"连接规则只能是 {', '.join(METHODS)}，收到 {method}")
+        raise ValueError(f"Linking rule must be one of {', '.join(METHODS)}, got {method}")
     if method == "two_stage":
         if durations is None or len(durations) != len(vectors):
-            raise ValueError("two_stage 需要每条片段的时长")
+            raise ValueError("two_stage needs the duration of each clip")
         return _two_stage(vectors, np.asarray(durations, dtype=float), threshold)
     if len(vectors) < 2:
         return np.zeros(len(vectors), dtype=int)
@@ -129,7 +152,8 @@ def _two_stage(vectors: Any, durations: Any, threshold: float) -> Any:
         long_labels = labels[long_index]
         groups = np.unique(long_labels)
         distances = 1 - vectors[short_index] @ vectors[long_index].T
-        # 每个短片段到每个长片段组的“最近成员”距离；只挂到明显最近的那个组。
+        # For each short clip, the distance to the nearest member of each long-clip group. Attach it
+        # only to the group that is clearly nearest.
         nearest = np.stack([distances[:, long_labels == g].min(axis=1) for g in groups], axis=1)
         order = np.argsort(nearest, axis=1, kind="stable")
         for row, clip in enumerate(short_index):

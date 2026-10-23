@@ -1,8 +1,10 @@
-"""导出那一步的测试。
+"""Tests for the export step.
 
-**这里防的是这个项目唯一一个「听不出来、也不报错、但会毁掉成品」的错**：拿 16 kHz 的分析
-副本去切成品。音色模型大多在 40 到 48 kHz 上训练，高频丢了补不回来，而且可能训完一个音色
-模型才发现不对。所以拒绝低采样率这条必须钉死。
+**This guards against the one error in this project that you cannot hear, that
+gives no warning, and that still ruins the final output**: cutting the final
+clips from the 16 kHz analysis copy. Voice models are mostly trained at 40 to
+48 kHz, and lost high frequencies cannot be restored. You may only notice
+after training a voice model. So refusing low sample rates must be locked down.
 """
 
 from __future__ import annotations
@@ -31,7 +33,8 @@ def _tone(path: Path, sample_rate: int, seconds: float = 6.0, level: float = 0.1
 
 
 def test_refuses_to_cut_from_a_low_rate_track(tmp_path: Path) -> None:
-    """16 kHz 的分析副本必须被挡住，这是成品的生死线。"""
+    """The 16 kHz analysis copy must be blocked. This is the line between a usable
+    and a ruined output."""
     analysis = tmp_path / "analysis_16k.wav"
     _tone(analysis, 16_000)
     with pytest.raises(ValueError, match="16000"):
@@ -43,7 +46,7 @@ def test_refuses_to_cut_from_a_low_rate_track(tmp_path: Path) -> None:
 
 
 def test_output_keeps_the_source_sample_rate(tmp_path: Path) -> None:
-    """成品的采样率必须跟人声轨一样，不能悄悄变。"""
+    """The output sample rate must match the vocals track. It must not change silently."""
     vocals = tmp_path / "vocals.flac"
     _tone(vocals, 44_100)
     written = export(
@@ -53,7 +56,8 @@ def test_output_keeps_the_source_sample_rate(tmp_path: Path) -> None:
 
 
 def test_loudness_is_evened_out_across_clips(tmp_path: Path) -> None:
-    """一大声一小声的两条，导出来响度应该拉到差不多，否则数据集听着忽大忽小。"""
+    """A loud clip and a quiet clip should come out at about the same loudness.
+    Otherwise the dataset sounds uneven."""
     loud, quiet = tmp_path / "loud.flac", tmp_path / "quiet.flac"
     _tone(loud, 44_100, level=0.5)
     _tone(quiet, 44_100, level=0.02)
@@ -66,12 +70,13 @@ def test_loudness_is_evened_out_across_clips(tmp_path: Path) -> None:
         tmp_path / "out",
     )
     levels = [float(np.sqrt(np.mean(sf.read(str(w.path))[0] ** 2))) for w in written]
-    assert max(levels) / min(levels) < 1.5  # 原始差了 25 倍
+    assert max(levels) / min(levels) < 1.5  # The original levels differ by 25 times
     assert all(w.gain_db != 0.0 for w in written)
 
 
 def test_never_clips_the_peak(tmp_path: Path) -> None:
-    """调响度可以，削顶不行。宁可这一条响度差一点。"""
+    """Adjusting loudness is fine, but clipping the peaks is not.
+    It is better for this clip to stay a bit uneven."""
     vocals = tmp_path / "vocals.flac"
     _tone(vocals, 44_100, level=0.99)
     written = export(
@@ -82,7 +87,8 @@ def test_never_clips_the_peak(tmp_path: Path) -> None:
 
 
 def test_very_short_clips_are_left_alone(tmp_path: Path) -> None:
-    """太短算不出可靠的响度，那就别调，原样导出比瞎调好。"""
+    """A clip that is too short gives no reliable loudness reading. So leave it
+    alone: exporting it as it is beats adjusting it blindly."""
     vocals = tmp_path / "vocals.flac"
     _tone(vocals, 44_100)
     written = export(
@@ -93,7 +99,8 @@ def test_very_short_clips_are_left_alone(tmp_path: Path) -> None:
 
 
 def test_manifest_records_where_each_file_came_from(tmp_path: Path) -> None:
-    """出了问题要能顺着表查回去：哪一集、第几秒、响度调了多少。"""
+    """When something goes wrong, the table must let you trace back to the source:
+    which episode, which second, and how much the loudness was changed."""
     import pandas as pd
 
     vocals = tmp_path / "vocals.flac"
@@ -110,7 +117,8 @@ def test_manifest_records_where_each_file_came_from(tmp_path: Path) -> None:
 
 
 def test_summary_puts_unassigned_last(tmp_path: Path) -> None:
-    """`_unassigned` 是未归属片段，排在最后，别让它抢主角的位置。"""
+    """`_unassigned` holds clips with no assigned speaker. It goes last, so it
+    does not take the place of a main character."""
     vocals = tmp_path / "vocals.flac"
     _tone(vocals, 44_100)
     written = export(

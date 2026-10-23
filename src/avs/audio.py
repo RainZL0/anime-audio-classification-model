@@ -1,4 +1,4 @@
-"""原采样率人声处理，以及只供分析使用的 16 kHz 副本。"""
+"""Vocal processing at the original sample rate, and a 16 kHz copy used only for analysis."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ ANALYSIS_SAMPLE_RATE = 16000
 
 @dataclass(frozen=True)
 class AudioInfo:
-    """一个音频文件的基本参数。"""
+    """Basic parameters of one audio file."""
 
     sample_rate: int
     channels: int
@@ -27,7 +27,7 @@ class AudioInfo:
 
 
 def audio_info(path: Path) -> AudioInfo:
-    """读采样率、声道数、时长，不把音频载进内存。"""
+    """Read the sample rate, channel count and duration, without loading the audio into memory."""
     info = sf.info(str(path))
     return AudioInfo(
         sample_rate=int(info.samplerate),
@@ -39,16 +39,17 @@ def audio_info(path: Path) -> AudioInfo:
 def _ffmpeg(args: list[str]) -> None:
     exe = shutil.which("ffmpeg")
     if exe is None:
-        raise RuntimeError("找不到 ffmpeg，先装上并加进 PATH")
+        raise RuntimeError("ffmpeg not found. Install it first and add it to PATH")
     proc = subprocess.run(
         [exe, "-v", "error", "-y", *args], capture_output=True, text=True, check=False
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"ffmpeg 失败：{proc.stderr.strip()[:500]}")
+        raise RuntimeError(f"ffmpeg failed: {proc.stderr.strip()[:500]}")
 
 
 def extract_audio(video: Path, dst: Path) -> None:
-    """从视频里抽出第一条音轨，无损存成 FLAC，采样率和声道都不动。"""
+    """Take the first audio track out of the video and save it losslessly as FLAC. The sample rate
+    and channels are not changed."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     _ffmpeg(["-i", str(video), "-vn", "-map", "0:a:0", "-c:a", "flac", str(dst)])
 
@@ -62,17 +63,19 @@ def separate_vocals(
     keep_instrumental: bool = False,
     precision: str = "fp16",
 ) -> Path:
-    """抠人声。sample_rate 必须传源文件的采样率，否则库会默认按 44100 重采样。
+    """Voice separation. sample_rate must be the source file's sample rate, otherwise the library
+    resamples to 44100 by default.
 
-    precision 取 fp32 / fp16 / bf16，默认 fp16，实测依据见 docs/TOOLS.md。低精度快得多，
-    代价是输出和全精度有细微出入。audio-separator 调 autocast 时不指定 dtype，等于用
-    torch 的全局默认值（CUDA 上是 fp16），所以想要 bf16 只能改那个默认值。
+    precision is fp32, fp16 or bf16. The default is fp16. For the measurements behind this choice,
+    see docs/TOOLS.md. Low precision is much faster, but its output differs slightly from full
+    precision. When audio-separator calls autocast without a dtype, it uses torch's global default
+    (fp16 on CUDA), so the only way to get bf16 is to change that default.
     """
     import torch
     from audio_separator.separator import Separator
 
     if precision not in PRECISIONS:
-        raise ValueError(f"precision 只能是 {', '.join(PRECISIONS)}，收到 {precision}")
+        raise ValueError(f"precision must be one of {', '.join(PRECISIONS)}, got {precision}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -95,12 +98,15 @@ def separate_vocals(
 
     vocals = [p for p in paths if "vocals" in p.name.lower()]
     if not vocals:
-        raise RuntimeError(f"抠人声没产出 vocals 轨，只有：{[p.name for p in paths]}")
+        raise RuntimeError(
+            f"Voice separation produced no vocals track. Only got: {[p.name for p in paths]}"
+        )
     return vocals[0]
 
 
 def make_analysis_copy(src: Path, dst: Path) -> None:
-    """做 16 kHz 单声道副本，只喂给说话人分段，绝不用它导出成品。"""
+    """Make a 16 kHz mono copy. It is only fed to speaker segmentation and is never used to export
+    the final output."""
     _ffmpeg(
         [
             "-i",
@@ -118,12 +124,13 @@ def make_analysis_copy(src: Path, dst: Path) -> None:
 
 
 def diarize(wav: Path, device: str, max_speakers: int | None = None) -> Any:
-    """切段认人。返回 pyannote 的 DiarizeOutput。
+    """Split audio into segments and identify the speakers. Returns pyannote's DiarizeOutput.
 
-    自己把波形读进内存再喂进去，不给 pipeline 传文件路径。因为传路径会让 pyannote 走
-    torchcodec 解码，而 torchcodec 在 Windows 上要求 FFmpeg 的动态库，本机只有静态版
-    ffmpeg.exe，会直接报 libtorchcodec_core*.dll 加载失败。解码交给我们自己的 ffmpeg
-    命令行，这个坑就不存在了。
+    The waveform is read into memory here and passed in, instead of giving the pipeline a file path.
+    A file path makes pyannote decode through torchcodec, and on Windows torchcodec needs FFmpeg's
+    shared libraries (DLLs). This machine only has the static build ffmpeg.exe, so loading fails
+    with libtorchcodec_core*.dll errors. Decoding is done by our own ffmpeg command line instead, so
+    this pitfall does not come up.
     """
     import torch
     from pyannote.audio import Pipeline
@@ -132,13 +139,14 @@ def diarize(wav: Path, device: str, max_speakers: int | None = None) -> Any:
     pipeline = Pipeline.from_pretrained(DIARIZATION_MODEL, token=True)
     if pipeline is None:
         raise RuntimeError(
-            f"{DIARIZATION_MODEL} 载入失败。多半是没在它网页上接受使用条款，"
-            "或者令牌没有读受限仓库的权限"
+            f"{DIARIZATION_MODEL} failed to load. Most likely you have not accepted "
+            "its terms of use on its web page, "
+            "or your token does not have permission to read gated repositories"
         )
     pipeline.to(torch.device(device))
 
     samples, sample_rate = sf.read(str(wav), dtype="float32", always_2d=True)
-    waveform = torch.from_numpy(samples).T  # pyannote 要 (声道, 采样点)
+    waveform = torch.from_numpy(samples).T  # pyannote expects (channels, samples)
     audio = {"waveform": waveform, "sample_rate": int(sample_rate), "uri": wav.stem}
 
     with ProgressHook() as hook:

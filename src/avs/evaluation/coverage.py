@@ -1,10 +1,15 @@
-"""对白覆盖核对：字幕里有哪些台词根本没有对应片段，把它们切出来听。
+"""Dialogue coverage check: find which subtitle lines have no clip at all, and cut them out to
+listen to.
 
-片段来自「字幕范围 ∩ 检测到有人说话」，还带一个 1 秒下限，所以片段数远少于字幕对白行数。
-少掉的那些是听不到、检测漏了，还是本来就该丢，只能人耳判断，这里负责把它们摆到面前。
+Clips come from the intersection of the subtitle time range and the speech detected, and they
+have a 1-second minimum length. So there are far fewer clips than dialogue lines in the subtitles.
+Whether the missing lines are too quiet to hear, missed by detection, or simply meant to be
+dropped can only be judged by ear. This module puts them in front of you.
 
-字幕相对音轨的偏移不再靠语音检测重算：现有片段都是从字幕切出来的，边界差的众数就是偏移，
-既不需要原始检测结果，也和当初切段用的是同一套边界。
+The offset of the subtitles relative to the audio is no longer recomputed with speech detection.
+The existing clips were all cut from the subtitles, so the mode (the most common value) of the
+boundary differences is the offset. This needs neither the raw detection results, nor a
+different boundary rule from the one used when the clips were cut.
 """
 
 from __future__ import annotations
@@ -21,19 +26,26 @@ from avs.project import load_episode, write_json
 SEARCH_SECONDS = 3.0
 STEP = 0.01
 EDGE = 0.06
-"""判断片段是否落在字幕行内时容许的边界误差，覆盖毫秒取整。"""
+"""Boundary error allowed when deciding whether a clip lies inside a subtitle line. Covers rounding
+to whole milliseconds."""
 FLOOR = 1.0
-"""当初切段的时长下限；短于它的字幕行不可能切出片段，单独归一类。"""
+"""Minimum clip length used when the clips were cut. A subtitle line shorter than this can never
+produce a clip, so it gets its own category."""
 HOLE_SECONDS = 20.0
-"""相邻片段间隔多久算一个空洞。整段没有片段而里面有台词，说明丢的是整场戏，不是零星几句。"""
+"""How long the gap between two adjacent clips must be to count as a hole. A stretch with no clips
+at all but with dialogue inside means a whole scene is missing, not just a few lines."""
 
 
 def align_to_segments(lines: list[dict[str, Any]], rows: list[dict[str, Any]]) -> tuple[float, int]:
-    """字幕相对音轨的偏移，以及在该偏移下完整落在字幕行内的片段数。
+    """The offset of the subtitles relative to the audio, and the number of clips that fall
+    completely inside a subtitle line at that offset.
 
-    切段时语音检测没有削掉边的那些片段，边界就等于字幕行边界，所以片段与行的起点差
-    （终点差同理）会在真实偏移上堆成一个很尖的峰，取众数即可。不用「落在行内的片段最多」
-    直接定偏移：边界容差让一整段偏移都拿到同样的命中数，只能挑出这段区间，挑不准位置。
+    Clips whose edges were not trimmed by speech detection during cutting have boundaries equal to
+    the subtitle line boundaries. So the start difference between a clip and a line (and the end
+    difference likewise) piles up into a sharp peak at the true offset, and taking the mode finds
+    it. Do not pick the offset as "the offset with the most clips inside lines": the boundary
+    tolerance gives a whole range of offsets the same hit count, so that only finds the range,
+    not the exact position.
     """
     if not lines or not rows:
         return 0.0, 0
@@ -58,7 +70,8 @@ def align_to_segments(lines: list[dict[str, Any]], rows: list[dict[str, Any]]) -
 def uncovered_lines(
     lines: list[dict[str, Any]], rows: list[dict[str, Any]], offset: float
 ) -> list[dict[str, Any]]:
-    """没有任何片段与之重叠的对白行，按是否短于切段下限分类。"""
+    """Dialogue lines that no clip overlaps, sorted by whether they are shorter than the
+    clip-cutting minimum length."""
     out = []
     for index, line in enumerate(lines):
         start, end = line["start"] + offset, line["end"] + offset
@@ -73,7 +86,8 @@ def uncovered_lines(
                 "stamp": stamp(start),
                 "seconds": seconds,
                 "text": line["text"],
-                # 短于下限的行不可能切出合格片段，长的那些才需要问检测为什么没认出人声。
+                # A line shorter than the minimum cannot yield a valid clip. Only the longer
+                # ones raise the question of why detection did not find the vocals.
                 "reason": "below_floor" if seconds < FLOOR else "no_speech_found",
             }
         )
@@ -81,10 +95,12 @@ def uncovered_lines(
 
 
 def find_holes(rows: list[dict[str, Any]], missing: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """连续没有片段、里面却有台词的整段。
+    """Stretches with no clips in a row, but with dialogue inside.
 
-    零星漏一句是检测边界问题，整场戏没有片段是另一回事，值得先看后者：一百多条逐条听
-    既慢又看不出规律，而空洞一目了然，还能顺带认出片头曲这种本来就没对白的段落。
+    Missing a single line now and then is a detection boundary problem. A whole scene with no clips
+    is a different matter, and it is worth checking first. Listening to over a hundred lines one by
+    one is slow and shows no pattern. Holes are obvious at a glance, and they also help spot
+    stretches like an opening theme that have no dialogue to begin with.
     """
     ordered = sorted(rows, key=lambda row: row["start"])
     holes = []
@@ -109,23 +125,29 @@ def find_holes(rows: list[dict[str, Any]], missing: list[dict[str, Any]]) -> lis
 
 
 def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> dict[str, Any]:
-    """核对这一集的对白覆盖，把没片段的台词按原因切成音频。"""
+    """Check dialogue coverage for this episode, and cut the lines that have no clip into audio
+    files, grouped by reason."""
     import soundfile as sf
 
     from avs.labeling import _cut
     from avs.stages.subtitle import load_dialogue
 
     if out.exists():
-        raise ValueError(f"输出已存在，换个目录以保留上次结果：{out}")
+        raise ValueError(
+            f"Output already exists. Use another directory to keep the previous result: {out}"
+        )
     if not math.isfinite(pad) or pad < 0:
-        raise ValueError("前后留白必须是不小于 0 的秒数")
+        raise ValueError("Padding before and after must be a number of seconds, not less than 0")
     episode, rows = load_episode(directory)
     lines = load_dialogue(subtitle)
     if not lines:
-        raise ValueError(f"{subtitle} 里没有对白行，检查字幕样式名")
+        raise ValueError(f"{subtitle} has no dialogue lines. Check the subtitle style name")
     offset, inside = align_to_segments(lines, rows)
     if inside < len(rows) * 0.9:
-        raise ValueError(f"只有 {inside}/{len(rows)} 条片段落在字幕行内，这份字幕多半不是这一集")
+        raise ValueError(
+            f"Only {inside}/{len(rows)} clips fall inside subtitle lines. "
+            "This subtitle file is most likely not for this episode"
+        )
 
     missing = uncovered_lines(lines, rows, offset)
     duration = sf.info(episode["vocals"]).duration
@@ -169,8 +191,10 @@ def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> di
         },
         "holes": holes,
         "uncovered": missing,
-        "note": "偏移取片段与字幕行边界差的众数；below_floor 是行本身短于切段下限，"
-        "no_speech_found 是行够长却没切出片段，具体原因要听音频才知道。",
+        "note": "The offset is the mode of the boundary differences between clips and subtitle "
+        "lines. below_floor means the line itself is shorter than the clip-cutting minimum length. "
+        "no_speech_found means the line is long enough but no clip was cut from it. "
+        "The exact cause can only be known by listening to the audio.",
     }
     write_json(out / "report.json", report)
     listing = [
@@ -180,8 +204,8 @@ def coverage(directory: Path, subtitle: Path, out: Path, pad: float = 0.0) -> di
     spans = []
     for hole in holes:
         spans.append(
-            f"{hole['stamp']}  空 {hole['seconds']:.1f}s  "
-            f"台词 {hole['lines']} 行 {hole['dialogue_seconds']:.1f}s  {hole['file']}"
+            f"{hole['stamp']}  hole {hole['seconds']:.1f}s  "
+            f"{hole['lines']} dialogue lines {hole['dialogue_seconds']:.1f}s  {hole['file']}"
         )
         spans.extend(f"      {text}" for text in hole["texts"])
     (out / "holes.txt").write_text("\n".join(spans) + "\n", encoding="utf-8")

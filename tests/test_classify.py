@@ -1,4 +1,8 @@
-"""按集留出检验：训练只用别的集，打分只看被测集，训练集没有的角色照样算错。"""
+"""Leave-one-episode-out check.
+
+Training uses only the other episodes. Scoring looks only at the test episode.
+Roles missing from the training set still count as wrong.
+"""
 
 from __future__ import annotations
 
@@ -58,7 +62,7 @@ def test_check_trains_on_other_episodes_and_counts_unseen_roles(tmp_path: Path) 
     assert report["unseen_role_clips"] == 1
     for method in ("nearest", "centroid", "logistic"):
         assert report["results"][method]["accuracy"] == pytest.approx(2 / 3, abs=1e-4)
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         classify_check(episodes, "ep3", annotations, out, ["redimnet2-b6"])
-    with pytest.raises(ValueError, match="没有 ep9 的名字"):
+    with pytest.raises(ValueError, match="No labels for ep9"):
         classify_check(episodes, "ep9", annotations, tmp_path / "x.json", ["redimnet2-b6"])

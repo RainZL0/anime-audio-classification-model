@@ -1,4 +1,8 @@
-"""对白覆盖核对：偏移靠现有片段反推，没片段的台词按原因分开。"""
+"""Dialogue coverage check.
+
+The offset is worked out from the existing clips. Dialogue lines with no clip
+are split by reason.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ from avs.evaluation.coverage import (
 )
 from avs.project import segment_rows, write_json
 
-# 字幕整体比音轨晚 0.5 秒，正确偏移是 -0.5。
+# The subtitles are 0.5 seconds later than the audio track overall, so the correct offset is -0.5.
 SHIFT = 0.5
 COVERED = [(0.0, 2.0), (2.0, 4.0), (8.0, 10.0)]
 SHORT = (4.5, 5.0)
@@ -104,11 +108,12 @@ def test_coverage_cuts_the_missing_lines_and_refuses_a_foreign_subtitle(tmp_path
     }
     cut = sorted(p.relative_to(out).as_posix() for p in out.rglob("*.wav"))
     assert [e["file"] for e in report["uncovered"]] == cut
-    # 留白让切出来的音频比字幕行长 0.4 秒，方便听清开头结尾。
+    # The padding makes each cut audio clip 0.4 seconds longer than its subtitle
+    # line, so the start and end are easy to hear.
     assert sf.info(out / cut[0]).duration == pytest.approx(0.9, abs=0.02)
     assert "第 3 句" in (out / "lines.txt").read_text(encoding="utf-8")
 
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         coverage(directory, subtitle, out)
 
     other = make_subtitle(tmp_path / "other.ass")
@@ -119,12 +124,13 @@ def test_coverage_cuts_the_missing_lines_and_refuses_a_foreign_subtitle(tmp_path
         event.start += 60_000
         event.end += 60_000
     subs.save(str(other))
-    with pytest.raises(ValueError, match="多半不是这一集"):
+    with pytest.raises(ValueError, match="most likely not for this episode"):
         coverage(directory, other, tmp_path / "coverage-other")
 
 
 def test_holes_are_stretches_with_no_clip_but_real_dialogue(tmp_path: Path) -> None:
-    # 片段之间留一个 30 秒的空档，里面放两条台词，另一个空档里什么都没有。
+    # There is a 30-second gap between clips. It holds two dialogue lines.
+    # The other gap holds nothing.
     rows = [{"start": 0.0, "end": 2.0}, {"start": 32.0, "end": 34.0}, {"start": 70.0, "end": 72.0}]
     missing = [
         {"start": 5.0, "end": 6.5, "seconds": 1.5, "text": "第一句"},
@@ -135,7 +141,8 @@ def test_holes_are_stretches_with_no_clip_but_real_dialogue(tmp_path: Path) -> N
     assert holes[0]["lines"] == 2
     assert holes[0]["dialogue_seconds"] == 2.5
     assert holes[0]["texts"] == ["第一句", "第二句"]
-    # 34 到 70 秒同样是空档，但里面没有台词，不算问题。
+    # The stretch from 34 to 70 seconds is also a gap, but it has no dialogue,
+    # so it is not a problem.
     assert len(holes) == 1
     assert tmp_path.exists()
 
@@ -145,6 +152,7 @@ def test_coverage_writes_hole_audio_and_listing(tmp_path: Path) -> None:
     subtitle = make_subtitle(tmp_path / "ep1.ass")
     out = tmp_path / "coverage"
     report = coverage(directory, subtitle, out)
-    # 片段 4 秒到 8 秒之间只空了 4 秒，够不上空洞门槛。
+    # Between the clips at 4 and 8 seconds the gap is only 4 seconds,
+    # which is below the hole threshold.
     assert report["summary"]["holes"] == 0
     assert (out / "holes.txt").read_text(encoding="utf-8").strip() == ""

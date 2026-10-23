@@ -1,4 +1,5 @@
-"""在同一批片段与人工标签上比较缓存声纹，保留完整阈值曲线。"""
+"""Compare cached voiceprints on the same clips and human labels, keeping the full threshold
+curve."""
 
 from __future__ import annotations
 
@@ -19,14 +20,15 @@ def compare(
     out: Path,
     methods: list[str] | None = None,
 ) -> dict[str, Any]:
-    """拒绝覆盖结果或比较不同覆盖的声纹；所有成绩均是探索，非独立验收。"""
+    """Refuse to overwrite a result, or to compare voiceprints built from different clip sets. All
+    scores are exploratory, not an independent acceptance test."""
     methods = methods or ["average"]
     if out.exists():
-        raise ValueError(f"报告已存在：{out}")
+        raise ValueError(f"Report already exists: {out}")
     if not models or len(set(models)) != len(models) or not thresholds:
-        raise ValueError("需要不重复的模型名和至少一个阈值")
+        raise ValueError("Need unique model names and at least one threshold")
     if len(set(methods)) != len(methods):
-        raise ValueError("连接规则不能重复")
+        raise ValueError("Linking methods must not be repeated")
     coverage = None
     inputs = []
     for model in models:
@@ -46,7 +48,7 @@ def compare(
                 }
             )
         if coverage is not None and ids != coverage:
-            raise ValueError("模型覆盖的片段不同，不能直接比较")
+            raise ValueError("Models cover different clips, so they cannot be compared directly")
         coverage = ids
     results: list[dict[str, Any]] = []
     with TemporaryDirectory(prefix="avs-compare-") as temp:
@@ -69,7 +71,9 @@ def compare(
                             "roles": scored["roles"],
                         }
                     )
-    # 同时更少错误合并、更多正确连接的点才算支配；不以组数少就宣称身份更准。
+    # A row is dominated only when another row has no more wrong merges, at least as many
+    # correct same-person links, and is strictly better on one of the two. Fewer groups alone
+    # does not mean the identities are more accurate, so it is not used as a reason.
     frontier = [
         row
         for row in results
@@ -85,7 +89,8 @@ def compare(
     ]
     report = {
         "schema": "avs.comparison.v1",
-        "note": "同批人工标签上的探索曲线；阈值已使用这些标签，不能作为独立验证。",
+        "note": "Exploration curve on the same batch of human labels. The thresholds were chosen "
+        "using these labels, so this cannot serve as an independent check.",
         "methods": methods,
         "embedded_clips": len(coverage or []),
         "inputs": inputs,

@@ -1,16 +1,21 @@
-"""量成绩随片段池变大怎么变，并检验按池子定分界线能不能把它稳住。
+"""Measure how the scores change as the clip pool grows, and test whether setting the threshold from
+the pool keeps them steady.
 
-做法：**被打分的那一集始终整集在池子里**，只往池子里加别的集的片段，加多少条由参数给。
-这样每一档池子大小面对的是同一批人工标签、同一批配对，成绩可以直接比。加进来的片段随机抽，
-每档抽好几遍，免得把一次抽样的运气当成规律。
+Method: **the scored episode always stays in the pool in full**, and only clips from other episodes
+are added. The number of clips added is set by a parameter. This way every pool size faces the same
+human labels and the same pairs, so the scores can be compared directly. The added clips are picked
+at random, and each size is run several times, so that one lucky draw is not mistaken for a pattern.
 
-报告里同时给两条线：
+The report gives two lines at once:
 
-- **固定分界线**：每一档都用同一个数，也就是现在的做法。
-- **按池子定分界线**：分界线由这个池子自己的距离算出来（见 stages/cluster.py 的 pool_threshold）。
+- **Fixed threshold**: the same number at every pool size. This is how it works now.
+- **Pool-based threshold**: the threshold is computed from this pool's own distances (see
+  pool_threshold in stages/cluster.py).
 
-判断哪条线更好，看的不是连上多少对，而是**错误合并稳不稳**。固定分界线的问题正是错误合并
-会随池子变大一路往下掉：这不是变准了，是合并越来越保守，同一角色的片段也连不上了。
+To judge which line is better, look not at how many pairs get linked, but at whether **wrong merges
+stay stable**. The problem with the fixed threshold is exactly that wrong merges keep falling as the
+pool grows. That is not the system becoming more accurate. Merging is just getting more
+conservative, so clips of the same character stop getting linked too.
 """
 
 from __future__ import annotations
@@ -25,11 +30,13 @@ from avs.project import digest, load_episode, read_json, time_key, write_json
 from avs.stages.cluster import POOL_MULTIPLIERS, POOL_QUANTILE, pool_threshold
 
 SEEDS = 8
-"""每一档池子大小抽几遍。抽样的运气不小，一遍看不出规律。"""
+"""How many random draws to run for each pool size. Sampling luck is large, so one draw does not
+show a pattern."""
 
 
 def _truth(directories: list[Path], scored: str, annotations: list[Path]) -> dict[str, str]:
-    """被打分那一集的人工身份：片段 ID 到角色名。只收时间毫秒级精确对上的。"""
+    """Human identities in the scored episode: clip ID to character name. Only collects labels whose
+    time matches exactly to the millisecond."""
     episodes = {}
     for directory in directories:
         episode, rows = load_episode(directory)
@@ -40,7 +47,7 @@ def _truth(directories: list[Path], scored: str, annotations: list[Path]) -> dic
         annotation = read_json(path)
         source = str(annotation["source"]).replace("\\", "/").rsplit("/", 1)[-1]
         if source not in episodes:
-            raise ValueError(f"{path} 的音轨不在这些集目录里")
+            raise ValueError(f"{path} has an audio track that is not in these episode folders")
         name, by_time = episodes[source]
         if name != scored:
             continue
@@ -52,14 +59,14 @@ def _truth(directories: list[Path], scored: str, annotations: list[Path]) -> dic
             if clip_id is not None:
                 matched[clip_id] = person
     if not matched:
-        raise ValueError(f"这些人工归档里没有 {scored} 的名字，无法打分")
+        raise ValueError(f"No labels for {scored} in these human archives, so it cannot be scored")
     return matched
 
 
 def _sizes(total: int, steps: int) -> list[int]:
-    """从「一条不加」到「全部加上」均匀取几档。"""
+    """Pick several evenly spaced sizes, from 'add nothing' to 'add everything'."""
     if steps < 2:
-        raise ValueError("至少要两档池子大小")
+        raise ValueError("Need at least two pool sizes")
     marks = sorted({round(total * i / (steps - 1)) for i in range(steps)})
     return marks
 
@@ -76,15 +83,16 @@ def drift(
     steps: int = 7,
     seeds: int = SEEDS,
 ) -> dict[str, Any]:
-    """扫池子大小，报固定分界线和按池子定分界线两条线的成绩。"""
+    """Scan pool sizes, and report the scores for both the fixed-threshold line and the
+    pool-based-threshold line."""
     import numpy as np
     from scipy.cluster.hierarchy import fcluster, linkage
     from scipy.spatial.distance import pdist
 
     if out.exists():
-        raise ValueError(f"报告已存在：{out}")
+        raise ValueError(f"Report already exists: {out}")
     if len({p.resolve() for p in episodes}) != len(episodes):
-        raise ValueError("集目录不能重复")
+        raise ValueError("Episode folders must not repeat")
     threshold = DEFAULT_THRESHOLDS[model] if threshold is None else threshold
     multiplier = POOL_MULTIPLIERS[model] if multiplier is None else multiplier
 
@@ -105,15 +113,17 @@ def drift(
             }
         )
     if not base:
-        raise ValueError(f"{scored} 不在这些集目录里")
+        raise ValueError(f"{scored} is not in these episode folders")
 
     scored_ids = sorted(truth)
     names = [truth[i] for i in scored_ids]
-    # 分界线扫得比 0.01 更细没有意义：漂移量本身就在 0.03 到 0.08 这个尺度上。
+    # Scanning the threshold finer than 0.01 is pointless: the drift itself is on the scale of 0.03
+    # to 0.08.
     grid = [round(0.45 + 0.01 * i, 3) for i in range(51)]
 
     def score(labels: dict[str, int]) -> tuple[int, int, int]:
-        # 没进这个池子的片段各自算一组，跟 evaluate 对没有分到组的片段的处理一致。
+        # Clips that are not in this pool each count as their own group. This matches how evaluate
+        # treats clips that were not assigned to a group.
         groups = [str(labels.get(i, f"solo:{i}")) for i in scored_ids]
         return pair_counts(names, groups)
 
@@ -164,7 +174,8 @@ def drift(
 
     report = {
         "schema": "avs.drift.v1",
-        "note": "被打分的那一集始终整集在池子里，加进来的是别的集的片段；同一批标签、同一批配对。",
+        "note": "The scored episode always stays in the pool in full. "
+        "The clips added are from other episodes. Same labels, same pairs.",
         "model": model,
         "scored_episode": scored,
         "labeled_clips": len(truth),
@@ -183,11 +194,14 @@ def drift(
 
 
 def _other_statistics(vectors: Any, distances: Any, tree: Any) -> dict[str, float]:
-    """几个也能不看标签就从池子里算出来的量，记下来供核对。
+    """A few quantities that can also be computed from the pool without using labels. They are
+    recorded here for checking.
 
-    这些都试过，没有一个能当分界线用：分界线需要随池子变大往外挪 4% 到 11%，
-    而配对距离的中位数几乎不动（池子里绝大多数配对本来就是不同角色），
-    最近邻距离和合并高度反而随池子变大往里缩，方向正好相反。留着是为了不用重做一遍才知道。
+    All of these were tried, and none can be used as a threshold. The threshold would need to move
+    outward by 4% to 11% as the pool grows. But the median pair distance hardly moves, because most
+    pairs in the pool are already between different characters. And the nearest-neighbour distance
+    and the merge height shrink inward as the pool grows, which is the opposite direction. They are
+    kept so that the check does not have to be redone to find this out.
     """
     import numpy as np
 
@@ -203,7 +217,8 @@ def _other_statistics(vectors: Any, distances: Any, tree: Any) -> dict[str, floa
 
 
 def _summary(runs: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
-    """每一档池子大小一行，两条线并排。数字是同一档各次抽样的平均。"""
+    """One row per pool size, with the two lines side by side. The numbers are the average of the
+    draws at that size."""
     import numpy as np
 
     rows = []
@@ -233,5 +248,5 @@ def _summary(runs: list[dict[str, Any]], threshold: float) -> list[dict[str, Any
 
 
 def _at(curve: list[dict[str, Any]], threshold: float) -> dict[str, Any]:
-    """扫的是一格一格的分界线，取离要问的那个数最近的一格。"""
+    """The scan goes in steps, so take the step closest to the threshold asked for."""
     return min(curve, key=lambda point: abs(point["threshold"] - threshold))

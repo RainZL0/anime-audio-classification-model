@@ -1,14 +1,22 @@
-"""按集留出检验：在别的集的人工标签上训练，把被测那一集的片段直接分到角色名下。
+"""Leave-one-episode-out check: train on the human labels of the other episodes, then assign each
+clip of the held-out episode directly to a character name.
 
-三种做法并排比，全部只用缓存的声纹，不重算：
+Three methods are compared side by side. All of them use only cached voiceprints, nothing is
+recomputed:
 
-- **最像的一条**：跟训练集里最像的那一条已标片段同名。分组靠的就是这种一条比一条。
-- **角色平均**：每个角色的已标片段平均成一个方向，片段归给最近的那个角色。
-- **小分类器**：在训练集声纹上训练的逻辑回归。正则强度只在训练集内部按集交叉验证挑，
-  不看被测集。
+- **Most similar one**: a clip gets the name of the most similar already-labeled clip in the
+  training set. Grouping works on this same one-by-one comparison.
+- **Character average**: the labeled clips of each character are averaged into one direction, and
+  each clip goes to the nearest character.
+- **Small classifier**: logistic regression (a standard method that gives each character a
+  probability) trained on the training set's voiceprints. Its regularization strength is chosen
+  only by cross-validation inside the training set, meaning training on some episodes and testing
+  on the one left out. The held-out episode is not looked at.
 
-每条预测附带把握大小，按把握从高到低排，报前 50%、前 80% 和全部片段的正确率。
-被测集里有、训练集里没有的角色一定判错，照样算进分母，另报它们有多少条。
+Each prediction comes with a confidence score. Clips are sorted from high confidence to low, and
+the accuracy is reported for the top 50%, the top 80%, and all clips. A character that appears in
+the held-out episode but not in the training set is always counted as wrong, and kept in the
+denominator. The number of such clips is reported separately.
 """
 
 from __future__ import annotations
@@ -24,7 +32,8 @@ from avs.project import load_episode, read_json, time_key, write_json
 DURATION_BINS = ((0.5, 1.0), (1.0, 1.5), (1.5, 3.0), (3.0, 6.0), (6.0, math.inf))
 COVERAGES = (0.5, 0.8, 1.0)
 STRENGTHS = (1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0)
-"""逻辑回归正则强度的候选，数越大约束越松。只在训练集内部挑。"""
+"""Candidate values for the logistic regression regularization strength. A larger number means a
+looser constraint on the model. Only chosen inside the training set."""
 
 METHODS = ("nearest", "centroid", "logistic")
 
@@ -32,7 +41,9 @@ METHODS = ("nearest", "centroid", "logistic")
 def labels_by_episode(
     directories: list[Path], annotations: list[Path]
 ) -> dict[str, dict[str, str]]:
-    """每一集的人工身份：集名到「片段 ID 到角色名」。只收时间毫秒级精确对上的，特殊标签不收。"""
+    """Human identities for each episode: episode name to a map of clip ID to character name. Only
+    labels whose time matches exactly to the millisecond are collected. Special labels are not
+    collected."""
     episodes = {}
     for directory in directories:
         episode, rows = load_episode(directory)
@@ -43,7 +54,7 @@ def labels_by_episode(
         annotation = read_json(path)
         source = str(annotation["source"]).replace("\\", "/").rsplit("/", 1)[-1]
         if source not in episodes:
-            raise ValueError(f"{path} 的音轨不在这些集目录里")
+            raise ValueError(f"{path} has an audio track that is not in these episode folders")
         name, by_time = episodes[source]
         for clip in annotation["clips"]:
             person = clip.get("name")
@@ -53,13 +64,14 @@ def labels_by_episode(
             if clip_id is None:
                 continue
             if found[name].get(clip_id, person) != person:
-                raise ValueError("同一片段有冲突的人工身份标签")
+                raise ValueError("The same clip has conflicting human identity labels")
             found[name][clip_id] = person
     return found
 
 
 def features(directory: Path, models: list[str]) -> tuple[list[dict[str, Any]], Any]:
-    """一集的声纹。多个模型时各自是单位长度，按片段 ID 对齐后拼起来，再整体归一。"""
+    """Voiceprints for one episode. With several models, each one is unit length. They are aligned
+    by clip ID, joined side by side, and then normalized as a whole."""
     import numpy as np
 
     base: list[dict[str, Any]] = []
@@ -70,14 +82,15 @@ def features(directory: Path, models: list[str]) -> tuple[list[dict[str, Any]], 
         if not base:
             base = records
         elif set(order) != {r["id"] for r in base}:
-            raise ValueError("模型覆盖的片段不同，不能拼在一起")
+            raise ValueError("Models cover different clips, so they cannot be joined together")
         parts.append(vectors[[order[r["id"]] for r in base]])
     joined = np.concatenate(parts, axis=1)
     return base, joined / np.linalg.norm(joined, axis=1, keepdims=True)
 
 
 def _class_scores(method: str, train: Any, names: list[str], test: Any, strength: float) -> Any:
-    """返回（角色名列表, 每条测试片段对每个角色的分数）。分数越大越像。"""
+    """Return (list of character names, each test clip's score for each character). A higher score
+    means more alike."""
     import numpy as np
 
     roles = sorted(set(names))
@@ -100,15 +113,17 @@ def _class_scores(method: str, train: Any, names: list[str], test: Any, strength
         model = LogisticRegression(C=strength, max_iter=5000)
         model.fit(train, index)
         return [roles[k] for k in model.classes_], model.predict_proba(test)
-    raise ValueError(f"不认识的做法 {method!r}")
+    raise ValueError(f"Unknown method {method!r}")
 
 
 def predict(
     method: str, train: Any, names: list[str], test: Any, strength: float = 10.0
 ) -> tuple[list[str], list[float]]:
-    """每条测试片段的预测角色和把握大小。
+    """Predicted character and confidence for each test clip.
 
-    逻辑回归的把握是它给的概率；另两种是第一名比第二名高出多少，只有一个角色时记 1。
+    For logistic regression, the confidence is the probability the model gives. For the other two
+    methods, it is how much the first place beats the second place. If there is only one character,
+    it is recorded as 1.
     """
     import numpy as np
 
@@ -125,7 +140,8 @@ def predict(
 
 
 def pick_strength(pool: dict[str, tuple[Any, list[str]]]) -> tuple[float, dict[str, float]]:
-    """在训练集内部按集轮流留出，挑逻辑回归的正则强度。只有一集训练时用中间值。"""
+    """Choose the logistic regression regularization strength, holding out one training episode at a
+    time. When there is only one training episode, use the middle value."""
     import numpy as np
 
     if len(pool) < 2:
@@ -151,7 +167,8 @@ def _rate(flags: list[bool]) -> float | None:
 def summarize(
     truth: list[str], guesses: list[str], confidence: list[float], durations: list[float]
 ) -> dict[str, Any]:
-    """正确率：全部、按时长分档、按把握从高到低取前若干比例。"""
+    """Accuracy: overall, by clip duration bins, and for the top few proportions ranked by
+    confidence from high to low."""
     right = [g == t for g, t in zip(guesses, truth, strict=True)]
     by_duration = {}
     for low, high in DURATION_BINS:
@@ -173,14 +190,15 @@ def classify_check(
     out: Path,
     models: list[str],
 ) -> dict[str, Any]:
-    """训练用除 `test` 以外各集的人工标签，只在 `test` 那一集上打分。"""
+    """Train on the human labels of every episode except `test`, and score only on the `test`
+    episode."""
     import numpy as np
 
     if out.exists():
-        raise ValueError(f"{out} 已存在，换一个文件名")
+        raise ValueError(f"{out} already exists, use another file name")
     labels = labels_by_episode(directories, annotations)
     if not labels.get(test):
-        raise ValueError(f"这些人工归档里没有 {test} 的名字，无法打分")
+        raise ValueError(f"No labels for {test} in these human archives, so it cannot be scored")
 
     pool: dict[str, tuple[Any, list[str]]] = {}
     held: tuple[list[dict[str, Any]], Any, list[str]] | None = None
@@ -195,7 +213,9 @@ def classify_check(
         elif keep:
             pool[episode["name"]] = (vectors[keep], names)
     if held is None or not pool:
-        raise ValueError("需要被测的那一集，以及至少一集有标签的训练集")
+        raise ValueError(
+            "Need the tested episode, plus at least one training episode that has labels"
+        )
 
     records, test_vectors, truth = held
     train = np.concatenate([v for v, _ in pool.values()])
@@ -235,7 +255,8 @@ def classify_check(
         "logistic_strength_search": search,
         "results": results,
         "clips": per_clip,
-        "note": "短于 0.5 秒的片段没有声纹，不在其中；训练集没有的角色照样算判错。",
+        "note": "Clips shorter than 0.5 seconds have no voiceprint, so they are not included. "
+        "Characters that are not in the training set are still counted as wrong.",
     }
     write_json(out, report)
     return report

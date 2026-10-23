@@ -1,4 +1,9 @@
-"""嵌入诊断：排除自身、单标签角色只当干扰项、未标注近邻只算线索、两模型同池。"""
+"""Embedding diagnosis.
+
+A clip is excluded from its own search. Roles with only one label count only as
+distractors. Unlabeled nearest neighbours count only as leads. Both models share
+one pool.
+"""
 
 from __future__ import annotations
 
@@ -44,7 +49,8 @@ def _episode(
     for model, matrix in vectors.items():
         cache = directory / "embeddings" / model
         cache.mkdir(parents=True)
-        # 第二个模型倒序保存，检验按片段 ID 对齐而不是按行号。
+        # The second model is saved in reverse order. This checks that rows are
+        # matched by clip ID, not by row number.
         order = slice(None) if model == MODELS[0] else slice(None, None, -1)
         np.save(cache / "vectors.npy", matrix[order])
         write_json(cache / "metadata.json", rows[order])
@@ -53,7 +59,7 @@ def _episode(
 
 
 def _fixture(tmp_path: Path) -> tuple[list[Path], Path]:
-    # ep1：A、A、A；ep2：B、B、未标注。第二个模型把 A 的第三条推向 B。
+    # ep1: A, A, A; ep2: B, B, unlabeled. The second model pushes A's third clip toward B.
     ep1 = _episode(
         tmp_path,
         "ep1",
@@ -116,7 +122,8 @@ def test_retrieval_excludes_self_and_reports_unlabeled_neighbours_as_leads(tmp_p
     assert second["top3_hit_rate"] == 1.0
     assert first["same_episode"] == {"evaluable": 5, "top1_hit_rate": 1.0}
     assert first["cross_episode"] == {"evaluable": 0, "top1_hit_rate": None}
-    # A 的第三条在全池里最近的是 ep2 那条未标注片段，只能记为线索。
+    # The nearest clip to A's third clip in the whole pool is the unlabeled clip
+    # in ep2, so it can only be recorded as a lead.
     assert first["full_pool_top1"] == {"same_role": 4, "unlabeled": 1}
     assert first["by_duration"]["0-1.5s"] == {"queries": 2, "top1_hit_rate": 1.0}
     third = next(q for q in report["models"][MODELS[0]]["queries"] if q["start"] == 4)
@@ -134,7 +141,7 @@ def test_retrieval_excludes_self_and_reports_unlabeled_neighbours_as_leads(tmp_p
     wavs = sorted(out.glob("examples/*/*/*.wav"))
     assert len(wavs) == 2 * (len(examples["far_same_role"]) + len(examples["near_other_role"]))
     assert sf.info(str(wavs[0])).samplerate == 44100
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         diagnose(episodes, [annotation], MODELS, out)
 
 
@@ -162,7 +169,7 @@ def test_groups_split_missed_pairs_by_threshold_and_must_match_segments(tmp_path
     assert report["models"][MODELS[0]]["retrieval"]["wrong_top1_in_same_group"] == 0
     data["episodes"]["ep1"]["segments_sha256"] = "stale"
     write_json(groups, data)
-    with pytest.raises(ValueError, match="不一致"):
+    with pytest.raises(ValueError, match="does not match"):
         diagnose(episodes, [annotation], MODELS[:1], tmp_path / "e", groups)
 
 
@@ -177,7 +184,7 @@ def test_single_label_roles_are_distractors_not_queries(tmp_path: Path) -> None:
     assert report["models"][MODELS[0]]["retrieval"]["queries"] == 3
     assert report["models"][MODELS[0]]["retrieval"]["roles"]["B"]["queries"] == 0
     assert report["models"][MODELS[0]]["distances"]["other_role_pairs"] == 3
-    with pytest.raises(ValueError, match="两个角色"):
+    with pytest.raises(ValueError, match="Need at least two characters"):
         diagnose(episodes, [annotation], MODELS[:1], tmp_path / "e")
 
 

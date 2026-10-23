@@ -38,7 +38,7 @@ def test_reference_links_preserve_unknown_and_reject_conflicts() -> None:
     conflict = link_reference_groups(data, {"0": "A", "1": "B", "2": "A"})
     assert conflict["support"]["conflicting_groups"] == ["g1"]
     assert conflict["assignments"][0]["speaker"] != conflict["assignments"][2]["speaker"]
-    with pytest.raises(ValueError, match="参考片段"):
+    with pytest.raises(ValueError, match="Reference clips"):
         link_reference_groups(data, {"5": "A"})
 
 
@@ -65,7 +65,8 @@ def test_reference_labels_are_excluded_and_hidden_contamination_is_counted(tmp_p
     assert before["metrics"]["missed_same_person_pairs"] == 2
     assert after["metrics"]["missed_same_person_pairs"] == 1
     assert after["metrics"]["correct_same_person_pairs"] == 1
-    # 一个未用作参考的 B 混进 g2，整组传播会让错误合并变多，评分必须揭示它。
+    # An unused-as-reference B is mixed into g2. Spreading across the whole group
+    # would create more wrong merges, and scoring must reveal it.
     data["assignments"][4]["speaker"] = "g2"
     write_json(base, data)
     write_json(candidate, link_reference_groups(data, {"0": "A", "2": "A"}))
@@ -89,7 +90,7 @@ def test_experiment_retains_splits_and_fixed_candidate(tmp_path: Path) -> None:
         assert trial["with_references"]["labeled_clips"] == expected
     candidate = read_json(tmp_path / "experiment/candidate.json")
     assert candidate["support"]["labels"] == report["results"][20]["support"]
-    with pytest.raises(ValueError, match="已存在"):
+    with pytest.raises(ValueError, match="already exists"):
         reference_experiment(base, [annotation], tmp_path / "experiment", ["A"])
 
 
@@ -101,7 +102,9 @@ def test_nearest_reference_does_not_chain_or_force_ambiguous_clips() -> None:
     result = assign_from_references(data, {"0": "A"}, records, vectors, 0.2)
     groups = [r["speaker"] for r in result["assignments"]]
     assert groups[0] == groups[1]
-    assert groups[2] == groups[3] != groups[0]  # 不能借已预测的 30 度片段继续连向 60 度。
+    assert (
+        groups[2] == groups[3] != groups[0]
+    )  # It must not reach 60 degrees by chaining through the already predicted 30-degree clip.
     assert groups[4] != groups[0]
     assert groups[5] is None
     vectors[1], vectors[2] = [2**-0.5, 2**-0.5], [0, 1]

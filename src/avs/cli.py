@@ -1,4 +1,4 @@
-"""字幕说话人分类的唯一命令入口。"""
+"""The single command-line entry point for subtitle-based speaker classification."""
 
 from __future__ import annotations
 
@@ -12,22 +12,26 @@ import typer
 from avs import pipeline
 from avs.project import write_json
 
-app = typer.Typer(name="avs", help="按字幕切段，把同一角色的声音归到一起。", no_args_is_help=True)
+app = typer.Typer(
+    name="avs",
+    help="Cut clips by subtitles, and group the voices of the same character together.",
+    no_args_is_help=True,
+)
 
 
 @app.callback()
 def main() -> None:
-    # Windows 管道默认编码不一定能表示中文。
+    # The default encoding of a Windows pipe may not be able to show every character.
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-DEVICE_HELP = "cuda、cpu 或 auto（有 NVIDIA 显卡就用 cuda）"
+DEVICE_HELP = "cuda, cpu, or auto (uses cuda if there is an NVIDIA GPU)"
 
 
 @app.command()
 def doctor() -> None:
-    """检查运行环境：显卡、FFmpeg、模型文件、Hugging Face 令牌。"""
+    """Check the runtime environment: GPU, FFmpeg, model files, and the Hugging Face token."""
     import shutil
 
     import torch
@@ -39,105 +43,161 @@ def doctor() -> None:
     def report(ok: bool, text: str, fix: str = "", required: bool = True) -> None:
         nonlocal problems
         problems += required and not ok
-        mark = "[好]" if ok else "[缺]" if required else "[可选]"
+        mark = "[ok]" if ok else "[missing]" if required else "[optional]"
         typer.echo(f"{mark} {text}" + (f"\n     {fix}" if fix and not ok else ""))
 
     cuda = torch.cuda.is_available()
-    gpu = f"，{torch.cuda.get_device_name(0)}" if cuda else ""
+    gpu = f", {torch.cuda.get_device_name(0)}" if cuda else ""
     report(
         cuda,
-        f"torch {torch.__version__}，CUDA {'可用' if cuda else '不可用'}{gpu}",
-        "没有可用的 NVIDIA 显卡，会用 CPU 计算。能用，但抠人声一集要慢很多",
+        f"torch {torch.__version__}, CUDA {'available' if cuda else 'not available'}{gpu}",
+        "No usable NVIDIA GPU was found, so the CPU will be used. It works, but separating vocals "
+        "for one episode is much slower",
         required=False,
     )
     for tool in ("ffmpeg", "ffprobe"):
         found = shutil.which(tool)
-        report(bool(found), f"{tool}：{found or '找不到'}", "装 FFmpeg，并把它的 bin 目录加进 PATH")
+        report(
+            bool(found),
+            f"{tool}: {found or 'not found'}",
+            "Install FFmpeg and add its bin folder to PATH",
+        )
     model = Path("models") / SEPARATION_MODEL
-    report(True, f"抠人声模型：{model}" if model.exists() else "抠人声模型：第一次处理时自动下载")
+    report(
+        True,
+        f"Voice separation model: {model}"
+        if model.exists()
+        else "Voice separation model: will be downloaded automatically the first time it is used",
+    )
     token = pipeline.has_hf_token()
     report(
         token,
-        f"Hugging Face 令牌：{'有' if token else '没有'}",
-        "只在不给 --offset、要自动量字幕偏移时需要：" + pipeline.TOKEN_HOWTO,
+        f"Hugging Face token: {'present' if token else 'missing'}",
+        "Only needed when --offset is not given and the subtitle offset should be measured "
+        "automatically: " + pipeline.TOKEN_HOWTO,
         required=False,
     )
     free = shutil.disk_usage(Path.cwd()).free / 2**30
-    report(free >= 5, f"当前磁盘剩余 {free:.0f} GB", "处理好的一集约占 0.5 GB，留足空间")
-    typer.echo("都齐了" if problems == 0 else f"有 {problems} 项要处理")
+    report(
+        free >= 5,
+        f"Free space on the current disk: {free:.0f} GB",
+        "One processed episode takes about 0.5 GB, so leave enough space",
+    )
+    typer.echo(
+        "All checks passed" if problems == 0 else f"Found {problems} item(s) that need attention"
+    )
 
 
 @app.command()
 def add(
-    workspace: Annotated[Path, typer.Argument(help="工作区目录，各集放在它的 episodes/ 下")],
-    video: Annotated[Path, typer.Argument(help="这一集的视频")],
-    subs: Annotated[Path, typer.Option(help="这一集的对白字幕，按它切片段")],
+    workspace: Annotated[
+        Path, typer.Argument(help="Workspace folder; episodes are kept in its episodes/ folder")
+    ],
+    video: Annotated[Path, typer.Argument(help="Video of this episode")],
+    subs: Annotated[
+        Path, typer.Option(help="Dialogue subtitles of this episode; clips are cut from them")
+    ],
     name: Annotated[
-        str | None, typer.Option(help="集名，例如 ep03；省略就取下一个没用过的 epNN")
+        str | None,
+        typer.Option(
+            help="Episode name, for example ep03; if omitted, the next unused epNN is used"
+        ),
     ] = None,
     text_subs: Annotated[
-        Path | None, typer.Option(help="另配的台词字幕（通常是日文原文），导出时文字从它取")
+        Path | None,
+        typer.Option(
+            help="Separate text subtitles (usually the Japanese original); export takes the text "
+            "from them"
+        ),
     ] = None,
-    audio: Annotated[Path | None, typer.Option(help="另给的原始音轨；省略就从视频里抽")] = None,
+    audio: Annotated[
+        Path | None,
+        typer.Option(help="Separate original audio track; if omitted, it is taken from the video"),
+    ] = None,
     offset: Annotated[
         float | None,
-        typer.Option(help="字幕加上的秒数；省略则自动量，要 Hugging Face 令牌"),
+        typer.Option(
+            help="Seconds to add to the subtitles; if omitted, it is measured automatically, which "
+            "needs a Hugging Face token"
+        ),
     ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
 ) -> None:
-    """加一集：切片段、算界面要用的声纹，给了台词字幕就一起配上。中途出错，再跑同一条命令接着做。"""
+    """Add one episode: cut clips, compute the voiceprints the interface needs, and attach text
+    subtitles if given. If it stops partway, run the same command again to continue."""
     try:
         result = pipeline.add_episode(
             workspace, video, subs, name, text_subs, audio, offset, device, say=typer.echo
         )
     except ValueError as exc:
-        typer.echo(f"出错：{exc}", err=True)
+        typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
-    typer.echo(f"{result['episode']} 加好了，{result['segments']} 条片段。打开界面：")
+    typer.echo(f"{result['episode']} added, {result['segments']} clips. To open the interface:")
     typer.echo(f"  uv run avs app {workspace}")
 
 
 @app.command()
 def prepare(
-    video: Annotated[Path, typer.Argument(help="这一集的视频，必需")],
-    subs: Annotated[Path, typer.Option(help="对应的对白字幕，必需")],
-    out: Annotated[Path, typer.Option(help="新的一集目录")],
-    name: Annotated[str, typer.Option(help="唯一集名，例如 ep03")],
-    audio: Annotated[Path | None, typer.Option(help="另给的原始音轨；省略就从视频里抽")] = None,
-    vocals: Annotated[Path | None, typer.Option(help="复用已有的原采样率人声轨")] = None,
-    offset: Annotated[float | None, typer.Option(help="字幕加上的秒数，省略则自动对齐")] = None,
+    video: Annotated[Path, typer.Argument(help="Video of this episode, required")],
+    subs: Annotated[Path, typer.Option(help="Matching dialogue subtitles, required")],
+    out: Annotated[Path, typer.Option(help="New episode folder")],
+    name: Annotated[str, typer.Option(help="Unique episode name, for example ep03")],
+    audio: Annotated[
+        Path | None,
+        typer.Option(help="Separate original audio track; if omitted, it is taken from the video"),
+    ] = None,
+    vocals: Annotated[
+        Path | None, typer.Option(help="Reuse an existing vocal track at its original sample rate")
+    ] = None,
+    offset: Annotated[
+        float | None,
+        typer.Option(help="Seconds to add to the subtitles; if omitted, aligned automatically"),
+    ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
 ) -> None:
-    """准备一集：抽音轨、抠人声、对齐字幕，每行对白一个片段。"""
+    """Prepare an episode: extract the audio, separate the vocals, align the subtitles, and make one
+    clip per dialogue line."""
     typer.echo(pipeline.prepare(video, subs, out, name, vocals, offset, device, audio))
 
 
 @app.command()
 def extend(
     episode: Path,
-    subtitle: Annotated[Path, typer.Option(help="这一集的 ASS 字幕")],
-    floor: Annotated[float, typer.Option(help="短于这个秒数的行不补，算不出可靠声纹")] = 0.2,
+    subtitle: Annotated[Path, typer.Option(help="ASS subtitles for this episode")],
+    floor: Annotated[
+        float,
+        typer.Option(
+            help="Lines shorter than this many seconds are not filled in, because no reliable "
+            "voiceprint can be computed"
+        ),
+    ] = 0.2,
 ) -> None:
-    """把字幕里没有对应片段的对白行补进片段表；已有片段不动，标签不用重做。"""
+    """Add dialogue lines that have no matching clip from the subtitles to the clip table. Existing
+    clips are not touched, so labels do not need to be redone."""
     result = pipeline.extend_segments(episode, subtitle, floor)
     typer.echo(
-        f"{result['episode']}：{result['before']} 条 -> {result['after']} 条，"
-        f"补了 {result['added']} 条（最短 {result['shortest_added']} 秒），"
-        f"另有 {result['too_short']} 条短于 {result['floor_seconds']} 秒没补"
+        f"{result['episode']}: {result['before']} -> {result['after']} clips, "
+        f"added {result['added']} (shortest {result['shortest_added']} seconds), "
+        f"{result['too_short']} more were shorter than "
+        f"{result['floor_seconds']} seconds and not added"
     )
-    typer.echo("片段表变了，声纹缓存已失效，重新运行 embed")
+    typer.echo("The clip table changed, so the voiceprint cache is now stale. Run embed again")
 
 
 @app.command()
 def embed(
-    episodes: Annotated[list[Path], typer.Argument(help="一集或多集目录")],
+    episodes: Annotated[list[Path], typer.Argument(help="One or more episode folders")],
     model: str = "redimnet2-b6",
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
     window: Annotated[
-        float, typer.Option(help="最小听音窗口秒数；短片段向两侧借相邻音频补足，0 表示不补")
+        float,
+        typer.Option(
+            help="Minimum listening window in seconds. Short clips borrow audio from their "
+            "neighbours on both sides to reach it. 0 means no borrowing"
+        ),
     ] = 0.0,
 ) -> None:
-    """计算全量片段声纹，输入未变时复用缓存。"""
+    """Compute voiceprints for all clips. The cache is reused when the input has not changed."""
     for episode in episodes:
         typer.echo(pipeline.embed(episode, model, device, window))
 
@@ -145,75 +205,102 @@ def embed(
 @app.command("set-video")
 def set_video(
     episode: Path,
-    video: Annotated[Path, typer.Argument(help="这一集的视频文件，和音轨同一条时间线")],
+    video: Annotated[
+        Path,
+        typer.Argument(help="Video file of this episode, on the same timeline as the audio track"),
+    ],
 ) -> None:
-    """给一集记上视频文件。时长和原始音轨对不上就拒绝，免得画面对错人。"""
+    """Record the video file for an episode. Refuse if its duration does not match the original
+    audio track, so pictures are never matched to the wrong speaker."""
     result = pipeline.attach_video(episode, video)
     typer.echo(
-        f"{result['episode']}：视频 {result['video_seconds']} 秒，音轨 {result['audio_seconds']} 秒"
+        f"{result['episode']}: video {result['video_seconds']} seconds, "
+        f"audio {result['audio_seconds']} seconds"
     )
 
 
 @app.command("set-subtitles")
 def set_subtitles(
     episode: Path,
-    subtitles: Annotated[Path, typer.Argument(help="这一集切片段时用的那份字幕")],
+    subtitles: Annotated[
+        Path, typer.Argument(help="The subtitle file that was used to cut clips for this episode")
+    ],
 ) -> None:
-    """给早期没记字幕的集补上字幕，界面要靠它显示台词。偏移从已有片段推出来。"""
+    """Add subtitles to early episodes that did not record them. The interface needs them to show
+    dialogue. The offset is worked out from the existing clips."""
     result = pipeline.attach_subtitles(episode, subtitles)
     typer.echo(
-        f"{result['episode']}：偏移 {result['offset']} 秒，{result['matched']:.1%} 的片段对上"
+        f"{result['episode']}: offset {result['offset']} seconds, "
+        f"{result['matched']:.1%} of clips matched"
     )
 
 
 @app.command("set-text-subtitles")
 def set_text_subtitles(
     episode: Path,
-    subtitles: Annotated[Path, typer.Argument(help="给导出提供台词文字的字幕，通常是日文原文")],
+    subtitles: Annotated[
+        Path,
+        typer.Argument(
+            help="Subtitles that supply the dialogue text for export, usually the Japanese original"
+        ),
+    ],
 ) -> None:
-    """给一集另配一份字幕，导出时台词文字从它取。偏移自动量，对不上就拒绝。"""
+    """Add a second subtitle file to an episode. Export takes the dialogue text from it. The offset
+    is measured automatically, and the command refuses if the two do not line up."""
     result = pipeline.attach_text_subtitles(episode, subtitles)
     typer.echo(
-        f"{result['episode']}：偏移 {result['text_subtitle_offset']} 秒，"
-        f"和切片段的字幕重合 {result['text_subtitle_agreement']:.0%}，"
-        f"{result['matched']:.1%} 的片段碰得到台词"
+        f"{result['episode']}: offset {result['text_subtitle_offset']} seconds, "
+        f"overlap with the clip subtitles {result['text_subtitle_agreement']:.0%}, "
+        f"{result['matched']:.1%} of clips match a dialogue line"
     )
 
 
 @app.command("import-labels")
 def import_labels(
-    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    workspace: Annotated[Path, typer.Argument(help="Workspace folder, which contains episodes/")],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
     target: Annotated[
         list[str] | None,
-        typer.Option(help="导入后只留这些目标角色，其余标成「其他」，可重复提供"),
+        typer.Option(
+            help="After import, keep only these target characters and set the rest to 'other'. Can "
+            "be given more than once"
+        ),
     ] = None,
 ) -> None:
-    """把人工归档里的名字导进界面的标签记录。只在标签记录还是空的时候用。"""
+    """Import the names from the human archive into the interface's label records. Only use this
+    while the label records are still empty."""
     from avs.app.labels import LabelStore, import_archives
     from avs.app.workspace import episode_dirs
     from avs.project import load_episode, time_key
 
     store = LabelStore(workspace / "labels")
     if store.batches:
-        raise typer.BadParameter("标签记录里已经有东西了，不重复导入")
+        raise typer.BadParameter(
+            "The label records already contain data, so nothing was imported again"
+        )
     by_time, sources = {}, {}
     for directory in episode_dirs(workspace):
         episode, rows = load_episode(directory)
         sources[Path(episode["vocals"]).name] = episode["name"]
         by_time.update({(episode["name"], time_key(r)): r["id"] for r in rows})
     count = import_archives(store, annotation, by_time, sources)
-    typer.echo(f"导入 {count} 条标签、{len(store.roles)} 个角色 -> {store.folder}")
+    typer.echo(f"Imported {count} labels, {len(store.roles)} characters -> {store.folder}")
     if target:
         migrate_targets(workspace, target)
 
 
 @app.command("migrate-targets")
 def migrate_targets(
-    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 labels/")],
-    target: Annotated[list[str], typer.Option(help="留下的目标角色，可重复提供")],
+    workspace: Annotated[Path, typer.Argument(help="Workspace folder, which contains labels/")],
+    target: Annotated[
+        list[str], typer.Option(help="Target characters to keep, can be given more than once")
+    ],
 ) -> None:
-    """只留下给定的目标角色，其余角色的标签都改成「其他」。改之前把标签记录原样归档。"""
+    """Keep only the given target characters. Labels of all other characters are set to 'other'. The
+    label records are archived unchanged before the change."""
     from datetime import datetime
 
     from avs.app.labels import LabelStore, migrate_to_targets
@@ -224,19 +311,29 @@ def migrate_targets(
         count = migrate_to_targets(store, target, archive)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    typer.echo(f"{count} 条标签改成了「其他」，目标角色：{'、'.join(target)}；原样归档在 {archive}")
+    typer.echo(
+        f"{count} labels set to 'other'. Target characters: {
+            ', '.join(target)
+        }; original archived in {archive}"
+    )
 
 
 @app.command("app")
 def run_app(
-    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],
+    workspace: Annotated[Path, typer.Argument(help="Workspace folder, which contains episodes/")],
     port: int = 8765,
-    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="启动后打开浏览器")] = True,
+    open_browser: Annotated[
+        bool, typer.Option("--open/--no-open", help="Open the browser after starting")
+    ] = True,
     model: Annotated[
-        list[str] | None, typer.Option(help="声纹模型，可重复提供；省略用三个拼在一起")
+        list[str] | None,
+        typer.Option(
+            help="Voiceprint models, can be given more than once; if omitted, the three are "
+            "combined"
+        ),
     ] = None,
 ) -> None:
-    """打开标注与修正界面。"""
+    """Open the labeling and correction interface."""
     import webbrowser
 
     import uvicorn
@@ -246,210 +343,317 @@ def run_app(
 
     state = AppState(workspace, tuple(model) if model else DEFAULT_MODELS)
     typer.echo(
-        f"{len(state.workspace.episodes)} 集、{len(state.workspace.clips)} 条片段、"
-        f"{state.trained['labels']} 条标签参与训练"
+        f"{len(state.workspace.episodes)} episodes, {len(state.workspace.clips)} clips, "
+        f"{state.trained['labels']} labels used for training"
     )
     for name, reason in state.workspace.skipped.items():
-        typer.echo(f"没载入 {name}：{reason}")
+        typer.echo(f"Could not load {name}: {reason}")
     if not state.workspace.episodes:
         typer.echo(
-            f"工作区里还没有能用的一集，先加一集：uv run avs add {workspace} 视频 --subs 字幕"
+            f"No episode in the workspace can be used yet. "
+            f"Add one first: uv run avs add {workspace} VIDEO --subs SUBTITLES"
         )
     url = f"http://127.0.0.1:{port}/"
-    typer.echo(f"打开 {url}")
+    typer.echo(f"Open {url}")
     if open_browser:
         import threading
 
-        # 等服务起来再开浏览器，否则第一眼是一个连不上的页面。
+        # Wait for the server to start before opening the browser, otherwise the first view is a
+        # page that cannot connect.
         threading.Timer(1.0, webbrowser.open, args=[url]).start()
     uvicorn.run(create_app(state), host="127.0.0.1", port=port, log_level="warning")
 
 
 @app.command()
 def group(
-    episodes: Annotated[list[Path], typer.Argument(help="要一起分组的集目录")],
-    out: Annotated[Path, typer.Option(help="新的分组 JSON 文件")],
+    episodes: Annotated[list[Path], typer.Argument(help="Episode folders to group together")],
+    out: Annotated[Path, typer.Option(help="New grouping JSON file")],
     threshold: Annotated[
-        float | None, typer.Option(help="距离阈值；省略则用该模型自己的默认值")
+        float | None,
+        typer.Option(help="Distance threshold; if omitted, this model's own default is used"),
     ] = None,
     model: str = "anime-va",
     method: Annotated[
-        str, typer.Option(help="连接规则：average/single/complete/mutual_knn/two_stage")
+        str, typer.Option(help="Linking rule: average/single/complete/mutual_knn/two_stage")
     ] = "average",
     relative: Annotated[
         bool,
-        typer.Option("--relative", help="分界线按这个池子自己的距离算，不用固定值；尚未独立检验"),
+        typer.Option(
+            "--relative",
+            help="The threshold is computed from this pool's own distances, not a fixed value; not "
+            "yet independently tested",
+        ),
     ] = False,
 ) -> None:
-    """只读取缓存进行全局分组，小组保留；可以反复调整阈值和连接规则。"""
+    """Group globally using only the cached voiceprints. Small groups are kept. You can adjust the
+    threshold and linking rule again and again."""
     from avs.embeddings.extract import DEFAULT_THRESHOLDS
 
     if relative:
         if threshold is not None:
-            raise typer.BadParameter("--relative 自己算分界线，不能同时给 --threshold")
+            raise typer.BadParameter(
+                "--relative computes the threshold itself, so it cannot be combined with "
+                "--threshold"
+            )
         threshold = pipeline.relative_threshold(episodes, model)
-        typer.echo(f"按池子算出的分界线 {threshold:.4f}（固定值是 {DEFAULT_THRESHOLDS[model]}）")
+        typer.echo(
+            f"Threshold computed from the pool: {threshold:.4f} "
+            f"(the fixed value is {DEFAULT_THRESHOLDS[model]})"
+        )
     elif threshold is None:
         threshold = DEFAULT_THRESHOLDS.get(model, 0.5)
-        typer.echo(f"未指定阈值，用 {model} 的默认值 {threshold}")
+        typer.echo(f"No threshold given, using the default for {model}: {threshold}")
     result = pipeline.group(episodes, out, threshold, model, method)
     typer.echo(result["summary"])
-    typer.echo(f"分组 -> {out}")
+    typer.echo(f"Grouping -> {out}")
 
 
 @app.command()
 def evaluate(
     groups: Path,
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
     out: Path = Path("runs/evaluation.json"),
 ) -> None:
-    """精确对照人工身份，统计错误合并与该合没合。"""
+    """Compare exactly against human identities, and count wrong merges and missed merges."""
     from avs.evaluation.identity import evaluate as score
 
     result = score(groups, annotation)
     write_json(out, result)
     typer.echo(result["metrics"])
-    typer.echo(f"报告 -> {out}")
+    typer.echo(f"Report -> {out}")
 
 
 @app.command()
 def compare(
-    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的比较报告 JSON")],
-    model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
-    method: Annotated[list[str] | None, typer.Option(help="连接规则，可重复；默认 average")] = None,
-    low: Annotated[float, typer.Option(help="阈值扫描下界")] = 0.20,
-    high: Annotated[float, typer.Option(help="阈值扫描上界")] = 0.90,
+    episodes: Annotated[list[Path], typer.Argument(help="Fixed episode folders")],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    out: Annotated[Path, typer.Option(help="New comparison report JSON")],
+    model: Annotated[
+        list[str] | None,
+        typer.Option(help="Only compare these models; by default both are compared"),
+    ] = None,
+    method: Annotated[
+        list[str] | None,
+        typer.Option(help="Linking rules, can be given more than once; default is average"),
+    ] = None,
+    low: Annotated[float, typer.Option(help="Lower bound of the threshold scan")] = 0.20,
+    high: Annotated[float, typer.Option(help="Upper bound of the threshold scan")] = 0.90,
 ) -> None:
-    """比较缓存模型与连接规则在给定阈值区间上的错误合并与该合没合；仅用于探索。
+    """Compare cached models and linking rules over a range of thresholds, counting wrong merges and
+    missed merges. For exploration only.
 
-    默认区间是给 ReDimNet 定的。不同模型的相似度尺度不一样，换模型要先看同一角色的距离落在哪，
-    再定区间；照搬别人的区间会扫在完全没有意义的一段上。
+    The default range was set for ReDimNet. Different models have different similarity scales.
+    Before switching models, check where the distances of the same character fall, then choose a
+    range. Copying someone else's range would scan a part where nothing useful can be seen.
     """
     from avs.embeddings.extract import MODELS
     from avs.evaluation.compare import compare as compare_models
 
     if not 0 < low < high <= 2:
-        raise typer.BadParameter("阈值区间必须满足 0 < low < high <= 2")
+        raise typer.BadParameter("The threshold range must satisfy 0 < low < high <= 2")
     grid = [i / 100 for i in range(round(low * 100), round(high * 100) + 1)]
     result = compare_models(episodes, annotation, model or list(MODELS), grid, out, method)
-    typer.echo(f"比较 {len(result['results'])} 个设置 -> {out}")
+    typer.echo(f"Compared {len(result['results'])} settings -> {out}")
 
 
 @app.command()
 def drift(
-    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
-    scored: Annotated[str, typer.Option(help="被打分的那一集集名，它始终整集在池子里")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的漂移报告 JSON")],
+    episodes: Annotated[list[Path], typer.Argument(help="Fixed episode folders")],
+    scored: Annotated[
+        str,
+        typer.Option(
+            help="Episode name of the scored episode; it is always included in full in the pool"
+        ),
+    ],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    out: Annotated[Path, typer.Option(help="New drift report JSON")],
     model: str = "anime-va",
     threshold: Annotated[
-        float | None, typer.Option(help="要考察的固定分界线，省略用模型默认值")
+        float | None,
+        typer.Option(help="Fixed threshold to examine; if omitted, the model's default is used"),
     ] = None,
     multiplier: Annotated[
-        float | None, typer.Option(help="按池子定分界线时乘的倍数，省略用模型默认值")
+        float | None,
+        typer.Option(
+            help="Multiplier used when the threshold is set from the pool; if omitted, the model's "
+            "default is used"
+        ),
     ] = None,
-    steps: Annotated[int, typer.Option(help="池子大小取几档")] = 7,
-    seeds: Annotated[int, typer.Option(help="每档抽几遍别的集的片段")] = 8,
+    steps: Annotated[int, typer.Option(help="How many pool sizes to try")] = 7,
+    seeds: Annotated[
+        int,
+        typer.Option(
+            help="How many random draws of clips from other episodes to make at each size"
+        ),
+    ] = 8,
 ) -> None:
-    """量成绩随片段池变大怎么变，对比固定分界线和按池子定分界线两种做法。
+    """Measure how the scores change as the clip pool grows, comparing a fixed threshold with a
+    threshold set from the pool.
 
-    被打分的那一集始终整集在池子里，只往里加别的集的片段。每一档面对同一批标签、同一批配对，
-    所以成绩可以直接比。要看的是错误合并稳不稳，不是连上多少对。
+    The scored episode is always included in full, and only clips from other episodes are added.
+    Each size faces the same labels and the same pairs, so the scores can be compared directly. What
+    matters is whether wrong merges stay stable, not how many pairs get linked.
     """
     from avs.evaluation.drift import drift as run_drift
 
     report = run_drift(
         episodes, scored, annotation, out, model, threshold, multiplier, steps=steps, seeds=seeds
     )
-    typer.echo(f"{report['labeled_clips']} 条标签、{report['roles']} 个角色，打分只看 {scored}")
-    typer.echo("每行是一档池子，两种定分界线的做法并排；要看的是错误合并稳不稳")
+    typer.echo(
+        f"{report['labeled_clips']} labels, {report['roles']} characters; "
+        f"scoring only looks at {scored}"
+    )
+    typer.echo(
+        "Each row is one pool size, with the two threshold methods side by side. What matters is "
+        "whether wrong merges stay stable"
+    )
     for row in report["summary"]:
         typer.echo(
-            f"片段池 {row['pool_clips']:>5} 条："
-            f"固定 {row['fixed_threshold']:.3f} 连上 {row['fixed_correct_pairs']:.0f}"
-            f" 错误合并 {row['fixed_false_merges']:.0f}"
-            f"；按池子定 {row['relative_threshold']:.4f}"
-            f" 连上 {row['relative_correct_pairs']:.0f}"
-            f" 错误合并 {row['relative_false_merges']:.0f}"
+            f"Pool of {row['pool_clips']:>5} clips: "
+            f"fixed threshold {row['fixed_threshold']:.3f}, linked {row['fixed_correct_pairs']:.0f}"
+            f", wrong merges {row['fixed_false_merges']:.0f}"
+            f"; pool threshold {row['relative_threshold']:.4f}"
+            f", linked {row['relative_correct_pairs']:.0f}"
+            f", wrong merges {row['relative_false_merges']:.0f}"
         )
-    typer.echo(f"报告 -> {out}")
+    typer.echo(f"Report -> {out}")
 
 
 @app.command("classify-check")
 def classify_check(
-    episodes: Annotated[list[Path], typer.Argument(help="训练集和被测集的集目录")],
-    test: Annotated[str, typer.Option(help="被测的那一集集名，它的标签不进训练")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的检验报告 JSON")],
+    episodes: Annotated[
+        list[Path], typer.Argument(help="Episode folders for the training set and the test set")
+    ],
+    test: Annotated[
+        str,
+        typer.Option(
+            help="Episode name of the one under test; its labels are not used for training"
+        ),
+    ],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    out: Annotated[Path, typer.Option(help="New classification check report JSON")],
     model: Annotated[
-        list[str] | None, typer.Option(help="声纹模型，可重复提供；多个时拼在一起")
+        list[str] | None,
+        typer.Option(
+            help="Voiceprint models, can be given more than once; multiple models are combined"
+        ),
     ] = None,
 ) -> None:
-    """按集留出检验：在别的集的标签上训练，把被测集的片段直接分到角色名下。"""
+    """Check by holding out whole episodes: train on the labels of the other episodes, then assign
+    each clip of the test episode directly to a character name."""
     from avs.evaluation.classify import classify_check as run_check
 
     report = run_check(episodes, test, annotation, out, model or ["anime-va"])
     typer.echo(
-        f"{'+'.join(report['models'])}：训练 {sum(report['train_episodes'].values())} 条，"
-        f"测 {report['test_clips']} 条，其中 {report['unseen_role_clips']} 条的角色训练集里没有"
+        f"{'+'.join(report['models'])}: trained on "
+        f"{sum(report['train_episodes'].values())} labels, "
+        f"tested {report['test_clips']} clips, of which "
+        f"{report['unseen_role_clips']} have a character that is not in the training set"
     )
     for method, own in report["results"].items():
-        tiers = "，".join(
-            f"{k} {v['accuracy']}（{v['clips']} 条）" for k, v in own["by_duration"].items()
+        tiers = ", ".join(
+            f"{k} {v['accuracy']} ({v['clips']} clips)" for k, v in own["by_duration"].items()
         )
-        confident = "，".join(f"{k} {v}" for k, v in own["by_confidence"].items())
-        typer.echo(f"{method}：全部 {own['accuracy']}；按把握 {confident}")
-        typer.echo(f"  按时长 {tiers}")
-    typer.echo(f"报告 -> {out}")
+        confident = ", ".join(f"{k} {v}" for k, v in own["by_confidence"].items())
+        typer.echo(f"{method}: overall {own['accuracy']}; by confidence {confident}")
+        typer.echo(f"  by duration {tiers}")
+    typer.echo(f"Report -> {out}")
 
 
 @app.command()
 def references(
     groups: Path,
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    role: Annotated[list[str], typer.Option(help="要试验参考合组的角色名，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的实验输出目录")],
-    nearest: Annotated[bool, typer.Option(help="直接按最近参考归属，扫描距离阈值")] = False,
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    role: Annotated[
+        list[str],
+        typer.Option(
+            help="Character names to test reference groups for, can be given more than once"
+        ),
+    ],
+    out: Annotated[Path, typer.Option(help="New experiment output folder")],
+    nearest: Annotated[
+        bool,
+        typer.Option(
+            help="Assign each clip directly to its nearest reference, and scan the distance "
+            "threshold"
+        ),
+    ] = False,
 ) -> None:
-    """每角色 1/2 条参考重复划分，排除参考后与原分组公平对照。"""
+    """Repeated split: for each character, use 1 or 2 clips as references, then exclude them and
+    compare fairly with the original grouping."""
     from avs.evaluation.references import reference_experiment
 
     result = reference_experiment(groups, annotation, out, role, nearest)
-    typer.echo(f"完成 {len(result['results'])} 次参考实验 -> {out}")
+    typer.echo(f"Finished {len(result['results'])} reference experiments -> {out}")
 
 
 @app.command()
 def diagnose(
-    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的诊断输出目录")],
-    groups: Annotated[Path | None, typer.Option(help="当前分组文件，用于区分组内/组间错误")] = None,
+    episodes: Annotated[list[Path], typer.Argument(help="Fixed episode folders")],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    out: Annotated[Path, typer.Option(help="New diagnosis output folder")],
+    groups: Annotated[
+        Path | None,
+        typer.Option(
+            help="Current grouping file; used to tell errors inside a group from errors between "
+            "groups"
+        ),
+    ] = None,
 ) -> None:
-    """用两模型缓存和人工标签做近邻与距离诊断，导出可试听错误实例。"""
+    """Run nearest-neighbour and distance diagnostics using both models' caches and the human
+    labels, and export wrong cases you can listen to."""
     from avs.embeddings.extract import MODELS
     from avs.evaluation.diagnose import diagnose as run_diagnosis
 
     result = run_diagnosis(episodes, annotation, list(MODELS), out, groups)
     for model, own in result["models"].items():
         typer.echo(
-            f"{model}: {own['retrieval']['queries']} 次查询，"
-            f"Top-1 同角色 {own['retrieval']['top1_hit_rate']}"
+            f"{model}: {own['retrieval']['queries']} queries, "
+            f"top-1 same-character rate {own['retrieval']['top1_hit_rate']}"
         )
-    typer.echo(f"诊断 -> {out}")
+    typer.echo(f"Diagnosis -> {out}")
 
 
 @app.command()
 def scores(
-    episodes: Annotated[list[Path], typer.Argument(help="固定的集目录")],
-    annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的分离度报告 JSON")],
-    model: Annotated[list[str] | None, typer.Option(help="只比较这些模型，默认两个都比")] = None,
-    norm: Annotated[list[str] | None, typer.Option(help="要比较的归一化，可重复")] = None,
-    window: Annotated[float, typer.Option(help="读哪一档听音窗口算出的声纹")] = 0.0,
+    episodes: Annotated[list[Path], typer.Argument(help="Fixed episode folders")],
+    annotation: Annotated[
+        list[Path],
+        typer.Option(help="Archive of human-labeled identities, can be given more than once"),
+    ],
+    out: Annotated[Path, typer.Option(help="New separation report JSON")],
+    model: Annotated[
+        list[str] | None,
+        typer.Option(help="Only compare these models; by default both are compared"),
+    ] = None,
+    norm: Annotated[
+        list[str] | None,
+        typer.Option(help="Normalizations to compare, can be given more than once"),
+    ] = None,
+    window: Annotated[
+        float, typer.Option(help="Which listening window's voiceprints to read")
+    ] = 0.0,
 ) -> None:
-    """比较原始余弦与分数归一化下，同一角色和不同角色的配对分不分得开。"""
+    """Compare whether pairs from the same character and pairs from different characters can be told
+    apart, with raw cosine similarity and with score normalization."""
     from avs.embeddings.extract import MODELS
     from avs.evaluation.scores import compare_norms
 
@@ -458,64 +662,85 @@ def scores(
         own = entry["overall"]
         typer.echo(
             f"{entry['model']:22s} {entry['norm']:7s} "
-            f"排序正确率 {own['auc']}  相等错误率 {own['eer']}"
+            f"ranking accuracy {own['auc']}  equal error rate {own['eer']}"
         )
-    typer.echo(f"{report['pairs']} 对标签配对 -> {out}")
+    typer.echo(f"{report['pairs']} labeled pairs -> {out}")
 
 
 @app.command()
 def coverage(
     episode: Path,
-    subtitle: Annotated[Path, typer.Option(help="这一集的 ASS 字幕")],
-    out: Annotated[Path, typer.Option(help="新的核对输出目录")],
-    pad: Annotated[float, typer.Option(help="切音频时前后各留几秒，便于听清")] = 0.0,
+    subtitle: Annotated[Path, typer.Option(help="ASS subtitles for this episode")],
+    out: Annotated[Path, typer.Option(help="New check output folder")],
+    pad: Annotated[
+        float,
+        typer.Option(help="Seconds to keep before and after each cut, so it is easier to hear"),
+    ] = 0.0,
 ) -> None:
-    """找出字幕里没有对应片段的台词，按原因切成音频供试听。"""
+    """Find dialogue lines with no matching clip, and cut them into audio files for listening,
+    grouped by reason."""
     from avs.evaluation.coverage import coverage as check
 
     report = check(episode, subtitle, out, pad)
     own = report["summary"]
     typer.echo(
-        f"{report['episode']}：对白 {own['dialogue_lines']} 行，"
-        f"有片段 {own['lines_with_clip']} 行，没片段 {own['lines_without_clip']} 行"
-        f"（短于 {report['floor_seconds']} 秒 {own['below_floor']} 行，"
-        f"够长却没切出 {own['no_speech_found']} 行）"
+        f"{report['episode']}: {own['dialogue_lines']} dialogue lines, "
+        f"{own['lines_with_clip']} with a clip, {own['lines_without_clip']} without a clip "
+        f"(shorter than {report['floor_seconds']} seconds: {own['below_floor']} lines; "
+        f"long enough but no speech found: {own['no_speech_found']} lines)"
     )
     typer.echo(
-        f"整段没有片段却有台词的空洞 {own['holes']} 处，共 {own['hole_seconds'] / 60:.1f} 分钟，"
-        f"里面有 {own['hole_dialogue_seconds']:.0f} 秒台词"
+        f"Gaps with no clip but with dialogue: {own['holes']}, "
+        f"{own['hole_seconds'] / 60:.1f} minutes in total, "
+        f"containing {own['hole_dialogue_seconds']:.0f} seconds of dialogue"
     )
-    typer.echo(f"偏移 {report['offset_seconds']:+.2f} 秒，音频与清单 -> {out}")
+    typer.echo(f"Offset {report['offset_seconds']:+.2f} seconds; audio files and list -> {out}")
 
 
 @app.command()
-def export(groups: Path, out: Annotated[Path, typer.Option(help="新的音频目录")]) -> None:
-    """从原采样率人声轨导出每个身份组，不设音质门槛。"""
+def export(groups: Path, out: Annotated[Path, typer.Option(help="New audio folder")]) -> None:
+    """Export each identity group from the original-sample-rate vocal track, with no audio quality
+    threshold."""
     result = pipeline.export_groups(groups, out)
-    typer.echo(f"导出 {result['files']} 条，共 {result['total_sec']} 秒 -> {out}")
+    typer.echo(f"Exported {result['files']} clips, {result['total_sec']} seconds in total -> {out}")
 
 
 @app.command()
 def label(
     episode: Path,
-    archive: Annotated[Path, typer.Option(help="人工归档，例如 annotations/ep03.json")],
+    archive: Annotated[Path, typer.Option(help="Human archive, for example annotations/ep03.json")],
     count: int = 50,
     port: int = 8765,
     plan: Annotated[
-        Path | None, typer.Option(help="标注计划；给了就只标计划里的片段，忽略 --count")
+        Path | None,
+        typer.Option(
+            help="Labeling plan; if given, only the clips in the plan are labeled, and --count is "
+            "ignored"
+        ),
     ] = None,
     known: Annotated[
         list[Path] | None,
-        typer.Option(help="页面词表用的已有归档，可重复；默认取计划里记的那几份"),
+        typer.Option(
+            help="Existing archives used for the page's name list, can be given more than once; by "
+            "default, the ones recorded in the plan"
+        ),
     ] = None,
     every: Annotated[
-        bool, typer.Option("--all", help="标这一集的全部片段，按时间顺序；忽略 --count")
+        bool,
+        typer.Option(
+            "--all", help="Label all clips of this episode, in time order; --count is ignored"
+        ),
     ] = False,
     video: Annotated[
-        Path | None, typer.Option(help="这一集的视频；给了就在页面上放对应画面，按需现切")
+        Path | None,
+        typer.Option(
+            help="Video of this episode; if given, the matching picture is shown on the page and "
+            "cut on demand"
+        ),
     ] = None,
 ) -> None:
-    """抽样、按计划或整集取片段，对照画面标角色名，逐条存入归档。"""
+    """Sample clips, or take them from the plan or the whole episode, check the picture to label
+    each character name, and save each one to the archive."""
     from avs.labeling import run
 
     run(episode, archive, count, port, plan, known, every, video)
@@ -523,15 +748,25 @@ def label(
 
 @app.command()
 def label_plan(
-    candidate: Annotated[Path, typer.Option(help="候选分组，例如分两步")],
-    baseline: Annotated[Path, typer.Option(help="现行默认分组，用于标出归属不同的片段")],
-    annotation: Annotated[list[Path], typer.Option(help="已有人工归档，可重复提供")],
-    out: Annotated[Path, typer.Option(help="新的标注计划 JSON")],
+    candidate: Annotated[
+        Path, typer.Option(help="Candidate grouping, for example one made in two steps")
+    ],
+    baseline: Annotated[
+        Path, typer.Option(help="Current default grouping, used to mark clips assigned differently")
+    ],
+    annotation: Annotated[
+        list[Path], typer.Option(help="Existing human archives, can be given more than once")
+    ],
+    out: Annotated[Path, typer.Option(help="New labeling plan JSON")],
 ) -> None:
-    """列出候选把哪些还没标过的短片段挂进了多条组，作为下一轮标注的范围。"""
+    """List the unlabeled short clips that the candidate attaches to more than one group. These form
+    the scope for the next labeling round."""
     from avs.labeling import build_plan
 
     plan = build_plan(candidate, baseline, annotation, out)
     for episode, own in plan["summary"].items():
-        typer.echo(f"{episode}: {own['clips']} 条待标，其中 {own['moved']} 条两套分组归属不同")
-    typer.echo(f"计划 -> {out}")
+        typer.echo(
+            f"{episode}: {own['clips']} clips waiting to be labeled, "
+            f"of which {own['moved']} are assigned to different groups in the two groupings"
+        )
+    typer.echo(f"Plan -> {out}")

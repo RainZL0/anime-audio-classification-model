@@ -1,7 +1,10 @@
-"""两种可互换的声纹提取器，输入 16 kHz 分析副本，输出单位长度向量。
+"""Two interchangeable voiceprint extractors.
 
-保留 ReDimNet2 与 WeSpeaker 供身份分组对照，模型差异不能替代人工身份评估。
-WeSpeaker 在当前 Windows 环境使用 CPU。
+Input is a 16 kHz analysis copy. Output is unit-length vectors (each vector is scaled to length 1).
+
+ReDimNet2 and WeSpeaker are both kept for comparing identity grouping. Differences between
+models cannot replace human identity evaluation.
+WeSpeaker uses the CPU on the current Windows setup.
 """
 
 from __future__ import annotations
@@ -17,55 +20,81 @@ ANIME_VA = "anime-va"
 MODELS = (FRONTIER, BASELINE, ANIME_CHAR, ANIME_VA)
 
 DEFAULT_THRESHOLDS = {FRONTIER: 0.50, BASELINE: 0.60, ANIME_CHAR: 0.53, ANIME_VA: 0.70}
-"""每个模型自己的起始距离阈值。相似度尺度因模型而异，套用别人的阈值会扫在毫无意义的一段上。
+"""Each model's own starting distance threshold.
 
-这些值都是在前两集标签上选的，**而且随片段池增大会漂移**：同一阈值下池子越大，按整组平均距离合并
-要求整簇平均距离达标，合并越保守。anime-va 0.70 在 372 条池里 ep03 连回 2613 对、错误合并 76 对，
-放进 1176 条池是 2095 对、错误合并 21 对。
+The similarity scale differs between models, so using another model's threshold would scan over
+a meaningless range.
 
-**注意这两个数是一起往下走的，所以不是分组变差了，是这个固定数字滑到了取舍曲线的保守那端。**
-把错误合并按住不动重新挪分界线，大池子能连上的反而更多（≤76 那一档，2613 对变 3278 对）。
-不随池子变的做法见 stages/cluster.py 的 pool_threshold，命令行是 `avs group --relative`；
-它还没有独立检验，所以这里仍然是默认。语料继续增长时用 `avs drift` 重新核，别当常数用。"""
+These values were chosen on the labels of the first two episodes, **and they drift as the clip
+pool grows**. At the same threshold, a bigger pool makes merging more conservative. This is
+because average linkage (merging two groups by the average distance between all their clips)
+requires the average distance across the whole cluster to reach the threshold. For anime-va at
+0.70, episode ep03 had 2613 same-person pairs linked with 76 wrong merges in a 372-clip pool.
+In a 1176-clip pool, it has 2095 pairs linked with 21 wrong merges.
+
+**Note that these two numbers move together. So the grouping has not gotten worse. The fixed
+number has slid to the conservative end of the trade-off curve.** Holding wrong merges fixed and
+moving the threshold again, a bigger pool can link even more pairs (at the 76-wrong-merges level,
+2613 pairs become 3278 pairs). The approach that does not change with pool size is pool_threshold
+in stages/cluster.py. The command line option is `avs group --relative`. It has no independent
+test yet, so the default here is still the fixed one. As more episodes are added, re-check with
+`avs drift`, and do not treat the number as a constant."""
 
 ANIME_VARIANTS = {ANIME_CHAR: "char", ANIME_VA: "va"}
-"""litagin02/anime_speaker_embedding 的两个变体。char 按角色训练，同一声优配的不同角色也要
-分开；va 按声优归并。我们的标签是角色，所以 char 是对口的那个，但两个都留着比：如果 va
-反而更好，说明本作里同一声优配多角的情况不多，而声优级别的目标更容易学。
+"""The two variants of litagin02/anime_speaker_embedding.
 
-作者提醒这个模型「倾向于积极区分说话人」，同一角色之间的相似度普遍低于其他模型，所以距离分界线不能
-从 ReDimNet 那边照搬，必须重新扫。"""
+"char" is trained by character, so different characters voiced by the same voice actor are also
+kept apart. "va" groups by voice actor. Our labels are characters, so "char" is the matching one.
+Both are kept for comparison anyway. If "va" turns out better, it means that in this series few
+voice actors play several characters, and a voice-actor-level target is easier to learn.
+
+The author warns that this model "tends to actively tell speakers apart". Its similarity between
+the same character is generally lower than with other models. So the distance threshold cannot be
+copied over from ReDimNet, and it must be scanned again."""
 
 SAMPLE_RATE = 16_000
-"""指纹模型都要 16 kHz，也就是分析副本的采样率。别拿原采样率的人声轨喂它们。"""
+"""Voiceprint models all need 16 kHz, which is the sample rate of the analysis copy. Do not feed
+them the vocals track at its original sample rate."""
 
 MIN_SECONDS = 0.5
-"""短于这个长度的片段不算声纹，因此进不了分组。
+"""Clips shorter than this length do not get a voiceprint, so they cannot enter grouping.
 
-这个值是量出来的，不是猜的。第 3 集标完之后，短于 0.5 秒的片段第一次有了人工身份，
-实测它们跟同角色、跟不同角色的相似度几乎分不开：把「同一角色」和「不同角色」两堆配对
-排在一起看，短于 0.5 秒的那批排对的比例只有 0.61，而完全随机猜是 0.50。也就是说这些
-片段带进来的主要是噪声。0.5 到 1 秒是 0.81，勉强有用，暂时保留。"""
+This value was measured, not guessed. After episode 3 was labeled, clips shorter than 0.5 seconds
+got human identities for the first time. Measured, their similarity to the same character and to
+different characters was almost impossible to tell apart. When the "same character" and
+"different character" pairs were put side by side, the ranking accuracy (how often a same-character
+pair scores higher than a different-character pair) for clips under 0.5 seconds was only 0.61.
+Pure random guessing gives 0.50. So these clips mostly bring in noise. Clips from 0.5 to 1 second
+get 0.81, which is marginally useful, so they are kept for now."""
 
 MIN_WINDOW = 0.0
-"""喂给模型的最小音频窗口。片段短于它时，向前后两侧对称取原轨上的相邻音频补足，
-片段本身的时间范围不变，只是模型多听了一点上下文。0 表示只听片段本身。
+"""Smallest audio window fed to the model.
 
-**为什么可能有用又可能有害。** 短片段的指纹差，一个解释是模型听到的音太少；补上相邻音频
-等于给它更多材料。但相邻音频未必还是同一个人在说，补过头就会把邻座的声音混进来。
-是利大于弊还是相反，只能在人工标签上量，别凭直觉定。"""
+When a clip is shorter than this, neighboring audio is taken from the original track symmetrically
+from both sides to fill it up. The clip's own time range does not change. The model just hears a
+little more context. 0 means it only hears the clip itself.
+
+**Why it may help or hurt.** Short clips have poor voiceprints. One explanation is that the model
+hears too little audio, and adding neighboring audio gives it more material. But the neighboring
+audio may not still be the same person speaking. Padding too much mixes in the voices of the
+neighbors. Whether the benefit outweighs the harm, or the reverse, can only be measured on human
+labels. Do not decide it by intuition."""
 
 REDIMNET2_REPO = "PalabraAI/redimnet2"
 REDIMNET2_SIZE = "b6"
 WESPEAKER_REPO = "Wespeaker/wespeaker-voxceleb-resnet293-LM"
 WESPEAKER_ONNX = "voxceleb_resnet293_LM.onnx"
-"""pyannote 的加载器默认找的文件名是 `speaker-embedding.onnx`，而这个仓库里叫别的名字，
-所以得自己先下下来再把本地路径递给它。"""
+"""pyannote's loader looks for the file name `speaker-embedding.onnx` by default, but this
+repository uses a different name. So the file has to be downloaded first, and its local path
+passed to the loader."""
 
 
 @dataclass(frozen=True)
 class Embedded:
-    """一条片段的指纹。vector 单独存进 .npy，这里只留能读的元信息。"""
+    """The voiceprint of one clip.
+
+    The vector is stored separately as .npy. Only the readable metadata is kept here.
+    """
 
     speaker: str
     start: float
@@ -77,7 +106,7 @@ class Embedded:
 
 
 class Extractor(Protocol):
-    """吃一段 16 kHz 单声道波形，吐一串数字。"""
+    """Takes a 16 kHz mono waveform and returns a sequence of numbers."""
 
     def __call__(self, mono: Any) -> Any: ...
 
@@ -86,7 +115,8 @@ def _load_redimnet2(device: str) -> Extractor:
     import numpy as np
     import torch
 
-    # torch.hub.load 自己没写类型标注，类型检查会拦，这里放行
+    # torch.hub.load has no type annotations of its own, so the type checker would block it.
+    # Let it through here.
     model = torch.hub.load(  # type: ignore[no-untyped-call]
         REDIMNET2_REPO,
         "redimnet2",
@@ -112,11 +142,12 @@ def _load_wespeaker(device: str) -> Extractor:
     from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 
     onnx = hf_hub_download(repo_id=WESPEAKER_REPO, filename=WESPEAKER_ONNX)
-    # onnxruntime-gpu 在本机是坏的，别把 cuda 递进去，见模块开头第 2 条
+    # onnxruntime-gpu is broken on this machine, so do not pass cuda in.
+    # See the notes at the top of this module.
     model = PretrainedSpeakerEmbedding(onnx, device=torch.device("cpu"))
 
     def extract(mono: Any) -> Any:
-        # pyannote 要 (批, 声道, 采样点) 三维
+        # pyannote needs a 3-D shape: (batch, channel, samples)
         wave = torch.from_numpy(np.ascontiguousarray(mono))[None, None, :]
         return np.asarray(model(wave)).squeeze(0)
 
@@ -124,19 +155,26 @@ def _load_wespeaker(device: str) -> Extractor:
 
 
 def load_extractor(model: str, device: str = "cuda") -> Extractor:
-    """按代号载入一个指纹模型。device 对 wespeaker 不生效，理由见模块开头。"""
+    """Load a voiceprint model by its code name.
+
+    device has no effect for wespeaker. The reason is at the top of this module.
+    """
     if model == FRONTIER:
         return _load_redimnet2(device)
     if model == BASELINE:
         return _load_wespeaker(device)
     if model in ANIME_VARIANTS:
         return _load_anime(ANIME_VARIANTS[model], device)
-    raise ValueError(f"不认识的模型 {model!r}，只能是 {' 或 '.join(MODELS)}")
+    raise ValueError(f"Unknown model {model!r}, must be one of {' or '.join(MODELS)}")
 
 
 def _load_anime(variant: str, device: str) -> Extractor:
-    """动画域的 ECAPA-TDNN。包里的 get_embedding 只收文件路径，这里照它的做法直接喂数组，
-    省掉每条片段写一个临时文件。输入同样是 16 kHz 单声道，正好是分析副本。"""
+    """The ECAPA-TDNN (a speaker-embedding neural network) for the anime domain.
+
+    The package's get_embedding only accepts file paths. So this follows its method and feeds the
+    array in directly, saving a temporary file for each clip. The input is also 16 kHz mono, which
+    is exactly the analysis copy.
+    """
     import numpy as np
     import torch
     from anime_speaker_embedding import AnimeSpeakerEmbedding
@@ -159,13 +197,15 @@ def embed_segments(
     device: str = "cuda",
     window: float = MIN_WINDOW,
 ) -> tuple[list[Embedded], Any]:
-    """给每条片段算指纹。wav 要 16 kHz 单声道，也就是分析副本。
+    """Compute a voiceprint for each clip. wav must be 16 kHz mono, which is the analysis copy.
 
-    `window` 是最小听音窗口，短片段会对称地向两边借相邻音频补到这个长度；元信息里记的
-    仍是片段自己的时间范围，借来的部分只影响模型听到什么，不影响这条片段是什么。
+    `window` is the smallest listening window. Short clips borrow neighboring audio from both sides
+    to fill this length. The recorded metadata still holds the clip's own time range. The borrowed
+    part only affects what the model hears, not what the clip is.
 
-    返回（元信息列表, 指纹矩阵）。矩阵每行一条，行号跟列表对齐，已经做过长度归一，
-    所以两行点乘就是余弦相似度。
+    Returns (list of metadata, voiceprint matrix). The matrix has one row per clip, and row numbers
+    line up with the list. The rows are already length-normalized, so the dot product of two rows
+    is their cosine similarity.
     """
     import numpy as np
     import soundfile as sf
@@ -173,7 +213,10 @@ def embed_segments(
     extract = load_extractor(model, device)
     samples, sample_rate = sf.read(str(wav), dtype="float32", always_2d=True)
     if sample_rate != SAMPLE_RATE:
-        raise ValueError(f"{wav} 是 {sample_rate} Hz，指纹模型要 {SAMPLE_RATE} Hz 的分析副本")
+        raise ValueError(
+            f"{wav} is {sample_rate} Hz, but the voiceprint model needs a "
+            f"{SAMPLE_RATE} Hz analysis copy"
+        )
     mono = samples[:, 0]
 
     meta: list[Embedded] = []
@@ -192,12 +235,17 @@ def embed_segments(
         vectors.append(vector / norm)
 
     if not vectors:
-        raise RuntimeError("一条指纹都没算出来，检查片段时长和分析副本")
+        raise RuntimeError(
+            "No voiceprint was computed at all. Check clip durations and the analysis copy"
+        )
     return meta, np.stack(vectors)
 
 
 def _window(start: float, end: float, window: float, duration: float) -> tuple[float, float]:
-    """把不足 `window` 的片段对称扩到 `window`；碰到轨道两端就往另一侧补回来。"""
+    """Symmetrically widen a clip shorter than `window` to `window`.
+
+    If it hits either end of the track, take the extra from the other side.
+    """
     if window <= 0 or end - start >= window:
         return start, end
     room = (window - (end - start)) / 2

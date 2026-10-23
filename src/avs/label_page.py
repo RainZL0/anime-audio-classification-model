@@ -1,16 +1,19 @@
-"""姓名标注页面；只展示人工任务，不展示机器分组。
+"""Name labeling page. It only shows the human task, never the machine grouping.
 
-页面把已有角色名当词表给出来，省得每条重敲，但不显示任何分组、组号或候选归属：
-标注者一旦看见机器的答案就不再是独立真值。改名、改归属、删标签都整份提交，服务端仍按
-`apply_names` 校验，页面不做本地增量状态。
+The page offers the existing character names as a name list, so you do not have to type each one
+again. But it never shows any grouping, group number or candidate assignment: once a labeler sees
+the machine's answer, the labels are no longer an independent ground truth. Renames, reassignments
+and label deletions are all submitted as one whole, and the server still checks them with
+`apply_names`. The page keeps no local incremental state.
 
-角色名排成一行行的小块，不占整行：整集连着标的时候名字有几十个，每个占一行会把
-片段推到屏幕外，得来回滚动才能既听见又点得着。展开的详情统一放在一块面板里，
-不塞回名字那一行，免得点开一个就把后面的名字全挤走。面板里的片段可以直接拖到别的
-名字上改归属，因为改错主要发生在整集标完之后回头核对，那时候一条条重新定位太慢。
-"""
+Character names are laid out as small blocks, not full-width rows. When a whole episode is labeled
+in one go there can be dozens of names, and one name per row would push the clips off the screen, so
+you would have to keep scrolling to both hear and click. Expanded details all go in one shared
+panel, not into the name's row, so opening one does not push the others away. Clips in the panel can
+be dragged onto another name to change their assignment, because mistakes mostly show up when re-
+checking after the whole episode is labeled, and locating each clip again would be too slow."""
 
-PAGE_NAMES = r"""<!doctype html><meta charset="utf-8"><title>角色身份标注</title>
+PAGE_NAMES = r"""<!doctype html><meta charset="utf-8"><title>Character identity labeling</title>
 <style>
 body{font:16px/1.7 system-ui;max-width:900px;margin:24px auto;padding:0 20px;
 background:#fafafa;color:#222}
@@ -19,7 +22,8 @@ background:white;cursor:pointer}
 button:hover{border-color:#888}
 input{cursor:text}
 audio{width:100%;margin:6px 0}
-/* 画面按原始高度显示，不放大也不占满：名字块得和画面同屏，否则又要来回滚动。 */
+/* The picture shows at its original height, neither enlarged nor filling the space: the name
+   blocks must share the screen with it, or you would have to scroll back and forth. */
 #clip{width:auto;max-width:min(100%,520px);max-height:30vh;background:#000;
 border-radius:8px;margin:6px 0;display:block}
 #clip[hidden]{display:none}
@@ -35,7 +39,8 @@ h1{margin:0 0 4px;font-size:26px}h2{margin:20px 0 4px;font-size:18px}
 #special button{color:#666;font-size:13px;padding:5px 9px}
 nav{margin:12px 0}
 
-/* 名字排成小块横向铺开，一屏能看全，不用为了点名字把片段滚出视野。 */
+/* Names are laid out as small blocks across the row, so they all fit on one screen and you do
+   not have to scroll clips out of view to click a name. */
 #known{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .chip{display:inline-flex;align-items:stretch;border:1px solid #dcdcdc;border-radius:6px;
 background:white;overflow:hidden;font-size:14px}
@@ -62,29 +67,37 @@ border-radius:8px;background:white}
 #detail .own:active{cursor:grabbing}
 #detail .here{outline:2px solid #4a7}
 </style>
-<h1>对照画面确认角色</h1>
-<p class="hint">时间相对音轨开头。按顺序到视频里看是谁在说，名字前后一致即可。
-这页不显示机器分组，也不该显示：看过机器的答案，标出来的就不再是独立真值。<br>
-快捷键：回车保存，← → 上一条／跳过，空格重播，数字 1-9 选下面前九个名字。<br>
-给了 <code>--video</code> 就在上面直接放这一条对应的画面，前后各多给半秒，看得出是谁在说。
-下面那个播放器是分离出来的人声，只作参考。</p>
+<h1>Confirm characters against the picture</h1>
+<p class="hint">Times are relative to the start of the audio track. Go through the clips in order,
+watch the video to see who is speaking, and keep the name consistent before and after.<br>
+This page does not show the machine grouping, and it should not: once you have seen the machine's
+answer, your labels are no longer an independent ground truth.<br>
+Shortcuts: Enter saves, ← → previous / skip, space replays, digits 1-9 pick one of the first nine
+names below.<br>
+With <code>--video</code>, the picture for this clip is shown above, with half a second of extra
+time before and after, so you can see who is speaking.
+The player below is the separated vocals, for reference only.</p>
 <div id="bar"><div id="fill"></div></div>
 <p id="status"></p>
 <div id="stamp"></div>
 <video id="clip" controls hidden></video>
 <audio id="audio" controls></audio>
-<p><input id="name" list="roster" placeholder="角色名，回车保存" autocomplete="off">
-<button id="submit">保存并继续</button><button id="drop">清除本条</button></p>
+<p><input id="name" list="roster" placeholder="Character name, Enter to save" autocomplete="off">
+<button id="submit">Save and continue</button><button id="drop">Clear this clip</button></p>
 <datalist id="roster"></datalist>
 <div id="special"></div>
-<nav><button id="prev">上一条</button><button id="next">跳过</button>
-<button id="tonew">下一条未标</button></nav>
-<h2>角色名 <input id="filter" placeholder="筛名字" autocomplete="off">
-<button id="add">＋ 建这个名字</button></h2>
-<p class="hint">点名字给当前片段打标；点右边的数字打开面板，看这个名字下都有哪些片段。
-面板里的片段可以直接拖到另一个名字上改归属，改错了不必回去一条条重听。
-在筛名字框里敲一个新名字再点「＋ 建这个名字」，就能先把名字建出来再往上拖。<br>
-试听旧标签只为帮你想起这个名字是谁，判断仍以画面为准，别改成靠耳朵比对。</p>
+<nav><button id="prev">Previous</button><button id="next">Skip</button>
+<button id="tonew">Next unlabeled</button></nav>
+<h2>Character names <input id="filter" placeholder="Filter names" autocomplete="off">
+<button id="add">+ Create this name</button></h2>
+<p class="hint">Click a name to label the current clip. Click the number on the right to open a
+panel showing all clips under that name.
+Clips in the panel can be dragged onto another name to change their assignment. If you made a
+mistake, you do not need to go back and listen to each clip again.
+Type a new name in the filter box and click "+ Create this name" to create it first, then you can
+drag clips onto it.<br>
+Listening to an old label is only to help you remember who this name is. The decision must still be
+made from the picture, not by comparing voices by ear.</p>
 <div id="known"></div>
 <div id="detail"></div>
 <audio id="ref" controls hidden></audio>
@@ -92,8 +105,9 @@ border-radius:8px;background:white}
 const clips=__CLIPS__, special=__SPECIAL__, roster=__KNOWN__, history=__HISTORY__;
 const hasVideo=__VIDEO__;
 let names=__NAMES__, at=0, opened=null;
-/* extra 是本次页面里新建、还没用到的名字；hidden 是从列表里藏掉的名字。两者都只活在
-   这个页面：真正被用到的名字已经在归档里，下次开页面自然回来，没用到的不值得落盘。 */
+/* extra holds names created on this page that are not used yet; hidden holds names hidden from
+   the list. Both only live on this page: names that are actually used are already in the archive
+   and come back next time the page opens, and unused ones are not worth saving to disk. */
 let extra=[], hidden=[];
 const el=id=>document.getElementById(id);
 const total=clips.length;
@@ -108,8 +122,9 @@ function clipsOf(value){
  clips.forEach((c,i)=>{if(names[c.id]===value)out.push(i);});
  return out;
 }
-/* 顺序固定：词表里的名字（常用的在前），然后是本页新建的，最后是本轮敲出来的新名字。
-   本轮标了多少条只显示，不参与排序，否则数字键会在手底下跳来跳去。 */
+/* Fixed order: names from the name list (common ones first), then names created on this page,
+   then new names typed in this round. How many clips this round labeled is only shown and does
+   not affect the order, otherwise the number keys would keep moving under your fingers. */
 function allNames(){
  const used=[];
  clips.forEach(c=>{
@@ -124,7 +139,8 @@ function rows(){
   .filter(n=>!keep||n.toLowerCase().includes(keep))
   .map(n=>[n,clipsOf(n)]);
 }
-/* 特殊标签也排成小块，否则标成「不止一个人」的片段就再也翻不出来复核了。 */
+/* Special labels are also laid out as small blocks, otherwise clips marked as 'more than one
+   person' could never be found again for review. */
 function markRows(){
  return Object.keys(special).map(v=>[v,clipsOf(v)]).filter(([,where])=>where.length);
 }
@@ -145,7 +161,7 @@ function makeChip(box,value,label,where,index,mark){
  }
  button(chip,label,()=>assign(value),'pick');
  const badge=button(chip,`${where.length}·${past.length}`,()=>openName(value),'more');
- badge.title=`本轮 ${where.length} 条，旧标签 ${past.length} 条`;
+ badge.title=`This round: ${where.length} clips, old labels: ${past.length}`;
  chip.ondragover=e=>{e.preventDefault();chip.classList.add('over');};
  chip.ondragleave=()=>chip.classList.remove('over');
  chip.ondrop=e=>{
@@ -163,7 +179,7 @@ function renderRoster(){
   const o=document.createElement('option');o.value=n;return o;
  }));
  if(!list.length&&!markRows().length){
-  box.textContent='还没有名字，在上面敲一个，或者用「＋ 建这个名字」。';return;
+  box.textContent='No names yet. Type one above, or use "+ Create this name".';return;
  }
  list.forEach(([name,where],index)=>makeChip(box,name,name,where,index<9?index:null,false));
  markRows().forEach(([value,where])=>makeChip(box,value,special[value],where,null,true));
@@ -187,27 +203,27 @@ function renderDetail(){
  const past=history[opened]||[];
  const head=document.createElement('h3');
  const shown=opened in special?special[opened]:opened;
- head.textContent=`${shown} · 本轮 ${where.length} 条 · 旧标签 ${past.length} 条`;
+ head.textContent=`${shown} · this round: ${where.length} clips · old labels: ${past.length}`;
  box.appendChild(head);
 
  const tools=document.createElement('div');tools.className='line';
- if(where.length&&!(opened in special))button(tools,'改名',()=>rename(opened,tools));
- if(where.length)button(tools,`撤掉这 ${where.length} 条标签`,()=>{
+ if(where.length&&!(opened in special))button(tools,'Rename',()=>rename(opened,tools));
+ if(where.length)button(tools,`Remove these ${where.length} labels`,()=>{
   submit(n=>{
    const proposed={...n};where.forEach(i=>delete proposed[clips[i].id]);return proposed;
   }).then(()=>{opened=null;render();});
  });
- if(!where.length&&!(opened in special))button(tools,'从列表里删掉这个名字',()=>{
+ if(!where.length&&!(opened in special))button(tools,'Remove this name from the list',()=>{
   extra=extra.filter(n=>n!==opened);
   if(roster.includes(opened))hidden.push(opened);
   opened=null;renderRoster();renderDetail();
  });
- button(tools,'关闭',()=>{opened=null;renderRoster();renderDetail();});
+ button(tools,'Close',()=>{opened=null;renderRoster();renderDetail();});
  box.appendChild(tools);
 
  if(where.length){
   const line=document.createElement('div');line.className='line';
-  line.appendChild(Object.assign(document.createElement('b'),{textContent:'本轮'}));
+  line.appendChild(Object.assign(document.createElement('b'),{textContent:'This round'}));
   where.forEach(i=>{
    const b=button(line,clips[i].stamp,()=>{at=i;render();},'own'+(i===at?' here':''));
    b.draggable=true;
@@ -215,22 +231,23 @@ function renderDetail(){
     e.dataTransfer.setData('text/plain',String(i));
     e.dataTransfer.effectAllowed='move';
    };
-   b.title=`${clips[i].seconds} 秒。点了跳过去，拖到别的名字上就改到那个名字。`;
+   b.title=`${clips[i].seconds} seconds. Click to jump; drag onto another name to reassign.`;
   });
   box.appendChild(line);
  }
  if(past.length){
   const line=document.createElement('div');line.className='line';
-  line.appendChild(Object.assign(document.createElement('b'),{textContent:'旧标签'}));
+  line.appendChild(Object.assign(document.createElement('b'),{textContent:'Old labels'}));
   past.forEach(entry=>{
    const b=button(line,`${entry.episode} ${entry.stamp}`,()=>audition(entry));
-   b.title=`${entry.seconds} 秒，点了试听。旧归档里的片段，改不了归属。`;
+   b.title=`${entry.seconds} seconds. Click to listen. Old archive clip: cannot be reassigned.`;
   });
   box.appendChild(line);
  }
 }
 
-/* 画面按需现切，切一段要几百毫秒，所以顺手把后一条也预热掉，翻过去时就已经在了。 */
+/* The picture is cut on demand. Cutting a clip takes a few hundred milliseconds, so the next
+   clip is warmed up too, and it is ready by the time you move on. */
 function showClip(c){
  const box=el('clip');
  box.hidden=false;
@@ -242,7 +259,7 @@ function showClip(c){
  if(next)fetch('video/'+next.id+'.mp4',{method:'HEAD'}).catch(()=>{});
 }
 
-/* 旧标签用单独的播放器，免得盖掉正在标的那一条。 */
+/* Old labels use a separate player, so they do not cover the clip being labeled. */
 function audition(entry){
  const ref=el('ref');
  ref.hidden=false;ref.src=entry.file;ref.play().catch(()=>{});
@@ -262,28 +279,29 @@ function rename(old,line){
  };
  box.onkeydown=e=>{if(e.key==='Enter')commit();if(e.key==='Escape')renderDetail();};
  line.replaceChildren(box);
- button(line,'确定',commit);
- button(line,'取消',()=>renderDetail());
+ button(line,'OK',commit);
+ button(line,'Cancel',()=>renderDetail());
  box.focus();box.select();
 }
 
 function render(){
  const had=done();
  el('status').textContent=total
-  ? `第 ${Math.min(at+1,total)} / ${total} 条 · 已标 ${had} · 未标 ${total-had}`
-  : '本轮没有片段';
+  ? `Clip ${Math.min(at+1,total)} / ${total} · labeled ${had} · unlabeled ${total-had}`
+  : 'No clips in this round';
  el('fill').style.width=total?`${had/total*100}%`:'0';
  el('special').replaceChildren();
  if(at>=total){
-  el('stamp').textContent='本轮到底了，可以回去改任何一条';
+  el('stamp').textContent='End of this round. You can go back and change any clip.';
   el('audio').removeAttribute('src');el('name').value='';
   el('clip').hidden=true;el('clip').removeAttribute('src');
  }else{
   const c=clips[at];
-  el('stamp').textContent=`${c.stamp} · ${c.seconds} 秒`;
+  el('stamp').textContent=`${c.stamp} · ${c.seconds} seconds`;
   if(!el('audio').src.endsWith('/'+c.id+'.wav')){
    el('audio').src=c.id+'.wav';
-   // 有画面时画面是主角，人声只作参考，别两个一起响。
+   // When there is a picture, the picture is the main source and the vocals are for reference only,
+   // so do not play both at once.
    if(!hasVideo)el('audio').play().catch(()=>{});
   }
   if(hasVideo)showClip(c);
@@ -293,8 +311,10 @@ function render(){
  renderRoster();renderDetail();
 }
 
-/* 提交排队，不丢按键：手比一次往返快的时候，先按的先落盘，而不是被 busy 挡掉。
-   update 拿到的是排到自己时的 names，所以连着改同一个名字也不会互相覆盖。 */
+/* Submissions are queued so no key press is lost: when your hand is faster than one round trip,
+   the earlier press is saved first instead of being blocked by a busy flag. update receives the
+   names as they are when its turn comes, so changing the same name several times in a row does
+   not overwrite each other. */
 let queue=Promise.resolve(true);
 function submit(update){
  queue=queue.then(async()=>{
@@ -303,16 +323,19 @@ function submit(update){
   try{
    const r=await fetch('/save',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(proposed)});
-   if(!r.ok)throw Error(r.statusText||'保存失败');
+   if(!r.ok)throw Error(r.statusText||'Save failed');
    names=proposed;return true;
   }catch(e){
-   el('status').textContent='保存失败，这一条没有改动，请重试。';return false;
+   el('status').textContent=
+    'Save failed. This clip was not changed, please try again.';
+   return false;
   }
  });
  return queue;
 }
 
-/* 先往前走再等回执：慢的是网络不是判断。存不下就退回那一条，不会悄悄跳过。 */
+/* Move forward first, then wait for the reply: the slow part is the network, not the decision.
+   If saving fails, go back to that clip. It is never skipped silently. */
 function assign(value){
  value=(value||'').trim();
  const i=at;
