@@ -328,6 +328,29 @@ def test_an_added_target_lists_old_others_that_may_be_it(tmp_path: Path) -> None
     assert state.store.labels[ids[0]] == "A"
 
 
+def test_roles_report_total_length_and_other_can_be_listed(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clips = state.workspace.clips
+    client.post("/api/label", json={"clips": [clips[0].id], "label": "A", "unusable": True})
+    client.post("/api/label", json={"clips": [clips[1].id], "label": "A"})
+    client.post("/api/label", json={"clips": [clips[2].id, clips[3].id], "label": OTHER})
+    summary = client.get("/api/state").json()
+    a = next(r for r in summary["roles"] if r["name"] == "A")
+    assert a["seconds"] == round(clips[0].duration + clips[1].duration, 1)
+    assert a["low_seconds"] == round(clips[0].duration, 1)
+    assert summary["other"]["seconds"] == round(clips[2].duration + clips[3].duration, 1)
+
+    # 「其他」也能点开：确认过的从最像目标角色的排起，没有「可能漏掉的」。
+    listed = client.get("/api/clips", params={"role": OTHER}).json()
+    assert not any(c.get("maybe") for c in listed)
+    mine = [c for c in listed if c["label"] == OTHER]
+    assert {c["id"] for c in mine} == {clips[2].id, clips[3].id}
+    best = [max(g["p"] for g in c["guess"] if g["name"] != OTHER) for c in mine]
+    assert best == sorted(best, reverse=True)
+
+
 def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: Path) -> None:
     store = LabelStore(tmp_path / "labels")
     store.apply([{"clip": "a", "unusable": True}])

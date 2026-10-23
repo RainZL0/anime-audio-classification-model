@@ -11,7 +11,7 @@ import hashlib
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -149,17 +149,32 @@ class AppState:
         per_episode: dict[str, Counter[str]] = {e: Counter() for e in self.workspace.episodes}
         confirmed: Counter[str] = Counter()
         predicted: Counter[str] = Counter()
+        seconds: defaultdict[str, float] = defaultdict(float)
+        low_seconds: defaultdict[str, float] = defaultdict(float)
         for clip in self.workspace.clips:
             state = self.status(clip)
             per_episode[clip.episode][state] += 1
             label = self.store.labels.get(clip.id)
             if state == "confirmed" and label:
                 confirmed[label] += 1
+                seconds[label] += clip.duration
+                if clip.id in self.store.unusable:
+                    low_seconds[label] += clip.duration
             elif state in ("auto", "review") and clip.row is not None:
                 predicted[self.guesses[clip.row].names[0]] += 1
+
+        def counts(name: str) -> dict[str, Any]:
+            """确认过几句、机器归给几句，确认过的共多少秒、其中标了「质量低」的多少秒。"""
+            return {
+                "confirmed": confirmed[name],
+                "predicted": predicted[name],
+                "seconds": round(seconds[name], 1),
+                "low_seconds": round(low_seconds[name], 1),
+            }
+
         # 目标角色一直列着，哪怕还没有一句；不再是目标的角色有标签时也列着，好再加回来。
         roles = [
-            {**role, "confirmed": confirmed[role["name"]], "predicted": predicted[role["name"]]}
+            {**role, **counts(role["name"])}
             for role in self.store.roles
             if role.get("target") or confirmed[role["name"]]
         ]
@@ -175,7 +190,7 @@ class AppState:
                 for name, meta in self.workspace.episodes.items()
             ],
             "roles": roles,
-            "other": {"confirmed": confirmed[OTHER], "predicted": predicted[OTHER]},
+            "other": counts(OTHER),
             "special": SPECIAL,
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
@@ -263,6 +278,8 @@ class AppState:
 
         可能漏掉的是机器没归给 TA、但「是 TA」的概率不低的片段：还没标的，以及标「其他」时
         TA 还不是目标角色的。加了新的目标角色以后，从这里把以前的「其他」复查一遍。
+        「其他」没有可能漏掉的：机器没归给其他的，就归给了某个目标角色，在那个角色里核对。
+        「其他」确认过的从最像某个目标角色的排起，标错的先看到；只在取列表时排一次，标完不跳。
         """
         mine, maybe = [], []
         for clip in self.workspace.clips:
@@ -280,9 +297,13 @@ class AppState:
             )
             if label is None and guess.names[0] == role:
                 mine.append(self.view(clip))
-            elif unchecked and guess.p(role) >= MAYBE_FLOOR:
+            elif role != OTHER and unchecked and guess.p(role) >= MAYBE_FLOOR:
                 maybe.append((guess.p(role), clip))
         maybe.sort(key=lambda pair: -pair[0])
+        if role == OTHER:
+            mine.sort(
+                key=lambda c: -max((g["p"] for g in c["guess"] if g["name"] != OTHER), default=0)
+            )
         return mine + [{**self.view(c), "maybe": True} for _, c in maybe[:MAYBE_LIMIT]]
 
     def references(self, name: str) -> list[dict[str, Any]]:

@@ -241,10 +241,10 @@ kbd {
 .role-item.on { background: var(--panel); border-color: var(--accent-ring); }
 .role-item .c { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; text-align: right; }
 .role-item .c b { color: var(--warn); font-weight: 600; }
-/* 不是目标角色的排在目标角色下面，名字淡一些；「其他」那一行只看数字，不能点开。 */
+/* 不是目标角色的排在目标角色下面，名字淡一些；「其他」放在最下面，上面一条分隔线。 */
 .role-item.off .nm { color: var(--text-3); }
-.role-item.other { cursor: default; border-top: 1px solid var(--line); border-radius: 0; margin-top: 4px; }
-.role-item.other:hover { background: transparent; }
+.role-item.other { position: relative; margin-top: 9px; }
+.role-item.other::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; border-top: 1px solid var(--line); }
 .role-head { display: flex; align-items: center; gap: 14px; padding: 6px 0 12px; }
 .role-head h2 { margin: 0; font-size: 20px; }
 .role-head .stats { color: var(--text-2); font-size: 12px; }
