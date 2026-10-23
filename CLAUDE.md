@@ -19,7 +19,7 @@
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+ty check src
 uv run pytest -q
 lychee --offline --no-progress CLAUDE.md docs   # 改过文档时
 ```

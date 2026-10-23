@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -17,7 +18,7 @@ app = typer.Typer(name="avs", help="按字幕切段，把同一角色的声音�
 @app.callback()
 def main() -> None:
     # Windows 管道默认编码不一定能表示中文。
-    if hasattr(sys.stdout, "reconfigure"):
+    if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 

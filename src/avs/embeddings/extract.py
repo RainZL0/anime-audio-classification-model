@@ -86,7 +86,7 @@ def _load_redimnet2(device: str) -> Extractor:
     import numpy as np
     import torch
 
-    # torch.hub.load 自己没写类型标注，mypy 会拦，这里放行
+    # torch.hub.load 自己没写类型标注，类型检查会拦，这里放行
     model = torch.hub.load(  # type: ignore[no-untyped-call]
         REDIMNET2_REPO,
         "redimnet2",

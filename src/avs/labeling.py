@@ -379,7 +379,7 @@ def run(
             self.send_response(204)
             self.end_headers()
 
-        def log_message(self, *args: Any) -> None:
+        def log_message(self, format: str, *args: Any) -> None:
             pass
 
     print(

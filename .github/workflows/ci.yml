@@ -26,8 +26,9 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
+      # ty 不在项目依赖里，固定版本临时跑；它会自己找到上一步建的 .venv。
       - name: Type check
-        run: uv run mypy src
+        run: uvx ty@0.0.91 check src
 
       - name: Test
         run: uv run pytest

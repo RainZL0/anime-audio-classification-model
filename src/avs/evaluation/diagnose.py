@@ -119,7 +119,7 @@ def analyse(
             "group": groups.get(row["id"]) if groups else None,
         }
 
-    queries = []
+    queries: list[dict[str, Any]] = []
     for q in range(n):
         if counts[names[q]] < 2:
             continue
@@ -275,7 +275,7 @@ def analyse(
         "equal_error_point": crossing,
         "same_role_by_min_duration": pair_bins,
     }
-    pairs = [
+    pairs: list[dict[str, Any]] = [
         {
             "a": records[labeled[i]]["id"],
             "b": records[labeled[j]]["id"],

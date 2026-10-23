@@ -56,7 +56,6 @@ torchaudio = [
 [dependency-groups]
 dev = [
     "ruff>=0.14",
-    "mypy>=1.18",
     "pytest>=8.4",
     "pytest-cov>=7.0",
     "httpx>=0.28.1",
@@ -83,25 +82,8 @@ select = [
 # 本项目的注释与文档字符串是中文，全角标点是有意的，不是同形字攻击
 ignore = ["RUF001", "RUF002", "RUF003"]
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_unreachable = true
-# 音频/ML 生态大量缺 stub，逐库放行而不是全局关掉 strict
-[[tool.mypy.overrides]]
-module = [
-    "anime_speaker_embedding.*",
-    "audio_separator.*",
-    "pandas.*",
-    "pyloudnorm.*",
-    "sklearn.*",
-    "pyannote.*",
-    "scipy.*",
-    "pysubs2.*",
-    "soundfile.*",
-    "torchaudio.*",
-]
-ignore_missing_imports = true
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -48,7 +48,7 @@ def compare(
         if coverage is not None and ids != coverage:
             raise ValueError("模型覆盖的片段不同，不能直接比较")
         coverage = ids
-    results = []
+    results: list[dict[str, Any]] = []
     with TemporaryDirectory(prefix="avs-compare-") as temp:
         for model in models:
             for method in methods:
