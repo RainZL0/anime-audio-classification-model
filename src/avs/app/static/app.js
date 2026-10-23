@@ -150,8 +150,10 @@ function Pill({ clip }) {
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
 function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAssign, onAccept, onPlayRef, hasVideo, videoRef,
-  onAvatar, onNewRole, onClear, context, onContext }) {
+  onAvatar, onNewRole, onClear, context, onContext, dock }) {
   const [loading, setLoading] = useState(true);
+  /* 底栏前 9 个角色的数字键，Shift + 它就是这个人·质量低。 */
+  const slot = (name) => { const i = dock.indexOf(name); return i >= 0 && i < 9 ? i + 1 : null; };
   const audioRef = useRef(null);
   const startVoice = useRef(0);
   useEffect(() => { setLoading(true); return () => clearTimeout(startVoice.current); }, [clip?.id, sound, context]);
@@ -241,6 +243,9 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
               <span class="pct">${pct(g.p)}</span>
               ${g.name !== OTHER && html`<button class="ref" title="听这个角色确认过的一句" onClick=${(e) => { e.stopPropagation(); onPlayRef(g.name); }}>
                 参考音${i === 0 ? html` <kbd>R</kbd>` : ""}</button>`}
+              ${g.name !== OTHER && html`<button class="low" title=${`标成 ${g.name}·质量低：${LOW_TIP}`}
+                onClick=${(e) => { e.stopPropagation(); onAssign(g.name, true); }}>质量低${
+                  slot(g.name) ? html` <span class="k">⇧${slot(g.name)}</span>` : ""}</button>`}
             </div>`)}
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1181,9 +1186,9 @@ function App() {
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
       ${showStage && html`<${Stage} clip=${current} roles=${roles} labelText=${labelText} sound=${sound} setSound=${setSound}
         speed=${speed} setSpeed=${setSpeed}
-        hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
+        hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n, low) => assign(n, undefined, low)} onAccept=${accept}
         onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} onClear=${clear}
-        context=${context} onContext=${nextContext} />`}
+        context=${context} onContext=${nextContext} dock=${dock} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${pick}
           roles=${roles} labelText=${labelText} onlyWork=${onlyWork} setOnlyWork=${toggleOnlyWork}

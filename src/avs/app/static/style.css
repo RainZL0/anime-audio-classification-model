@@ -139,7 +139,7 @@ kbd {
 .stranger.early { color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line); }
 .cands { display: flex; flex-direction: column; gap: 6px; }
 .cand {
-  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 10px;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
   cursor: pointer; text-align: left;
 }
@@ -223,9 +223,10 @@ kbd {
 .chip:hover { border-color: var(--accent); }
 .chip .k { font: 11px var(--mono); color: var(--text-3); }
 .chip.flash { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
-.chip .low { padding: 1px 7px; font-size: 11px; border-radius: 99px; color: var(--bad); border-color: var(--bad-soft);
-  background: transparent; margin-left: 2px; }
-.chip .low:hover { border-color: var(--bad); }
+.chip .low, .cand .low { padding: 1px 7px; font-size: 11px; border-radius: 99px; color: var(--bad); border-color: var(--bad-soft);
+  background: transparent; margin-left: 2px; white-space: nowrap; }
+.chip .low:hover, .cand .low:hover { border-color: var(--bad); }
+.cand .low .k { font: 11px var(--mono); color: var(--text-3); }
 .dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
 .dock > button { white-space: nowrap; flex: none; }
 
