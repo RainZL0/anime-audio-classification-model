@@ -486,9 +486,8 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
 
 /* ───────────── Groups view: name a group of similar voices ───────────── */
 
-function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, setFocus, firstRun }) {
-  /* The ticked lines in each group. The label buttons act only on these. */
-  const [picked, setPicked] = useState({});
+/* `picked`: the ticked lines in each group. The group's buttons act only on these; the keys too, see App. */
+function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, setFocus, firstRun, picked, setPicked }) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState({});
   const [names, setNames] = useState({});
@@ -500,6 +499,8 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
         "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". If it is someone you want to collect, press \"New character\" to make the ticked lines a target character, then crop an avatar from the picture; you can type a name now or later. If it is not someone you want, press \"Other\".")}</p>
       <ol><li>${tr("一组里混着几个人时，分几次勾、几次标。按住 Shift 点，能一下勾上中间的几句。",
         "When a group mixes several people, tick and label them in turns. Shift+click ticks all the lines in between.")}</li>
+      <li>${tr("有勾选时，数字键、Q、N 标勾上的台词；没勾选时，标正在播放的那一句。",
+        "While lines are ticked, the number keys, Q and N label the ticked lines; with none ticked, they label the line playing.")}</li>
       <li>${tr("每命名一组，机器就会重新学一次，其余台词的猜测随之变准。", "Each group you name retrains the machine, and its guesses for the other lines get better.")}</li>
       <li>${tr("定下目标角色、再标几组「其他」以后，去「场景」视图逐句确认会快得多。",
         "Once you have your target characters and a few groups of \"other\", confirming line by line in the Scenes view goes much faster.")}</li></ol></div></div>`}
@@ -514,18 +515,22 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
         const keep = open.filter((c) => ticked.has(c.id));
         const all = open.length > 0 && keep.length === open.length;
         const done = open.length === 0;
+        /* Built on the newest ticks, so two clicks before the page draws again both count. */
         const tick = (c, e) => {
           e.stopPropagation();
-          const next = new Set(ticked);
-          const on = !next.has(c.id);
-          const from = open.findIndex((o) => o.id === anchor[g.key]);
-          const to = open.findIndex((o) => o.id === c.id);
-          const span = e.shiftKey && from >= 0 ? open.slice(Math.min(from, to), Math.max(from, to) + 1) : [c];
-          span.forEach((o) => (on ? next.add(o.id) : next.delete(o.id)));
-          setPicked({ ...picked, [g.key]: next });
-          setAnchor({ ...anchor, [g.key]: c.id });
+          const shift = e.shiftKey;
+          setPicked((p) => {
+            const next = new Set(p[g.key] || []);
+            const on = !next.has(c.id);
+            const from = open.findIndex((o) => o.id === anchor[g.key]);
+            const to = open.findIndex((o) => o.id === c.id);
+            const span = shift && from >= 0 ? open.slice(Math.min(from, to), Math.max(from, to) + 1) : [c];
+            span.forEach((o) => (on ? next.add(o.id) : next.delete(o.id)));
+            return { ...p, [g.key]: next };
+          });
+          setAnchor((a) => ({ ...a, [g.key]: c.id }));
         };
-        const tickAll = () => setPicked({ ...picked, [g.key]: new Set(all ? [] : open.map((c) => c.id)) });
+        const tickAll = () => setPicked((p) => ({ ...p, [g.key]: new Set(all ? [] : open.map((c) => c.id)) }));
         /* The machine's guess only goes in the placeholder, not in the box: listen first, Enter to accept it. */
         const value = names[g.key] ?? "";
         const chosen = value.trim() || g.hint?.name || "";
@@ -558,7 +563,7 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
           </div>
           ${!done && html`<div class="pick-row">
             <button type="button" onClick=${tickAll}>${all ? tr("全不选", "Select none") : tr("全选", "Select all")}</button>
-            <span class="note">${keep.length ? tr(`勾了 ${keep.length} 句`, `${lines(keep.length)} ticked`)
+            <span class="note">${keep.length ? tr(`勾了 ${keep.length} 句；数字键、Q、N 也标勾上的`, `${lines(keep.length)} ticked; number keys, Q and N label them too`)
               : tr("先勾上同一个人的台词，再选是谁", "Tick the lines of one person first, then pick who it is")}</span>
           </div>`}
           ${known.length > 0 && keep.length > 0 && html`<div class="pick-row">
@@ -1006,6 +1011,14 @@ function App() {
   roleNow.current = role;
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
+  /* The ticked lines in Groups, per group. Kept here because the keys label them too. Like focusNow, the newest
+     ticks are kept in a ref as well, so a second quick key press doesn't label the same lines again. */
+  const [picked, setPickedState] = useState({});
+  const pickedNow = useRef(picked);
+  const setPicked = useCallback((next) => {
+    pickedNow.current = typeof next === "function" ? next(pickedNow.current) : next;
+    setPickedState(pickedNow.current);
+  }, []);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
   /* The server's job that adds an episode (see AddEpisode), and whether its dialog is open. */
@@ -1158,6 +1171,7 @@ function App() {
         if (seq === loadSeq.current) setGroupsLoading(false);
       }
       setGroups(found);
+      setPicked({});
       setClips(found.flatMap((g) => g.clips));
       setFocus((f) => (found.some((g) => g.clips.some((c) => c.id === f)) ? f : found[0]?.clips[0]?.id));
     }
@@ -1218,6 +1232,15 @@ function App() {
   /* The Groups order only has unlabeled lines. When a labeled one is open, find next and previous by its place
      in the group. */
   const groupIds = useMemo(() => groups.flatMap((g) => g.clips.map((c) => c.id)), [groups]);
+  /* What the number keys, Q, N and the bottom bar label: in Groups the ticked lines if there are any, else the
+     line playing. The ticks are used up, so the next press goes to the line playing. */
+  const keyTargets = () => {
+    if (view !== "groups") return undefined;
+    const ticked = groups.flatMap((g) => g.clips.filter((c) => !c.label && pickedNow.current[g.key]?.has(c.id)));
+    if (!ticked.length) return undefined;
+    setPicked({});
+    return ticked.map((c) => c.id);
+  };
   const besides = (id) => {
     const at = groupIds.indexOf(id);
     return { after: order.filter((o) => groupIds.indexOf(o) > at), before: order.filter((o) => groupIds.indexOf(o) < at) };
@@ -1498,11 +1521,11 @@ function App() {
         /* Read the digit from e.code: with Shift held, e.key is "!", "@" and so on. Shift + number is the same
            character, low quality. */
         const name = dock[Number(e.code.at(-1)) - 1];
-        if (name) { handled(); assign(name, undefined, e.shiftKey); }
+        if (name) { handled(); assign(name, keyTargets(), e.shiftKey); }
       }
-      else if (k === "q") { handled(); assign(OTHER); }
+      else if (k === "q") { handled(); assign(OTHER, keyTargets()); }
       else if (e.key === "/") { handled(); setPalette(true); }
-      else if (k === "n" && now() && view !== "export") { handled(); newRole(); }
+      else if (k === "n" && now() && view !== "export") { handled(); newRole(keyTargets()); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
       else if (e.key === "Backspace" || e.key === "Delete") { handled(); clear(); }
@@ -1600,7 +1623,7 @@ function App() {
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
         ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} labelText=${labelText}
-          focus=${focus} setFocus=${pick} firstRun=${firstRun}
+          focus=${focus} setFocus=${pick} firstRun=${firstRun} picked=${picked} setPicked=${setPicked}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}
       </main>
@@ -1608,22 +1631,22 @@ function App() {
 
     ${view !== "export" && html`<footer class="dock">
       ${dock.slice(0, 9).map((name, i) => html`<div class="chip" key=${name}
-          title=${tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`)} onClick=${() => assign(name)}>
+          title=${tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`)} onClick=${() => assign(name, keyTargets())}>
         <${Avatar} role=${roles[name]} name=${name} size="md" /><${RoleName} role=${roles[name]} name=${name} />
         <span class="k">${i + 1}</span>
         <button class="low" title=${tr(`按 Shift + ${i + 1} 标成 ${name}·质量低：`, `Press Shift + ${i + 1} to label as ${name}, low quality: `) + lowTip()}
-          onClick=${(e) => { e.stopPropagation(); assign(name, undefined, true); }}>${tr("质量低", "Low quality")} <span class="k">⇧${i + 1}</span></button></div>`)}
-      <div class="chip" title=${tr("不是任何一个目标角色", "Not any of the target characters")} onClick=${() => assign(OTHER)}>
+          onClick=${(e) => { e.stopPropagation(); assign(name, keyTargets(), true); }}>${tr("质量低", "Low quality")} <span class="k">⇧${i + 1}</span></button></div>`)}
+      <div class="chip" title=${tr("不是任何一个目标角色", "Not any of the target characters")} onClick=${() => assign(OTHER, keyTargets())}>
         <${Avatar} blank=${true} size="md" /><span class="rn">${labelText[OTHER]}</span><span class="k">Q</span></div>
-      <button class="ghost" onClick=${() => current && newRole()} disabled=${!current}>${tr("新角色", "New character")} <kbd>N</kbd></button>
+      <button class="ghost" onClick=${() => current && newRole(keyTargets())} disabled=${!current}>${tr("新角色", "New character")} <kbd>N</kbd></button>
       <button class="ghost" onClick=${() => setPalette(true)}>${tr("其他角色", "More characters")} <kbd>/</kbd></button>
       <span class="more">${dock.length > 9 ? tr(`另有 ${dock.length - 9} 个目标角色在搜索里`, `${many(dock.length - 9, "more target")} in search`) : ""}</span>
     </footer>`}
 
     <audio ref=${refAudio} hidden></audio>
     ${palette && html`<${Palette} roles=${roles} onClose=${() => setPalette(false)}
-      onPick=${(name) => { setPalette(false); assign(name); }}
-      onNew=${() => { setPalette(false); newRole(); }} />`}
+      onPick=${(name) => { setPalette(false); assign(name, keyTargets()); }}
+      onNew=${() => { setPalette(false); newRole(keyTargets()); }} />`}
     ${crop && html`<${Cropper} source=${playerRef.current} name=${crop.name} role=${roles[crop.name]}
       onSave=${saveAvatar} onClose=${closeCrop} />`}
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
