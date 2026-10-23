@@ -27,9 +27,8 @@ const NEEDS_WORK = new Set(["review", "novoice", "unlabeled"]);
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
 /* 「其他」：不是任何一个目标角色。它是人下的判断，按 Q 标。 */
 const OTHER = "__other__";
-/* 有快捷键的特殊标签。「无法确认」「不止一个人」不再给键：只问是不是目标角色，拿不准、
-   或几个人同时说话但没有目标角色的，都标「其他」；以前标的照样显示。 */
-const SPECIAL_KEYS = { v: "__not_speech__" };
+/* 特殊标签（无法确认、不止一个人、不是说话）不再给键：只问是不是目标角色，拿不准、
+   几个人同时说话但没有目标角色、欢呼音效这类不是说话的，都标「其他」；以前标的照样显示。 */
 /* 标成目标角色之后的第二层开关，名字照常是 TA。没标成目标角色时按钮是灰的。 */
 const FLAGS = [
   { key: "c", flag: "unusable", text: "质量低",
@@ -200,8 +199,6 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
         disabled=${!roles[clip.label]?.target}
         title=${roles[clip.label]?.target ? f.tip : "先标成目标角色才能选；「其他」本来就不导出"}>
         ${clip[f.flag] ? `已标${f.text}` : f.text} <kbd>${f.key.toUpperCase()}</kbd></button>`)}
-      ${Object.entries(SPECIAL_KEYS).map(([key, value]) => html`
-        <button onClick=${() => onAssign(value)}>${special[value]} <kbd>${key.toUpperCase()}</kbd></button>`)}
     </div>
     ${clip.rejects.length > 0 && html`<div class="note" style="margin-top:8px">你说过这句不是：${clip.rejects.join("、")}</div>`}
     <div class="hint">
@@ -557,8 +554,7 @@ function Help({ onClose }) {
     ["J / ↓，K / ↑", "下一句，上一句"], ["空格", "从头重播这一句"], ["Enter", "接受机器猜的第一个"],
     ["1 – 9", "标成底部角色栏里对应的目标角色"], ["Q", "其他：不是任何一个目标角色"],
     ["N", "标成一个新的目标角色，名字以后再起；有画面时接着截头像"],
-    ["/", "搜索角色，或者敲名字新建"], ["V", "不是说话"],
-    ["C", "开关「质量低」：已标成目标角色、但背景音太重之类。照样帮机器认人，导出时跳过"],
+    ["/", "搜索角色，或者敲名字新建"],    ["C", "开关「质量低」：已标成目标角色、但背景音太重之类。照样帮机器认人，导出时跳过"],
     ["X", "开关「多人」：已标成目标角色、但还有别人同时出声。不拿来认人，导出时跳过"],
     ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"], ["Z", "撤销上一步（可以一直往回撤）"],
     ["F", "场景视图里只看要处理的"], ["角色视图里没确认的句子按 X", "这句不是这个角色"], ["「可能漏掉的」里 Enter", "这句是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
@@ -1012,7 +1008,6 @@ function App() {
       else if (k === "x" && view === "roles" && current?.maybe) { handled(); rejectMaybe(); }
       else if (k === "x" && view === "roles" && current && !current.label) { handled(); toggleMark(current.id); move(1); }
       else if (current && FLAGS.some((f) => f.key === k)) { handled(); toggleFlag(FLAGS.find((f) => f.key === k).flag); }
-      else if (SPECIAL_KEYS[k]) { handled(); assign(SPECIAL_KEYS[k]); }
       else if (e.key === "Backspace") { handled(); clear(); }
       else if (k === "r" && current?.guess.length) { handled(); playRef(current.guess[0].name); }
       else if (k === "f" && view === "scene") { handled(); setOnlyWork(!onlyWork); }

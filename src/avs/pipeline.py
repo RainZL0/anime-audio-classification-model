@@ -236,7 +236,7 @@ def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS)
     不用重标。代价是声纹缓存会失效，需要重跑 `embed`。
 
     补进来的行里必然混着解说、群体欢呼这类不属于任何角色的声音；不在这里猜，
-    统一收进来交给人耳判断，标注页有 `__not_speech__` 之类的标签可用。
+    统一收进来交给人耳判断，标注时标「其他」。
     """
     from avs.audio import audio_info
     from avs.evaluation.coverage import align_to_segments, uncovered_lines
