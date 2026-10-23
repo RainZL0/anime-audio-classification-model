@@ -90,11 +90,19 @@ kbd {
 }
 
 /* Overall layout: top bar, stage on the left, list on the right, character bar at the bottom. The whole page does not scroll, only the list does. */
-.shell { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+/* minmax(0, 1fr): a wide top bar or bottom bar must not make the whole page wider than the window. */
+.shell { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100vh; }
 .top {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 10px;
   padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
 }
+/* Keep each button on one line, so the top bar is the same height in every view. When the window is narrow, the
+   progress bar and the training note get shorter instead, so the buttons on the right stay on screen. */
+.top button, .top .progress > span { white-space: nowrap; }
+.top .progress { flex: 0 1 auto; min-width: 0; }
+.top .bar { flex: 0 1 160px; min-width: 40px; }
+.top .model-chip { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.top > button { flex: none; }
 .brand { font-weight: 650; letter-spacing: 0.2px; display: flex; align-items: center; gap: 8px; }
 .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
 .tabs { display: flex; gap: 2px; background: var(--panel-2); border: 1px solid var(--line);
@@ -242,6 +250,8 @@ kbd {
 .cand .low .k { font: 11px var(--mono); color: var(--text-3); }
 .dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
 .dock > button { white-space: nowrap; flex: none; }
+.chip.off { opacity: 0.45; cursor: default; }
+.chip.off:hover { border-color: var(--line-strong); }
 
 /* Characters view */
 .roles-grid { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding-top: 10px; }
@@ -353,6 +363,8 @@ kbd {
 .check { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--panel); cursor: pointer; }
 .check.on { border-color: var(--accent-ring); background: var(--accent-soft); }
+/* A tick box, like the lines in Groups, so it reads as "pick several", not as one choice of a row of buttons. */
+.check input[type="checkbox"] { margin: 0; cursor: pointer; accent-color: var(--accent); }
 .check .min { margin-left: auto; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .text-subs { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .text-sub { display: grid; grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 8px;

@@ -76,6 +76,8 @@ const typing = (el) => el.tagName === "SELECT" || el.tagName === "TEXTAREA"
 /* "Other": not any of the target characters. It is a human judgment, labeled with Q. Unsure whether it is a
    target, several people talking with no target among them, cheering and sound effects: all get "other". */
 const OTHER = "__other__";
+/* "Other" typed as a name, in either language, means the "other" label, not a new character that looks the same. */
+const otherName = (s) => ["其他", "other"].includes(s.trim().toLowerCase());
 /* Each target character has two choices: clean, and "low quality" (Shift + number). Only targets have it;
    "other" is never exported anyway. There used to be a separate "several people", now merged into low quality. */
 /* Seconds the video clip extends past each end of the line. Matches avoc.app.video.VIDEO_PAD on the server. */
@@ -414,7 +416,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
   const maybe = maybeListOf(clips);
   const confirmed = confirmedOf(clips, role);
   /* Who the machine gave these lines to, as written inside a sentence. */
-  const them = other ? tr("「其他」", "\"other\"") : role;
+  const them = other ? tr("「其他」", "\"Other\"") : role;
   return html`<div class="roles-grid">
     <div class="role-list">
       ${list.map((r) => html`<div class="role-item ${r.name === role ? "on" : ""} ${r.target ? "" : "off"}"
@@ -432,7 +434,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
     <div>
       ${!current ? html`<div class="empty"><h2>${tr("选一个角色", "Pick a character")}</h2><p>${tr(
         "左边上面是目标角色，就是你要收集的人；其余的人一律标「其他」。灰色数字是确认过的句数，橙色是机器归进来、还没人确认的句数，下面是确认过的台词累计多长。",
-        "At the top left are the target characters, the people you want to collect; everyone else is labeled \"other\". The gray number is lines confirmed, the orange one is lines the machine gave them that no one has confirmed yet, and below is the total length of the confirmed lines.")}</p></div>`
+        "At the top left are the target characters, the people you want to collect; everyone else is labeled \"Other\". The gray number is lines confirmed, the orange one is lines the machine gave them that no one has confirmed yet, and below is the total length of the confirmed lines.")}</p></div>`
       : html`
         <div class="role-head">
           ${other ? html`<${Avatar} blank=${true} size="xl" />`
@@ -453,7 +455,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
               title=${current.target ? tr("不再收集这个人：机器不再猜这个角色，已标的留着，以后还能加回来",
                   "Stop collecting this person: the machine stops guessing them, their labels stay, and you can add them back later")
                 : tr("重新收集这个人：以前标「其他」的台词会列进「可能漏掉的」，要复查",
-                  "Collect this person again: lines labeled \"other\" before will be listed under Maybe missed for you to recheck")}>
+                  "Collect this person again: lines labeled \"Other\" before will be listed under Maybe missed for you to recheck")}>
               ${current.target ? tr("不再作为目标", "Stop targeting") : tr("设为目标角色", "Make target")}</button>`}
           </div>
         </div>
@@ -461,7 +463,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
           <div style="flex:1"><h3>${tr(`机器把这 ${pending.length} 句归给了${other ? "「其他」" : ` ${role}`}`,
             `The machine gave these ${lines(pending.length)} to ${them}`)}</h3>
             <p>${tr(html`从最没把握的开始排。听到不对的，直接标成对的人或「其他」<kbd>Q</kbd>，它就离开这里；听完一键确认其余的。`,
-              html`Least sure first. When one is wrong, label it with the right character or "other" <kbd>Q</kbd> and it leaves this list; when you're done listening, confirm the rest at once.`)}</p></div>
+              html`Least sure first. When one is wrong, label it with the right character or "Other" <kbd>Q</kbd> and it leaves this list; when you're done listening, confirm the rest at once.`)}</p></div>
           <button class="primary" onClick=${onConfirmRest}>
             ${tr(`确认其余 ${pending.length} 句`, `Confirm the other ${lines(pending.length)}`)} <kbd style="margin-left:4px">Shift+Enter</kbd></button>
         </div>`}
@@ -471,7 +473,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
         ${maybe.length > 0 && html`<div class="section-title">${tr(`可能漏掉的 ${maybe.length} 句`, `Maybe missed: ${lines(maybe.length)}`)}</div>
           <p class="note" style="margin:0 0 8px">${tr(
             `机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
-            `The machine didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "other" before are listed here too.`)}</p>
+            `The machine didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`)}</p>
           ${maybe.map((clip) => html`<${Row} key=${clip.id} clip=${clip} roles=${roles} labelText=${labelText} maybeOf=${role}
             selected=${clip.id === focus} flash=${flashes.has(clip.id)}
             onSelect=${() => setFocus(clip.id)} />`)}`}
@@ -487,7 +489,7 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
 /* ───────────── Groups view: name a group of similar voices ───────────── */
 
 /* `picked`: the ticked lines in each group. The group's buttons act only on these; the keys too, see App. */
-function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, setFocus, firstRun, picked, setPicked }) {
+function GroupsView({ groups, loading, roles, dock, labelText, onName, onNew, focus, setFocus, firstRun, picked, setPicked }) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState({});
   const [names, setNames] = useState({});
@@ -503,7 +505,7 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
         "While lines are ticked, the number keys, Q and N label the ticked lines; with none ticked, they label the line playing.")}</li>
       <li>${tr("每命名一组，机器就会重新学一次，其余台词的猜测随之变准。", "Each group you name retrains the machine, and its guesses for the other lines get better.")}</li>
       <li>${tr("定下目标角色、再标几组「其他」以后，去「场景」视图逐句确认会快得多。",
-        "Once you have your target characters and a few groups of \"other\", confirming line by line in the Scenes view goes much faster.")}</li></ol></div></div>`}
+        "Once you have your target characters and a few groups of \"Other\", confirming line by line in the Scenes view goes much faster.")}</li></ol></div></div>`}
     ${groups.length === 0 && html`<div class="empty"><h2>${tr("没有可分的组了", "No groups left")}</h2>
       <p>${tr("这一集还没标的台词，要么彼此都不太像，要么已经全部有了名字。去「场景」视图逐句确认吧。",
         "The unlabeled lines in this episode are either not much alike, or all named already. Go confirm them line by line in the Scenes view.")}</p></div>`}
@@ -536,13 +538,14 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
         const submit = (e) => {
           e.preventDefault();
           if (!keep.length || !value.trim()) return;
-          onName(ids, value.trim());
+          onName(ids, otherName(value) ? OTHER : value.trim());
           /* The name was for these lines; the lines left in the group may be someone else. */
           setNames({ ...names, [g.key]: "" });
         };
-        /* The machine's guess comes first and is marked the same way as its top guess on the left. */
-        const known = Object.values(roles).filter((r) => r.target && r.name !== g.hint?.name).slice(0, 8);
-        const who = g.hint && roles[g.hint.name] ? [roles[g.hint.name], ...known] : known;
+        /* The same characters in the same order as the bottom bar, with the same number keys. The machine's guess is
+           marked the same way as its top guess on the left; if it is past the ninth, it is added at the end. */
+        const who = dock.slice(0, 9);
+        if (g.hint && roles[g.hint.name] && !who.includes(g.hint.name)) who.push(g.hint.name);
         return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""} ${done ? "done" : ""}">
           <h3>${tr(`第 ${gi + 1} 组`, `Group ${gi + 1}`)} <span class="meta">${lines(g.size)} · ${tr(`${g.seconds} 秒`, `${g.seconds} s`)}${
             done ? tr(" · 都标好了", " · all labeled") : ""}</span>
@@ -566,10 +569,11 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
               : tr("先勾上同一个人的台词，再选是谁", "Tick the lines of one person first, then pick who it is")}</span>
           </div>`}
           ${!done && html`<div class="who-row">
-            ${who.map((r) => html`<button type="button" key=${r.name} class="chip ${r.name === g.hint?.name ? "top" : ""}" disabled=${!keep.length}
-                title=${r.name === g.hint?.name ? tr("机器在这组里最常猜的角色", "The character the machine guesses most often in this group") : ""}
-                onClick=${() => onName(ids, r.name)}>
-              <${Avatar} role=${r} name=${r.name} size="sm" /><${RoleName} role=${r} name=${r.name} /></button>`)}
+            ${who.map((name, i) => html`<button type="button" key=${name} class="chip ${name === g.hint?.name ? "top" : ""}" disabled=${!keep.length}
+                title=${name === g.hint?.name ? tr("机器在这组里最常猜的角色", "The character the machine guesses most often in this group") : ""}
+                onClick=${() => onName(ids, name)}>
+              <${Avatar} role=${roles[name]} name=${name} size="sm" /><${RoleName} role=${roles[name]} name=${name} />${
+                i < 9 ? html`<span class="k">${i + 1}</span>` : ""}</button>`)}
             <button type="button" class="chip" disabled=${!keep.length} onClick=${() => onName(ids, OTHER)}
                 title=${tr("不是你要收集的人", "Not someone you want to collect")}>
               <${Avatar} blank=${true} size="sm" /><span class="rn">${labelText[OTHER]}</span><span class="k">Q</span></button>
@@ -658,9 +662,10 @@ function ExportView({ state, setState, toast }) {
         "Cut from the vocals at the original sample rate, loudness evened out, one folder per character")}</span></div>
     <div class="field"><label class="title">${tr("导出哪些角色", "Characters to export")}</label>
       <div class="role-checks">
-        ${trainable.map((r) => html`<div class="check ${picked.has(r.name) ? "on" : ""}" onClick=${() => toggle(r.name)}>
+        ${trainable.map((r) => html`<label class="check ${picked.has(r.name) ? "on" : ""}">
+          <input type="checkbox" checked=${picked.has(r.name)} onChange=${() => toggle(r.name)} />
           <${Avatar} role=${r} name=${r.name} size="md" /><${RoleName} role=${r} name=${r.name} />
-          <span class="min">${lines(r.confirmed)}${includeAuto && r.predicted ? ` + ${r.predicted}` : ""}</span></div>`)}
+          <span class="min">${lines(r.confirmed)}${includeAuto && r.predicted ? ` + ${r.predicted}` : ""}</span></label>`)}
       </div></div>
     <div class="field"><label class="title">${tr("包括哪些台词", "Lines to include")}</label>
       <span class="seg">
@@ -877,7 +882,8 @@ function Palette({ roles, onPick, onNew, onClose }) {
   const q = query.trim().toLowerCase();
   const found = names.filter((r) => !q || r.name.toLowerCase().includes(q)).slice(0, 12);
   const options = [...found.map((r) => ({ name: r.name, role: r }))];
-  if (q && !names.some((r) => r.name.toLowerCase() === q)) options.push({ name: query.trim(), fresh: true });
+  if (otherName(query)) options.unshift({ name: OTHER, other: true });
+  else if (q && !names.some((r) => r.name.toLowerCase() === q)) options.push({ name: query.trim(), fresh: true });
   options.push({ unnamed: true });
   const pick = (o) => (o.unnamed ? onNew() : onPick(o.name));
   const key = (e) => {
@@ -893,6 +899,7 @@ function Palette({ roles, onPick, onNew, onClose }) {
       ${options.map((o, i) => html`<div class="opt ${i === at ? "on" : ""}" onMouseEnter=${() => setAt(i)} onClick=${() => pick(o)}>
         ${o.unnamed ? html`<div class="av md unknown">+</div><span>${tr("新角色，先不起名字", "New character, no name yet")}</span><span class="c"><kbd>N</kbd></span>`
           : o.fresh ? html`<div class="av md unknown">+</div><span>${tr(`新建角色「${o.name}」`, `New character "${o.name}"`)}</span>`
+          : o.other ? html`<${Avatar} blank=${true} size="md" /><span>${tr("其他", "Other")}</span><span class="c"><kbd>Q</kbd></span>`
           : html`<${Avatar} role=${o.role} name=${o.name} size="md" /><${RoleName} role=${o.role} name=${o.name} />
             <span class="c">${lines(o.role.confirmed)}</span>`}
       </div>`)}
@@ -1442,7 +1449,7 @@ function App() {
     const changes = pending.map((c) => ({ clip: c.id, label: role }));
     const result = await send("/api/changes", { changes },
       tr(`确认了 ${pending.length} 句是${role === OTHER ? "「其他」" : ` ${role}`}`,
-        `Confirmed ${lines(pending.length)} as ${role === OTHER ? "\"other\"" : role}`));
+        `Confirmed ${lines(pending.length)} as ${role === OTHER ? "\"Other\"" : role}`));
     if (result) { setPlaying(false); reload(); }
   };
   const renameRole = async () => {
@@ -1676,7 +1683,7 @@ function App() {
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
         ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} labelText=${labelText}
-          focus=${focus} setFocus=${pick} firstRun=${firstRun} picked=${picked} setPicked=${setPicked}
+          dock=${dock} focus=${focus} setFocus=${pick} firstRun=${firstRun} picked=${picked} setPicked=${setPicked}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}
       </main>
@@ -1691,8 +1698,10 @@ function App() {
           onClick=${(e) => { e.stopPropagation(); assign(name, keyTargets(), true); }}>${tr("质量低", "Low quality")} <span class="k">⇧${i + 1}</span></button></div>`)}
       <div class="chip" title=${tr("不是任何一个目标角色", "Not any of the target characters")} onClick=${() => assign(OTHER, keyTargets())}>
         <${Avatar} blank=${true} size="md" /><span class="rn">${labelText[OTHER]}</span><span class="k">Q</span></div>
-      <button class="ghost" onClick=${() => current && newRole(keyTargets())} disabled=${!current}>${tr("新角色", "New character")} <kbd>N</kbd></button>
-      <button class="ghost" onClick=${() => setPalette(true)}>${tr("其他角色", "More characters")} <kbd>/</kbd></button>
+      <div class="chip ${current ? "" : "off"}" title=${tr("新建一个目标角色，名字可以以后再起；有画面时接着截头像", "Make a new target character; you can name it later. With video, crop an avatar next")}
+          onClick=${() => current && newRole(keyTargets())}>
+        <div class="av md unknown">+</div><span class="rn">${tr("新角色", "New character")}</span><span class="k">N</span></div>
+      <button class="ghost" onClick=${() => setPalette(true)}>${tr("搜索角色", "Search characters")} <kbd>/</kbd></button>
       <span class="more">${dock.length > 9 ? tr(`另有 ${dock.length - 9} 个目标角色在搜索里`, `${many(dock.length - 9, "more target")} in search`) : ""}</span>
     </footer>`}
 
@@ -1705,7 +1714,7 @@ function App() {
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
     ${addOpen && html`<${AddDialog} onClose=${() => setAddOpen(false)} ...${addProps} />`}
     ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span>
-      ${toast.extra && html`<button onClick=${undo}>${tr("撤销 Z", "Undo Z")}</button>`}</div>`}
+      ${toast.extra && html`<button onClick=${undo}>${tr("撤销", "Undo")} <kbd>Z</kbd></button>`}</div>`}
   </div>`;
 }
 
