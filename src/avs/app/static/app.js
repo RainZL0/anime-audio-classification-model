@@ -667,6 +667,115 @@ function ExportView({ state, setState, toast }) {
   </div>`;
 }
 
+/* ───────────── Adding an episode and the first-use guide ───────────── */
+
+/* The machine checks, the same list as `avs doctor`. Fetched once; torch is loaded for the GPU check, so it can
+   take a few seconds. */
+function Checks() {
+  const [list, setList] = useState(null);
+  useEffect(() => { call("/api/doctor").then(setList).catch(() => setList([])); }, []);
+  if (!list) return html`<div class="note">${tr("正在检查这台机器…", "Checking this machine…")}</div>`;
+  return html`<ul class="checks">${list.map((c) => html`<li class=${c.ok ? "ok" : c.required ? "bad" : "soft"}>
+    <span class="mark">${c.ok ? "✓" : c.required ? "✗" : "–"}</span>
+    <span>${c.text}${!c.ok && c.fix ? html`<br /><span class="note">${c.fix}</span>` : ""}</span></li>`)}</ul>`;
+}
+
+/* The form for one episode, and the progress of the `avs add` the server runs for it. `adding` is the server's job
+   status, polled by App. */
+function AddEpisode({ state, adding, setAdding, onOpen, toast }) {
+  const last = [...state.episodes].reverse().find((e) => e.offset != null);
+  const [video, setVideo] = useState("");
+  const [subtitles, setSubtitles] = useState("");
+  const [textSubtitles, setTextSubtitles] = useState("");
+  const [offset, setOffset] = useState(last ? String(last.offset) : "");
+  const [busy, setBusy] = useState(false);
+  const log = useRef(null);
+  useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [adding?.lines.length]);
+  const run = async (body) => {
+    setBusy(true);
+    try { setAdding(await call("/api/add", body)); } catch (e) { toast(e.message, true); }
+    setBusy(false);
+  };
+  const start = (e) => {
+    e.preventDefault();
+    const seconds = offset.trim() === "" ? null : Number(offset);
+    if (seconds !== null && !Number.isFinite(seconds)) { toast(tr("字幕偏移要填一个数，比如 -0.95", "The subtitle offset must be a number, such as -0.95"), true); return; }
+    run({ video, subtitles, text_subtitles: textSubtitles, offset: seconds });
+  };
+  const stop = async () => {
+    setBusy(true);
+    try { setAdding(await call("/api/add/stop", {})); } catch (e) { toast(e.message, true); }
+    setBusy(false);
+  };
+  const running = adding?.state === "running";
+  const minutes = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const unfinished = Object.entries(state.skipped || {});
+  return html`<div class="add-episode">
+    ${adding && adding.state !== "idle" && html`<div class="add-run ${adding.state}">
+      <div class="add-head"><b>${{
+        running: tr(`正在加 ${adding.episode}…`, `Adding ${adding.episode}…`),
+        done: tr(`${adding.episode} 加好了`, `${adding.episode} is added`),
+        failed: tr(`${adding.episode} 没加成`, `${adding.episode} failed`),
+        stopped: tr(`${adding.episode} 已停下`, `${adding.episode} was stopped`),
+      }[adding.state]}</b>
+        <span class="note">${minutes(adding.seconds)}</span>
+        <span class="spacer"></span>
+        ${running && html`<button disabled=${busy} onClick=${stop}>${tr("停下", "Stop")}</button>`}
+        ${adding.state === "done" && state.episodes.some((e) => e.name === adding.episode)
+          && html`<button class="primary" onClick=${() => onOpen(adding.episode)}>${tr(`打开 ${adding.episode}`, `Open ${adding.episode}`)}</button>`}</div>
+      <pre class="add-log" ref=${log}>${adding.lines.join("\n") || tr("正在启动…", "Starting…")}</pre>
+      ${running && adding.bar && html`<div class="note add-bar">${adding.bar}</div>`}
+      ${adding.state === "failed" && adding.errors?.length > 0 && html`<pre class="add-log errors">${adding.errors.slice(-15).join("\n")}</pre>`}
+      ${running && html`<div class="note">${tr("有显卡时一集要几分钟，只用 CPU 会慢很多。可以关掉这个窗口接着标别的集，做完会提示。",
+        "With a GPU one episode takes a few minutes; on the CPU it takes much longer. You can close this and keep labeling other episodes; you will be told when it is done.")}</div>`}
+      ${(adding.state === "failed" || adding.state === "stopped") && html`<div class="note">${tr("改好问题以后再点「开始」。做完的步骤会留着，从停下的地方接着做。",
+        "Fix the problem, then press Start again. Finished steps are kept, and it carries on from where it stopped.")}</div>`}
+    </div>`}
+    ${unfinished.length > 0 && html`<div class="field"><label class="title">${tr("没做完的集", "Unfinished episodes")}</label>
+      ${unfinished.map(([name, why]) => html`<div class="unfinished"><b>${name}</b><span class="note">${why}</span>
+        <button disabled=${busy || running} onClick=${() => run({ resume: name })}>${tr("接着做", "Carry on")}</button></div>`)}</div>`}
+    <form class="add-form" onSubmit=${start}>
+      <div class="field"><label class="title">${tr("视频文件", "Video file")}</label>
+        <input value=${video} onInput=${(e) => setVideo(e.target.value)} placeholder="D:\\anime\\Episode 01.mkv" /></div>
+      <div class="field"><label class="title">${tr("对白字幕（ASS 或 SRT，按它切台词）", "Dialogue subtitles (ASS or SRT; lines are cut from it)")}</label>
+        <input value=${subtitles} onInput=${(e) => setSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ass" /></div>
+      <div class="field"><label class="title">${tr("日文台词字幕（可以不填，导出日文文字时用）", "Japanese text subtitles (optional; used for Japanese export text)")}</label>
+        <input value=${textSubtitles} onInput=${(e) => setTextSubtitles(e.target.value)} placeholder="D:\\anime\\Episode 01.ja.srt" /></div>
+      <div class="field"><label class="title">${tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>
+        <input class="offset" value=${offset} onInput=${(e) => setOffset(e.target.value)} placeholder=${tr("自动测", "measure")} />
+        <div class="note">${tr("字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。不知道就填 0，或者空着让它自动测（要 Hugging Face 令牌）。",
+          "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. If you don't know, try 0, or leave it empty to measure it (needs a Hugging Face token).")}</div></div>
+      <div class="note">${tr("路径整段粘贴进来就行。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
+        "Paste the full paths. On Windows, hold Shift, right-click the file, and choose \"Copy as path\".")}</div>
+      <div><button class="primary" type="submit" disabled=${busy || running || !video.trim() || !subtitles.trim()}>${tr("开始", "Start")}</button></div>
+    </form>
+  </div>`;
+}
+
+function AddDialog({ onClose, ...props }) {
+  return html`<div class="overlay" onClick=${onClose}><div class="help add-dialog" onClick=${(e) => e.stopPropagation()}>
+    <h2>${tr("加一集", "Add an episode")}</h2><${AddEpisode} ...${props} /></div></div>`;
+}
+
+/* The page for a workspace with no usable episode yet: what the tool does, the machine checks, and the form. */
+function Welcome(props) {
+  return html`<div class="form welcome-page">
+    <div><h2>${tr("欢迎", "Welcome")}</h2>
+      <p>${tr("这个工具把一个动画角色说的每一句台词收集成干净的单人音频，带上台词文字，可以直接拿去训练语音模型。",
+        "This tool collects every line one anime character speaks as clean single-speaker audio with its text, ready for training a voice model.")}</p>
+      <ol class="steps">
+        <li>${tr("加一集：给出视频和对白字幕。机器按字幕切台词，再把人声和音乐分开。", "Add an episode: give its video and dialogue subtitles. The machine cuts the lines along the subtitles and separates the voices from the music.")}</li>
+        <li>${tr("在「起步分组」里给你要的角色起名，其他人都标「其他」。", "In Groups, name the character you want, and label everyone else \"Other\".")}</li>
+        <li>${tr("在「场景」和「角色」里改机器猜错的。每改一次，机器马上重学。", "In Scenes and Characters, fix the machine's wrong guesses. It retrains after every fix.")}</li>
+        <li>${tr("在「导出」里导出成 GPT-SoVITS、Style-Bert-VITS2 或 RVC 用的格式。", "In Export, export for GPT-SoVITS, Style-Bert-VITS2 or RVC.")}</li>
+      </ol></div>
+    <div class="field"><label class="title">${tr("这台机器", "This machine")}</label><${Checks} key=${lang} /></div>
+    <div class="field"><label class="title">${tr("加第一集", "Add the first episode")}</label><${AddEpisode} ...${props} /></div>
+    <p class="note">${tr(html`也可以在命令行里加：<code>uv run avs add "${props.state.workspace}" 视频 --subs 字幕</code>`,
+      html`You can also add one in a terminal: <code>uv run avs add "${props.state.workspace}" VIDEO --subs SUBTITLES</code>`)}</p>
+  </div>`;
+}
+
 /* ───────────── Search or make a character ───────────── */
 
 function Palette({ roles, onPick, onNew, onClose }) {
@@ -858,6 +967,9 @@ function App() {
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
+  /* The server's job that adds an episode (see AddEpisode), and whether its dialog is open. */
+  const [adding, setAdding] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(() => localStorage.getItem("avs-sound") || "vocals");
@@ -942,6 +1054,33 @@ function App() {
       else if (!s.roles.some((r) => r.confirmed > 0)) setView("groups");
     }).catch((e) => setError(e.message));
   }, []);
+
+  /* Follow an episode being added. When it ends, the overview is fetched again, since the server has reloaded the
+     workspace with the new episode. */
+  useEffect(() => { call("/api/add").then(setAdding).catch(() => {}); }, []);
+  const addingState = adding?.state;
+  useEffect(() => {
+    if (addingState !== "running") return;
+    const timer = setInterval(async () => {
+      try {
+        const now = await call("/api/add");
+        setAdding(now);
+        if (now.state === "running") return;
+        setState(await call("/api/state"));
+        if (now.state === "done") showToast(tr(`${now.episode} 加好了`, `${now.episode} is added`));
+        else if (now.state === "failed") { showToast(tr(`${now.episode} 没加成，点「加一集」看原因`, `${now.episode} failed; open "Add an episode" to see why`), true); }
+      } catch {}
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [addingState]);
+  /* The first episode added from the welcome page: open it, starting in Groups. */
+  useEffect(() => {
+    if (state && !episode && state.episodes.length) {
+      setEpisode(state.episodes[0].name);
+      if (!state.roles.some((r) => r.confirmed > 0)) setView("groups");
+    }
+  }, [state, episode]);
+  const openEpisode = (name) => { setAddOpen(false); setEpisode(name); };
 
   /* Fetch the list again on a new episode, view or character. Once fetched its order stays fixed: labeled lines
      stay where they are instead of jumping away. */
@@ -1236,7 +1375,7 @@ function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (crop) return;
-      if (palette || help) { if (e.key === "Escape") { setPalette(false); setHelp(false); } return; }
+      if (palette || help || addOpen) { if (e.key === "Escape") { setPalette(false); setHelp(false); setAddOpen(false); } return; }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.ctrlKey && e.key !== "z" || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       const handled = () => e.preventDefault();
@@ -1273,16 +1412,10 @@ function App() {
   const corner = html`<div class="corner"><${LanguageButton} onSwitch=${switchLanguage} /></div>`;
   if (error) return html`${corner}<div class="empty"><h2>${tr("连不上本地服务", "Can't reach the local server")}</h2><p>${error}</p></div>`;
   if (!state) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>${tr("正在载入…", "Loading…")}</p></div>`;
+  const addProps = { state, adding, setAdding, onOpen: openEpisode, toast: showToast };
   if (!state.episodes.length) {
-    const skipped = Object.entries(state.skipped || {});
-    return html`${corner}<div class="empty"><h2>${tr("工作区里还没有能用的一集", "No usable episode in this workspace yet")}</h2>
-      <p>${tr("每集要有视频和对白字幕。在命令行里运行下面这条，处理完刷新这个页面：",
-        "Each episode needs a video and dialogue subtitles. Run this in a terminal, then refresh this page when it finishes:")}</p>
-      <pre class="command">uv run avs add "${state.workspace}" ${tr("视频文件 --subs 字幕文件", "VIDEO --subs SUBTITLES")}</pre>
-      <p>${tr(html`要导出日文台词，再加 <code>--text-subs 日文字幕</code>。`,
-        html`To export Japanese text, also add <code>--text-subs JAPANESE_SUBTITLES</code>.`)}</p>
-      ${skipped.length ? html`<p>${tr("没载入的集：", "Episodes not loaded:")}</p><ul>${skipped.map(([name, why]) => html`<li><b>${name}</b>${tr("：", ": ")}${why}</li>`)}</ul>` : ""}
-    </div>`;
+    return html`${corner}<${Welcome} ...${addProps} />
+      ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span></div>`}`;
   }
 
   const counts = episodeInfo?.counts || {};
@@ -1298,9 +1431,14 @@ function App() {
   return html`<div class="shell">
     <header class="top">
       <div class="brand"><span class="dot"></span>avs</div>
-      <select value=${episode} onChange=${(e) => setEpisode(e.target.value)} title=${tr("换一集", "Switch episode")}>
+      <select value=${episode} title=${tr("换一集", "Switch episode")}
+        onChange=${(e) => { if (e.target.value === "+") { e.target.value = episode; setAddOpen(true); } else setEpisode(e.target.value); }}>
         ${state.episodes.map((e) => html`<option value=${e.name}>${e.name}</option>`)}
+        <option value="+">${tr("＋ 加一集…", "+ Add an episode…")}${Object.keys(state.skipped || {}).length
+          ? tr(`（${Object.keys(state.skipped).length} 集没做完）`, ` (${Object.keys(state.skipped).length} unfinished)`) : ""}</option>
       </select>
+      ${addingState === "running" && !addOpen && html`<button class="ghost adding-chip" onClick=${() => setAddOpen(true)}
+        title=${tr("点开看进度", "Click to see the progress")}><span class="spinner small"></span>${tr(`正在加 ${adding.episode}`, `Adding ${adding.episode}`)}</button>`}
       <nav class="tabs">
         ${tabs.map(([v, l, key]) => html`
           <button class=${view === v ? "on" : ""} title=${tr(`快捷键 ${key}`, `Shortcut ${key}`)} onClick=${() => setView(v)}>${l}
@@ -1367,6 +1505,7 @@ function App() {
     ${crop && html`<${Cropper} source=${playerRef.current} name=${crop.name} role=${roles[crop.name]}
       onSave=${saveAvatar} onClose=${closeCrop} />`}
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
+    ${addOpen && html`<${AddDialog} onClose=${() => setAddOpen(false)} ...${addProps} />`}
     ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span>
       ${toast.extra && html`<button onClick=${undo}>${tr("撤销 Z", "Undo Z")}</button>`}</div>`}
   </div>`;

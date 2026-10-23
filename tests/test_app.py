@@ -247,6 +247,56 @@ def test_an_episode_without_voiceprints_is_skipped_not_fatal(tmp_path: Path) -> 
     assert {c.episode for c in state.workspace.clips} == {"ep1"}
 
 
+FINISH_VOICEPRINTS = """
+import sys
+from pathlib import Path
+import numpy as np
+from avs.project import cache_signature, read_json, write_json
+args = sys.argv[1:]
+folder = Path(args[1]) / "episodes" / args[args.index("--name") + 1]
+rows = read_json(folder / "segments.json")
+cache = folder / "embeddings/redimnet2-b6"
+cache.mkdir(parents=True)
+np.save(cache / "vectors.npy", np.tile(np.float32([1, 0, 0]), (len(rows), 1)))
+write_json(cache / "metadata.json", rows)
+write_json(cache / "cache.json", cache_signature(folder, "redimnet2-b6"))
+"""
+
+
+def test_an_unfinished_episode_can_be_carried_on_from_the_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The page's "carry on" button reruns avs add with the files the episode recorded, and the
+    workspace is reloaded once it is done. A small script stands in for avs add."""
+    import shutil
+    import sys
+
+    monkeypatch.setattr("avs.app.adding.shutil.which", lambda _: "found")
+    root = _workspace(tmp_path)
+    half = episode(root / "episodes", "ep2", np.array([[1.0, 0.0, 0.0]] * 6, dtype=float))
+    shutil.rmtree(half / "embeddings")
+    (tmp_path / "ep2.mkv").write_text("x", encoding="utf-8")
+    (tmp_path / "ep2.ass").write_text("1\n00:00:00,000 --> 00:00:01,000\nhi\n", encoding="utf-8")
+    meta = json.loads((half / "episode.json").read_text(encoding="utf-8"))
+    meta.update(video=str(tmp_path / "ep2.mkv"), subtitles=str(tmp_path / "ep2.ass"))
+    meta["subtitle_offset"] = -0.95
+    (half / "episode.json").write_text(json.dumps(meta), encoding="utf-8")
+    (tmp_path / "finish.py").write_text(FINISH_VOICEPRINTS, encoding="utf-8")
+
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    state.adding.program = [sys.executable, str(tmp_path / "finish.py")]
+    client = TestClient(create_app(state))
+    english = {"X-Language": "en"}
+    missing = client.post("/api/add", json={"video": "x.mkv"}, headers=english)
+    assert missing.status_code == 400 and "subtitles" in missing.json()["detail"]
+    assert client.post("/api/add", json={"resume": "ep2"}).json()["episode"] == "ep2"
+    state.adding.ended.wait(timeout=60)
+    assert client.get("/api/add").json()["state"] == "done", state.adding.lines
+    summary = client.get("/api/state").json()
+    assert [e["name"] for e in summary["episodes"]] == ["ep1", "ep2"]
+    assert summary["skipped"] == {}
+
+
 def test_messages_follow_the_page_language(tmp_path: Path) -> None:
     import shutil
 

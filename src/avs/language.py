@@ -2,11 +2,15 @@
 current language in the `X-Language` header, and the messages the server sends back (error reasons,
 reasons a clip was not exported) follow it."""
 
+import os
 from contextvars import ContextVar
 
-LANGUAGE: ContextVar[str] = ContextVar("language", default="en")
+LANGUAGE: ContextVar[str] = ContextVar(
+    "language", default="zh" if os.environ.get("AVS_LANGUAGE") == "zh" else "en"
+)
 """The language this request wants, `zh` or `en`. Outside a request (the command line, tests calling
-directly) it is English."""
+directly) it is English, unless the environment variable `AVS_LANGUAGE` is `zh`. The interface sets
+it when it runs `avs add` for the page, so the progress lines follow the page language."""
 
 
 def say(zh: str, en: str) -> str:

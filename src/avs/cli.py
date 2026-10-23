@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from avs import pipeline
+from avs.language import say
 
 app = typer.Typer(
     name="avs",
@@ -31,57 +32,14 @@ DEVICE_HELP = "cuda, cpu, or auto (uses cuda if there is an NVIDIA GPU)"
 @app.command()
 def doctor() -> None:
     """Check the runtime environment: GPU, FFmpeg, model files, and the Hugging Face token."""
-    import shutil
-
-    import torch
-
-    from avs.audio import SEPARATION_MODEL
+    from avs.doctor import checks
 
     problems = 0
-
-    def report(ok: bool, text: str, fix: str = "", required: bool = True) -> None:
-        nonlocal problems
-        problems += required and not ok
-        mark = "[ok]" if ok else "[missing]" if required else "[optional]"
-        typer.echo(f"{mark} {text}" + (f"\n     {fix}" if fix and not ok else ""))
-
-    cuda = torch.cuda.is_available()
-    gpu = f", {torch.cuda.get_device_name(0)}" if cuda else ""
-    report(
-        cuda,
-        f"torch {torch.__version__}, CUDA {'available' if cuda else 'not available'}{gpu}",
-        "No usable NVIDIA GPU was found, so the CPU will be used. It works, but separating vocals "
-        "for one episode is much slower",
-        required=False,
-    )
-    for tool in ("ffmpeg", "ffprobe"):
-        found = shutil.which(tool)
-        report(
-            bool(found),
-            f"{tool}: {found or 'not found'}",
-            "Install FFmpeg and add its bin folder to PATH",
-        )
-    model = Path("models") / SEPARATION_MODEL
-    report(
-        True,
-        f"Voice separation model: {model}"
-        if model.exists()
-        else "Voice separation model: will be downloaded automatically the first time it is used",
-    )
-    token = pipeline.has_hf_token()
-    report(
-        token,
-        f"Hugging Face token: {'present' if token else 'missing'}",
-        "Only needed when --offset is not given and the subtitle offset should be measured "
-        "automatically: " + pipeline.TOKEN_HOWTO,
-        required=False,
-    )
-    free = shutil.disk_usage(Path.cwd()).free / 2**30
-    report(
-        free >= 5,
-        f"Free space on the current disk: {free:.0f} GB",
-        "One processed episode takes about 0.5 GB, so leave enough space",
-    )
+    for check in checks(Path.cwd()):
+        problems += check.required and not check.ok
+        mark = "[ok]" if check.ok else "[missing]" if check.required else "[optional]"
+        fix = f"\n     {check.fix}" if check.fix and not check.ok else ""
+        typer.echo(f"{mark} {check.text}{fix}")
     typer.echo(
         "All checks passed" if problems == 0 else f"Found {problems} item(s) that need attention"
     )
@@ -126,12 +84,17 @@ def add(
     subtitles if given. If it stops partway, run the same command again to continue."""
     try:
         result = pipeline.add_episode(
-            workspace, video, subs, name, text_subs, audio, offset, device, say=typer.echo
+            workspace, video, subs, name, text_subs, audio, offset, device, report=typer.echo
         )
     except ValueError as exc:
-        typer.echo(f"Error: {exc}", err=True)
+        typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
         raise typer.Exit(1) from exc
-    typer.echo(f"{result['episode']} added, {result['segments']} clips. To open the interface:")
+    typer.echo(
+        say(
+            f"{result['episode']} 加好了，{result['segments']} 个片段。打开界面：",
+            f"{result['episode']} added, {result['segments']} clips. To open the interface:",
+        )
+    )
     typer.echo(f"  uv run avs app {workspace}")
 
 

@@ -19,6 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from avs.app.adding import Adding, clean_path
 from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avs.app.video import VIDEO_PAD, cut_video
@@ -52,8 +53,10 @@ class AppState:
     def __init__(
         self, root: Path, models: tuple[str, ...] = DEFAULT_MODELS, grouping: str = GROUPING_MODEL
     ) -> None:
+        self.models, self.grouping_model = models, grouping
         self.workspace = load_workspace(root, models, grouping)
         self.store = LabelStore(self.workspace.labels_dir)
+        self.adding = Adding(root, lambda _: self.reload())
         self.lock = threading.RLock()
         self.guesses: dict[int, Guess] = {}
         self.trained: dict[str, Any] = {}
@@ -64,6 +67,13 @@ class AppState:
         self._prefetch_ready = threading.Condition()
         self._prefetchers: list[threading.Thread] = []
         self.retrain()
+
+    def reload(self) -> None:
+        """Load the workspace again after an episode was added. Labels are kept as they are."""
+        workspace = load_workspace(self.workspace.root, self.models, self.grouping_model)
+        with self.lock:
+            self.workspace = workspace
+            self.retrain()
 
     # Model
 
@@ -191,6 +201,7 @@ class AppState:
                 {
                     "name": name,
                     "video": bool(meta.get("video")),
+                    "offset": meta.get("subtitle_offset"),
                     "counts": dict(per_episode[name]),
                     "text_subtitles": _text_subtitles(meta),
                 }
@@ -596,6 +607,15 @@ class ExportBody(BaseModel):
     subtitles used for cutting."""
 
 
+class AddBody(BaseModel):
+    video: str = ""
+    subtitles: str = ""
+    text_subtitles: str = ""
+    offset: float | None = None
+    resume: str | None = None
+    """Carry on with an episode that was not finished, using the files recorded for it."""
+
+
 class TextSubtitlesBody(BaseModel):
     episode: str
     path: str
@@ -610,6 +630,25 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
         "offset": meta.get("text_subtitle_offset"),
         "agreement": meta.get("text_subtitle_agreement"),
     }
+
+
+def _recorded_files(root: Path, name: str) -> tuple[Path, Path, Path | None, float | None, str]:
+    """The files an unfinished episode was started with, read from its episode.json, to carry on."""
+    from avs.project import read_json, validate_name
+
+    validate_name(name)
+    path = root / "episodes" / name / "episode.json"
+    if not path.is_file():
+        raise ValueError(
+            say(
+                f"{name} 还没切好片段，没法接着做。重新加这一集",
+                f"{name} has no clips yet, so it cannot be continued. Add it again",
+            )
+        )
+    meta = read_json(path)
+    text = meta.get("text_subtitles")
+    return (Path(meta["video"]), Path(meta["subtitles"]), Path(text) if text else None,
+            meta.get("subtitle_offset"), name)  # fmt: skip
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:
@@ -780,6 +819,38 @@ def create_app(state: AppState) -> Any:
                 return state.summary()
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/doctor")
+    def read_doctor() -> list[dict[str, Any]]:
+        from dataclasses import asdict
+
+        from avs.doctor import checks
+
+        return [asdict(c) for c in checks(state.workspace.root.resolve())]
+
+    @app.get("/api/add")
+    def read_adding() -> dict[str, Any]:
+        return state.adding.status()
+
+    @app.post("/api/add")
+    def post_add(body: AddBody) -> dict[str, Any]:
+        try:
+            if body.resume:
+                return state.adding.start(*_recorded_files(state.workspace.root, body.resume))
+            if not body.video.strip() or not body.subtitles.strip():
+                raise ValueError(
+                    say("视频和字幕都要填", "both the video and the subtitles are needed")
+                )
+            text = clean_path(body.text_subtitles) if body.text_subtitles.strip() else None
+            return state.adding.start(
+                clean_path(body.video), clean_path(body.subtitles), text, body.offset
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/add/stop")
+    def post_add_stop() -> dict[str, Any]:
+        return state.adding.stop()
 
     # The avatar route must come before /media/{kind}/{clip_id}, or "avatar" would be
     # taken as a kind.

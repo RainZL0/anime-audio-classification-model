@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from avs.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
+from avs.language import Words, say
 from avs.project import (
     cache_dir,
     cache_signature,
@@ -24,15 +25,19 @@ from avs.project import (
     write_json,
 )
 
-TOKEN_HOWTO = (
-    "Accept the terms of use at https://huggingface.co/pyannote/speaker-diarization-community-1, "
-    "then log in by running uv run hf auth login"
+TOKEN_PAGE = "https://huggingface.co/pyannote/speaker-diarization-community-1"
+TOKEN_HOWTO = Words(
+    f"先在 {TOKEN_PAGE} 同意使用条款，再运行 uv run hf auth login 登录",
+    f"Accept the terms of use at {TOKEN_PAGE}, then log in by running uv run hf auth login",
 )
-NO_TOKEN_HINT = (
+NO_TOKEN_HINT = Words(
+    "没给字幕偏移，要用 pyannote 自动测，但这台机器没有 Hugging Face 令牌。"
+    "二选一：填上偏移（同一个片源、同一个字幕组的每一集都一样，填前面测过的值就行），或者"
+    + TOKEN_HOWTO.zh,
     "--offset was not given, so pyannote would have to measure the subtitle offset automatically, "
     "but this machine has no Hugging Face token. "
     "Choose one: give --offset (it is the same for all episodes from the same source and subtitle "
-    "group, so enter the value measured for an earlier episode), or " + TOKEN_HOWTO
+    "group, so enter the value measured for an earlier episode), or " + TOKEN_HOWTO.en,
 )
 
 
@@ -72,24 +77,29 @@ def prepare(
 
     validate_name(name)
     if out.exists():
-        raise ValueError(f"Output folder already exists: {out}")
+        raise ValueError(say(f"输出文件夹已经存在：{out}", f"Output folder already exists: {out}"))
     if offset is not None and not math.isfinite(offset):
-        raise ValueError("The subtitle offset must be a finite number")
+        raise ValueError(
+            say("字幕偏移必须是一个有限的数", "The subtitle offset must be a finite number")
+        )
     if not video.is_file():
-        raise ValueError(f"Video does not exist: {video}")
+        raise ValueError(say(f"视频不存在：{video}", f"Video does not exist: {video}"))
     if not subtitles.is_file():
-        raise ValueError(f"Subtitles do not exist: {subtitles}")
+        raise ValueError(say(f"字幕不存在：{subtitles}", f"Subtitles do not exist: {subtitles}"))
     lines = load_lines(subtitles)
     if not lines:
-        raise ValueError("There are no dialogue lines in the subtitles")
+        raise ValueError(say("字幕里没有台词", "There are no dialogue lines in the subtitles"))
     if offset is None and not has_hf_token():
-        raise ValueError(NO_TOKEN_HINT)
+        raise ValueError(str(NO_TOKEN_HINT))
     device = resolve_device(device)
     picture = video_seconds(video)
     if audio is not None and abs(audio_info(audio).duration - picture) > VIDEO_TOLERANCE:
         raise ValueError(
-            "The audio track and the video have different durations, so they are probably not the "
-            "same source"
+            say(
+                "音轨和视频的时长不一样，多半不是同一个片源",
+                "The audio track and the video have different durations, so they are probably not "
+                "the same source",
+            )
         )
     out.mkdir(parents=True)
     if audio is None:
@@ -97,13 +107,21 @@ def prepare(
         extract_audio(video, audio)
     source = audio_info(audio)
     if source.sample_rate < 32000:
-        raise ValueError("The original audio track has a sample rate below 32000 Hz")
+        raise ValueError(
+            say(
+                "原音轨的采样率低于 32000 Hz",
+                "The original audio track has a sample rate below 32000 Hz",
+            )
+        )
     if vocals:
         info = audio_info(vocals)
         if info.sample_rate != source.sample_rate or abs(info.duration - source.duration) > 0.1:
             raise ValueError(
-                "The sample rate or duration of the reused vocal track does not match the original "
-                "audio track"
+                say(
+                    "复用的人声轨和原音轨的采样率或时长对不上",
+                    "The sample rate or duration of the reused vocal track does not match the "
+                    "original audio track",
+                )
             )
     if vocals is None:
         # Half precision is only faster on the GPU, so use full precision on the CPU.
@@ -120,15 +138,18 @@ def prepare(
         offset, overlap = find_offset(lines, speech, source.duration)
         if overlap < MIN_OVERLAP_RATIO:
             raise ValueError(
-                f"Subtitle alignment overlap {overlap} is too low. "
-                "Check the subtitles against the source"
+                say(
+                    f"字幕和声音只重合 {overlap}，太低了。检查字幕和片源是不是对得上",
+                    f"Subtitle alignment overlap {overlap} is too low. "
+                    "Check the subtitles against the source",
+                )
             )
     # Remove duplicate times from bilingual subtitles. Do not join adjacent lines, and do not shrink
     # the boundaries based on audio quality or speaker labels.
     spans = sorted({(max(0.0, a + offset), min(source.duration, b + offset)) for a, b in lines})
     rows = segment_rows(name, [{"start": a, "end": b} for a, b in spans if b > a])
     if not rows:
-        raise ValueError("All subtitles fall outside the audio track")
+        raise ValueError(say("字幕全都落在音轨外面", "All subtitles fall outside the audio track"))
     episode = {
         "schema": "avs.episode.v1",
         "name": name,
@@ -178,7 +199,7 @@ def attach_video(directory: Path, video: Path) -> dict[str, Any]:
 
     episode, _ = load_episode(directory)
     if not video.is_file():
-        raise ValueError(f"Video does not exist: {video}")
+        raise ValueError(say(f"视频不存在：{video}", f"Video does not exist: {video}"))
     seconds = video_seconds(video)
     audio = audio_info(Path(episode["source"])).duration
     if abs(seconds - audio) > VIDEO_TOLERANCE:
@@ -215,7 +236,7 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     episode, rows = load_episode(directory)
     dialogue = load_dialogue(subtitles)
     if not dialogue:
-        raise ValueError("There are no dialogue lines in the subtitles")
+        raise ValueError(say("字幕里没有台词", "There are no dialogue lines in the subtitles"))
     starts = {round(r["start"], 2) for r in rows}
     votes: Counter[float] = Counter()
     for line in dialogue:
@@ -248,7 +269,6 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     is below `MIN_AGREEMENT`, or fewer than `MIN_MATCHED` of the clips touch a line.
     """
     from avs.app.workspace import subtitle_lines
-    from avs.language import say
     from avs.stages.text_subtitle import (
         MIN_AGREEMENT,
         MIN_MATCHED,
@@ -331,10 +351,10 @@ def add_episode(
     audio: Path | None = None,
     offset: float | None = None,
     device: str = "auto",
-    say: Callable[[str], None] = lambda _: None,
+    report: Callable[[str], None] = lambda _: None,
 ) -> dict[str, Any]:
     """One command adds one episode: `prepare`, the few voiceprints the interface needs, and, if
-    there are Japanese subtitles, attaches them too.
+    there are Japanese subtitles, attaches them too. `report` gets one line for each step.
 
     If it fails partway, the steps already done are kept, and running the same command again
     continues from where it stopped: `prepare` counts as done once it writes episode.json, and
@@ -350,24 +370,43 @@ def add_episode(
     validate_name(name)
     out = workspace / "episodes" / name
     device = resolve_device(device)
-    say(f"{name}: computing on {device}, folder {out}")
+    report(
+        say(
+            f"{name}：用 {device} 计算，文件夹 {out}",
+            f"{name}: computing on {device}, folder {out}",
+        )
+    )
 
     if (out / "episode.json").exists():
         episode, rows = load_episode(out)
         if episode.get("video") != str(video.resolve()):
             raise ValueError(
-                f"{name} was already processed with another video: {episode.get('video')}"
+                say(
+                    f"{name} 已经用另一个视频处理过：{episode.get('video')}",
+                    f"{name} was already processed with another video: {episode.get('video')}",
+                )
             )
-        say(f"Already cut {len(rows)} clips, continuing from here")
+        report(
+            say(
+                f"已经切好 {len(rows)} 个片段，从这里接着做",
+                f"Already cut {len(rows)} clips, continuing from here",
+            )
+        )
     else:
         if out.exists():
             raise ValueError(
-                f"{out} already exists but is not a finished episode. "
-                "Make sure it is not in use, delete it, and try again"
+                say(
+                    f"{out} 已经存在，但不是处理完的一集。确认没在用以后删掉它，再试一次",
+                    f"{out} already exists but is not a finished episode. "
+                    "Make sure it is not in use, delete it, and try again",
+                )
             )
-        say(
-            "Extracting audio, separating vocals, cutting clips by subtitles (this step is the "
-            "slowest)"
+        report(
+            say(
+                "提取音轨、分离人声、按字幕切片段（这一步最慢）",
+                "Extracting audio, separating vocals, cutting clips by subtitles (this step is the "
+                "slowest)",
+            )
         )
         try:
             result = prepare(video, subtitles, out, name, None, offset, device, audio)
@@ -375,19 +414,28 @@ def add_episode(
             if out.exists():
                 shutil.rmtree(out)
             raise
-        say(f"Cut {result['segments']} clips, subtitle offset {result['offset']:+.2f} seconds")
+        report(
+            say(
+                f"切了 {result['segments']} 个片段，字幕偏移 {result['offset']:+.2f} 秒",
+                f"Cut {result['segments']} clips, subtitle offset {result['offset']:+.2f} seconds",
+            )
+        )
 
     models = list(dict.fromkeys((*DEFAULT_MODELS, GROUPING_MODEL)))
     for model in models:
-        say(f"Computing voiceprints: {model}")
+        report(say(f"计算声纹：{model}", f"Computing voiceprints: {model}"))
         embed(out, model, device)
 
     if text_subtitles is not None:
-        say("Attaching text subtitles")
+        report(say("配台词字幕", "Attaching text subtitles"))
         own = attach_text_subtitles(out, text_subtitles)
-        say(
-            f"Offset {own['text_subtitle_offset']:+.2f} seconds, "
-            f"{own['matched']:.1%} of clips match dialogue"
+        report(
+            say(
+                f"偏移 {own['text_subtitle_offset']:+.2f} 秒，"
+                f"{own['matched']:.1%} 的片段对上了台词",
+                f"Offset {own['text_subtitle_offset']:+.2f} seconds, "
+                f"{own['matched']:.1%} of clips match dialogue",
+            )
         )
 
     _, rows = load_episode(out)

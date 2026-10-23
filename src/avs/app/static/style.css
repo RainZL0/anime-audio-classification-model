@@ -299,6 +299,37 @@ kbd {
 .welcome p { margin: 0; color: var(--text-2); font-size: 13px; }
 .welcome ol { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 
+/* Welcome page and adding an episode */
+.welcome-page { max-width: 720px; padding: 24px 0 60px; }
+.welcome-page h2 { margin: 0 0 6px; font-size: 20px; }
+.welcome-page p { margin: 0; color: var(--text-2); }
+.steps { margin: 10px 0 0; padding-left: 20px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.checks li { display: flex; gap: 8px; align-items: baseline; }
+.checks .mark { width: 14px; flex: none; font-weight: 600; }
+.checks .ok .mark { color: var(--ok); }
+.checks .bad .mark, .checks .bad { color: var(--bad); }
+.checks .soft .mark { color: var(--text-3); }
+.add-episode { display: flex; flex-direction: column; gap: 14px; }
+.add-form { display: flex; flex-direction: column; gap: 12px; }
+.add-form input { width: 100%; }
+.add-form input.offset { width: 120px; margin-bottom: 4px; }
+.add-run { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex;
+  flex-direction: column; gap: 8px; }
+.add-run.done { background: var(--ok-soft); }
+.add-run.failed { border-color: var(--bad); }
+.add-head { display: flex; align-items: center; gap: 10px; }
+.add-head .spacer { flex: 1; }
+.add-log { margin: 0; max-height: 180px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all;
+  background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; }
+.add-bar { font-family: ui-monospace, monospace; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.add-log.errors { background: var(--bad-soft); color: var(--bad); }
+.unfinished { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.unfinished .note { flex: 1; }
+.add-dialog { width: min(680px, 94vw); max-height: 80vh; overflow-y: auto; margin-top: -6vh; }
+.adding-chip { display: inline-flex; align-items: center; gap: 6px; }
+.spinner.small { width: 12px; height: 12px; border-width: 2px; }
+
 /* Export */
 .form { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-top: 12px; }
 .field label.title { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 6px; }

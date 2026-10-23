@@ -6,11 +6,29 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from avs.language import say
+
 MAX_LINE = 20.0
 DIALOGUE_STYLE = "Default"
 SEARCH_SECONDS = 30.0
 STEP = 0.01
 MIN_OVERLAP_RATIO = 0.6
+
+
+def read_subtitles(path: Path) -> Any:
+    """Open an ASS or SRT file with pysubs2. A file it cannot read becomes a ValueError with a
+    plain reason, instead of a library error deep in a traceback."""
+    import pysubs2
+
+    try:
+        return pysubs2.load(str(path))
+    except (pysubs2.Pysubs2Error, UnicodeDecodeError) as exc:
+        raise ValueError(
+            say(
+                f"读不出这个字幕文件，它要是 ASS 或 SRT：{path}（{exc}）",
+                f"cannot read this subtitle file; it must be ASS or SRT: {path} ({exc})",
+            )
+        ) from exc
 
 
 def load_dialogue(path: Path) -> list[dict[str, Any]]:
@@ -21,9 +39,7 @@ def load_dialogue(path: Path) -> list[dict[str, Any]]:
     as well: lines whose text is empty (those lines are only layout commands), and the `====`
     separator lines that fansub groups (subtitle teams) use to split sections.
     """
-    import pysubs2
-
-    subs = pysubs2.load(str(path))
+    subs = read_subtitles(path)
     lines = [
         {
             "start": event.start / 1000.0,

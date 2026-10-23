@@ -101,7 +101,8 @@ The interface's labels are stored in the workspace folder `labels/`:
 
 ```text
 src/avs/
-  cli.py                   command entry point
+  cli.py                   command entry point (also run by `python -m avs`)
+  doctor.py                machine checks, shown by `avs doctor` and the welcome page
   project.py               data format for an episode and its clips, content fingerprints, cache folders
   pipeline.py              prepare and add episodes, attach video and subtitles, voiceprint cache
   audio.py                 voice separation, making the analysis copy, the speech timeline used to measure subtitle offset
@@ -114,6 +115,7 @@ src/avs/
   app/labels.py            label records in the interface, undo, cast table
   app/model.py             small classifier and similarity check
   app/video.py             cut the short video pieces shown next to each line
+  app/adding.py            add an episode from the interface: runs `avs add` in a separate process
   app/server.py            web server endpoints, starting groups, picture cutting, export
   app/static/              front-end pages
 ```

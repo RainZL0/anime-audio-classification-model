@@ -34,7 +34,7 @@ The first version is done, with four views: Groups, Scenes, Characters and Expor
 
 Not done yet:
 
-- A first-use guide, error messages for when something goes wrong, and adding a new episode from inside the interface. Done so far: the command-line `avs add` adds an episode with one command, and running the same command again after an interruption carries on. The empty-workspace page gives this command. Episodes whose voiceprints are not all computed are skipped, so the whole interface does not fail to open.
+- Error messages for when something goes wrong still need a pass by a first-time user. Done: the first-use welcome page with machine checks, and adding an episode from inside the interface, with progress, stop and carry on ([USAGE.md](USAGE.md#labeling-and-correction-interface)).
 - **Show which lines are low quality.** Train another classifier, inside the clips of a target character, that separates "clean" from "low quality" (heavy background sound, several people speaking at once). It would hint that the person should choose "low quality". It only answers whether a clip can go into a clean dataset, not who is speaking. So low-quality clips count as negatives here, but they still do not count as negatives in the classifier that identifies people. Do this once a few dozen "low quality" labels have built up, and first measure how accurate it is. The voiceprint models were trained to recognize people regardless of noise, so they may not be able to separate clean clips from noisy ones. If so, a different feature is needed. The "spread of voiceprints across several windows within a clip" that was tried earlier is described in [TOOLS.md](TOOLS.md).
 
 ## First release standard

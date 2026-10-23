@@ -76,10 +76,10 @@ class TextLine:
 def load_text_lines(path: Path) -> list[TextLine]:
     """Read an ASS or SRT file, split it into lines, remove speaker tags and sound notes, and sort
     by time. The times are the subtitle file's own."""
-    import pysubs2
+    from avs.stages.subtitle import read_subtitles
 
     lines: list[TextLine] = []
-    for event in pysubs2.load(str(path)):
+    for event in read_subtitles(path):
         if event.end <= event.start:
             continue
         parts = []
