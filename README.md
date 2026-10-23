@@ -24,10 +24,10 @@ uv run avoc doctor
 
 `doctor` checks the GPU, FFmpeg, the voice separation model, your Hugging Face token and free disk space. Fix anything it marks as missing.
 
-Add an episode to a workspace folder (here `work`). One command separates the voices, cuts the clips and computes everything the labeling app needs:
+Add an episode to a workspace folder. Any name works; `runs` is used here because git already ignores it. One command separates the voices, cuts the clips and computes everything the labeling app needs:
 
 ```bash
-uv run avoc add work "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
+uv run avoc add runs "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
 ```
 
 - `--offset` is how many seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and the same subtitle group almost always share one offset. Find it once, then reuse it.
@@ -38,7 +38,7 @@ uv run avoc add work "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
 Open the labeling app:
 
 ```bash
-uv run avoc app work
+uv run avoc app runs
 ```
 
 It opens `http://127.0.0.1:8765` in your browser. Everything stays on your machine.
