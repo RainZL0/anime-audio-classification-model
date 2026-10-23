@@ -57,9 +57,11 @@ uv run avs app runs
 
 在浏览器打开 `http://127.0.0.1:8765`。`--port` 换端口，`--no-open` 不自动开浏览器，`--model` 可重复，只用指定的声纹模型。
 
-- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，一次标一整组：点已有角色的头像，或者定成一个新角色。名字可以不填。
-- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的前三名，每个候选附一条参考音，Enter 接受第一名，数字键选底部的角色，`/` 搜索或新建角色。F 只看要人处理的。短于 1 秒、前后 0.5 秒内没有别的台词的短句标成「太短，默认跳过」，不算要处理的，只在「整集」里出现，想标也能标。
-- **角色**（O）：按角色列出片段，从机器最没把握的开始，可以连着播。X 标出「不是这个角色」，Shift+Enter 确认其余。这里也能改名、合并角色、设头像、关掉某个角色的训练。
+只给要收集的人（目标角色）起名字，别的人一律按 Q 标「其他」。目标角色可以有好几个，在「角色」视图里随时加减，加减时已有的标签怎么算见 [HOW_IT_WORKS.md](HOW_IT_WORKS.md#标注与修正界面)。
+
+- **起步分组**（G）：没有标签时先来这里。机器把听起来像同一个人的片段归成一组，一次标一整组：点目标角色的头像，定成一个新的目标角色，或者「都是其他」。名字可以不填。
+- **场景**（S）：按集、按场景列出全部台词。左边放画面和机器猜的名次，目标角色附一条参考音，Enter 接受第一名，数字键选底部的目标角色，Q 标「其他」，`/` 搜索或新建角色。F 只看要人处理的。短于 1 秒、前后 0.5 秒内没有别的台词的短句标成「太短，默认跳过」，不算要处理的，只在「整集」里出现，想标也能标。
+- **角色**（O）：左边上面是目标角色，下面是不再作为目标、但还有标签的角色，最后一行是「其他」的句数。点开一个角色，先列机器归给 TA 的，从最没把握的开始，可以连着播；X 标出「不是这个角色」，Shift+Enter 确认其余。再往下是「可能漏掉的」：机器没归给 TA、但听起来有可能是的，从最像的开始，Enter 是 TA，X 不是。这里也能改名、合并角色、设头像、设为或不再作为目标角色。
 - **导出**（E）：选角色和格式（GPT-SoVITS、Style-Bert-VITS2 或按角色分文件夹），可以只导人确认过的，也可以带上机器有把握的。切片段的字幕是中文译文、要训练日语模型时，「台词文字从哪来」选「每集另配的台词字幕」，在下面每集贴上日文字幕的路径，点「对齐并配上」；也可以用下面的 `set-text-subtitles` 命令配。配不上台词的片段不导出，明细在导出目录的 `rejected.tsv`。
 
 认人主要靠头像，名字可以不起：
@@ -76,13 +78,15 @@ uv run avs app runs
 uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
 uv run avs set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
 uv run avs set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
-uv run avs import-labels runs --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --untrained 路人
+uv run avs import-labels runs --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --target teo
+uv run avs migrate-targets runs --target teo
 ```
 
 - `set-video`：给 `prepare` 改成必需视频之前处理的集记上视频。时长和音轨对不上就拒绝。
 - `set-subtitles`：给没记字幕的集补上字幕，偏移从已有片段推出来，按时间重叠找台词文字。
 - `set-text-subtitles`：给一集另配一份字幕（ASS 或 SRT），导出时台词文字从它取。偏移自动量，和切片段的字幕对不上就拒绝。来源以 Netflix、Amazon 的为好，电视台录的字幕带 🎤 之类的符号，不会被去掉。
-- `import-labels`：把旧的人工归档一次导进标签记录，只在记录还空着时可用，导入不能撤销。`--untrained` 的名字照样导入，但不拿来训练。
+- `import-labels`：把旧的人工归档一次导进标签记录，只在记录还空着时可用，导入不能撤销。给了 `--target` 就接着做下面的 `migrate-targets`。
+- `migrate-targets`：只留下给定的目标角色（可重复给），其余角色的标签都改成「其他」。改之前把 `labels/` 里的标签记录和角色表原样复制到 `labels/archive-日期-时间/`。迁移不能用 Z 撤回，要找回原来的名字就看归档。
 
 ## 标注
 

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from avs.app.labels import LabelStore
+from avs.app.labels import OTHER, LabelStore, migrate_to_targets
 from avs.app.model import train_and_predict
 from avs.app.server import AppState, create_app
 from avs.app.workspace import Clip, neighbor_gap, text_for
@@ -73,6 +73,49 @@ def test_an_old_cast_without_patterns_gets_them_in_order(tmp_path: Path) -> None
     )
     store = LabelStore(folder)
     assert [(r["named"], r["pattern"]) for r in store.roles] == [(True, 0), (True, 1)]
+    assert store.targets() == ["A", "B"]
+
+
+def test_other_remembers_the_targets_it_was_judged_against(tmp_path: Path) -> None:
+    store = LabelStore(tmp_path / "labels")
+    store.apply([{"clip": "a", "label": "A"}])
+    store.apply([{"clip": "o", "label": OTHER}])
+    assert store.against["o"] == {"A"}
+
+    store.apply([{"clip": "b", "label": "B"}])
+    store.update_role("A", target=False)
+    store.apply([{"clip": "o", "label": OTHER}])
+    assert store.against["o"] == {"B"}
+    store.undo()
+    assert store.against["o"] == {"A"}
+    assert LabelStore(tmp_path / "labels").against["o"] == {"A"}
+
+    store.update_role("A", target=True)
+    store.rename_role("A", "teo")
+    assert store.against["o"] == {"teo"}
+
+
+def test_migration_keeps_targets_and_archives_the_rest(tmp_path: Path) -> None:
+    store = LabelStore(tmp_path / "labels")
+    store.apply(
+        [
+            {"clip": "a", "label": "teo"},
+            {"clip": "b", "label": "麦昆"},
+            {"clip": "c", "label": "__unclear__"},
+        ],
+        source="import:x",
+    )
+    archive = tmp_path / "labels" / "archive"
+    assert migrate_to_targets(store, ["teo"], archive) == 1
+    assert store.labels == {"a": "teo", "b": OTHER, "c": "__unclear__"}
+    assert store.against["b"] == {"teo"}
+    assert store.targets() == ["teo"]
+    assert not store.can_undo()
+    assert "麦昆" in (archive / "events.jsonl").read_text(encoding="utf-8")
+    with pytest.raises(ValueError, match="已经存在"):
+        migrate_to_targets(store, ["teo"], archive)
+    with pytest.raises(ValueError, match="没有这些角色"):
+        migrate_to_targets(store, ["nobody"], tmp_path / "other")
 
 
 def test_text_is_found_by_overlap_not_exact_time() -> None:
@@ -111,16 +154,34 @@ def test_a_voice_unlike_any_known_role_is_not_trusted() -> None:
     rows = [centers[i % 2] + rng.normal(0, 0.05, 3) for i in range(40)]
     features = np.array([*rows, centers[2] + rng.normal(0, 0.05, 3)])
     features /= np.linalg.norm(features, axis=1, keepdims=True)
-    names = ["A" if i % 2 == 0 else "B" for i in range(40)]
 
-    few = train_and_predict(features, list(range(4)), names[:4], {})
+    def examples(n: int) -> dict[str, tuple[list[int], list[int]]]:
+        even, odd = list(range(0, n, 2)), list(range(1, n, 2))
+        return {"A": (even, odd), "B": (odd, even)}
+
+    few = train_and_predict(features, examples(4), {})
     assert few.threshold is None
     assert few.guesses[40].familiar is None
 
-    trained = train_and_predict(features, list(range(40)), names, {})
+    trained = train_and_predict(features, examples(40), {})
     assert trained.threshold is not None
+    assert trained.guesses[39].names[0] == "B"
     assert trained.guesses[39].familiar is True
     assert trained.guesses[40].familiar is False
+
+
+def test_other_only_counts_against_the_targets_of_its_time() -> None:
+    # A 和 C 声音不同。C 的片段在 C 还不是目标时标成了「其他」，
+    # 后来加 C 当目标，它们不该算 C 的反例。
+    rng = np.random.default_rng(1)
+    centers = np.eye(3)
+    features = np.array([centers[i // 10] + rng.normal(0, 0.05, 3) for i in range(30)])
+    features /= np.linalg.norm(features, axis=1, keepdims=True)
+    a, b, c = list(range(10)), list(range(10, 20)), list(range(20, 30))
+    only_a = train_and_predict(features, {"A": (a, b + c)}, {})
+    assert only_a.guesses[25].names[0] == "__other__"
+    with_c = train_and_predict(features, {"A": (a, b + c), "C": (c[:2], a + b)}, {})
+    assert with_c.guesses[25].names[0] == "C"
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -154,7 +215,7 @@ def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
         "/api/changes", json={"changes": [{"clip": clips[1]["id"], "reject": "A", "on": True}]}
     ).json()
     moved = {c["id"]: c for c in rejected["updated"]}
-    assert moved[clips[1]["id"]]["guess"][0]["name"] == "B"
+    assert moved[clips[1]["id"]]["guess"][0]["name"] != "A"
 
     undone = client.post("/api/undo").json()
     assert undone["undo"] is True
@@ -203,3 +264,30 @@ def test_skipped_clips_stay_out_of_the_work_lists_until_someone_labels_them(
     client.post("/api/label", json={"clips": [lonely.id], "label": "B"})
     clips = {c["id"]: c for c in client.get("/api/clips", params={"episode": "ep1"}).json()}
     assert clips[lonely.id]["status"] == "confirmed"
+
+
+def test_an_added_target_lists_old_others_that_may_be_it(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    ids = [c.id for c in state.workspace.clips]
+    client.post("/api/label", json={"clips": [ids[0]], "label": "A"})
+    client.post("/api/label", json={"clips": [ids[3]], "label": OTHER})
+    summary = client.get("/api/state").json()
+    assert summary["other"]["confirmed"] == 1
+    listed = {c["id"]: c for c in client.get("/api/clips", params={"episode": "ep1"}).json()}
+    assert {listed[i]["guess"][0]["name"] for i in (ids[4], ids[5])} == {OTHER}
+
+    # 后来决定也要 B：ids[3] 当初标「其他」时 B 还不是目标，应该出现在「可能漏掉的」里。
+    client.post("/api/label", json={"clips": [ids[4]], "label": "B"})
+    listed = {c["id"]: c for c in client.get("/api/clips", params={"role": "B"}).json()}
+    assert listed[ids[3]].get("maybe") is True
+    assert ids[5] in listed and not listed[ids[5]].get("maybe")
+
+    # 去掉 A 这个目标：A 的标签留着，机器不再猜 A。
+    client.post("/api/roles", json={"name": "A", "target": False})
+    guesses = {
+        c["id"]: c["guess"] for c in client.get("/api/clips", params={"episode": "ep1"}).json()
+    }
+    assert all(g["name"] != "A" for g in guesses[ids[1]])
+    assert state.store.labels[ids[0]] == "A"

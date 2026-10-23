@@ -120,8 +120,9 @@ def set_text_subtitles(
 def import_labels(
     workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 episodes/")],
     annotation: Annotated[list[Path], typer.Option(help="人工身份归档，可重复提供")],
-    untrained: Annotated[
-        list[str] | None, typer.Option(help="导进来但不参与训练的名字，比如「路人」")
+    target: Annotated[
+        list[str] | None,
+        typer.Option(help="导入后只留这些目标角色，其余标成「其他」，可重复提供"),
     ] = None,
 ) -> None:
     """把人工归档里的名字导进界面的标签记录。只在标签记录还是空的时候用。"""
@@ -137,8 +138,29 @@ def import_labels(
         episode, rows = load_episode(directory)
         sources[Path(episode["vocals"]).name] = episode["name"]
         by_time.update({(episode["name"], time_key(r)): r["id"] for r in rows})
-    count = import_archives(store, annotation, by_time, sources, untrained or [])
+    count = import_archives(store, annotation, by_time, sources)
     typer.echo(f"导入 {count} 条标签、{len(store.roles)} 个角色 -> {store.folder}")
+    if target:
+        migrate_targets(workspace, target)
+
+
+@app.command("migrate-targets")
+def migrate_targets(
+    workspace: Annotated[Path, typer.Argument(help="工作区目录，里面有 labels/")],
+    target: Annotated[list[str], typer.Option(help="留下的目标角色，可重复提供")],
+) -> None:
+    """只留下给定的目标角色，其余角色的标签都改成「其他」。改之前把标签记录原样归档。"""
+    from datetime import datetime
+
+    from avs.app.labels import LabelStore, migrate_to_targets
+
+    store = LabelStore(workspace / "labels")
+    archive = store.folder / f"archive-{datetime.now():%Y%m%d-%H%M%S}"
+    try:
+        count = migrate_to_targets(store, target, archive)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"{count} 条标签改成了「其他」，目标角色：{'、'.join(target)}；原样归档在 {archive}")
 
 
 @app.command("app")

@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from avs.app.labels import LabelStore, is_special
+from avs.app.labels import OTHER, LabelStore, is_special
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avs.labeling import SPECIAL, VIDEO_PAD, cut_video
@@ -25,6 +25,10 @@ STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
 """起步分组用 anime-va 的分界线，见 docs/DECISIONS.md。"""
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]+")
+MAYBE_FLOOR = 0.05
+"""角色视图「可能漏掉的」只列「是 TA」的概率不低于这个数的片段。"""
+MAYBE_LIMIT = 100
+"""「可能漏掉的」最多列这么多条，从最像的往下排。"""
 
 
 class AppState:
@@ -42,25 +46,40 @@ class AppState:
     # 模型
 
     def retrain(self) -> None:
-        rows, names = [], []
+        """每个目标角色的正例是标成 TA 的片段；反例是标成别的名字的、标「其他」时 TA 已经是
+        目标的，以及人说过不是 TA 的。听不清之类的特殊标签不进训练。"""
+        targets = self.store.targets()
+        examples: dict[str, tuple[list[int], list[int]]] = {t: ([], []) for t in targets}
+        used: set[int] = set()
         for clip_id, name in self.store.labels.items():
             clip = self.workspace.by_id.get(clip_id)
             if clip is None or clip.row is None or is_special(name):
                 continue
-            if self.store.trainable(name):
-                rows.append(clip.row)
-                names.append(name)
+            against = self.store.against.get(clip_id, set())
+            for target in targets:
+                if name == target:
+                    examples[target][0].append(clip.row)
+                elif name != OTHER or target in against:
+                    examples[target][1].append(clip.row)
+                else:
+                    continue
+                used.add(clip.row)
         rejects: dict[int, set[str]] = {}
         for clip_id, rejected in self.store.rejects.items():
             clip = self.workspace.by_id.get(clip_id)
-            if clip is not None and clip.row is not None and rejected:
-                rejects[clip.row] = set(rejected)
+            if clip is None or clip.row is None or not rejected:
+                continue
+            rejects[clip.row] = set(rejected)
+            for target in rejected & set(targets):
+                if self.store.labels.get(clip_id) != target:
+                    examples[target][1].append(clip.row)
+                    used.add(clip.row)
         began = time.perf_counter()
-        trained = train_and_predict(self.workspace.features, rows, names, rejects)
+        trained = train_and_predict(self.workspace.features, examples, rejects)
         self.guesses = trained.guesses
         self.trained = {
-            "labels": len(rows),
-            "roles": len(set(names)),
+            "labels": len(used),
+            "roles": len(targets),
             "seconds": round(time.perf_counter() - began, 2),
             "familiar_threshold": trained.threshold,
         }
@@ -117,12 +136,13 @@ class AppState:
                 confirmed[label] += 1
             elif state in ("auto", "review") and clip.row is not None:
                 predicted[self.guesses[clip.row].names[0]] += 1
+        # 目标角色一直列着，哪怕还没有一句；不再是目标的角色有标签时也列着，好再加回来。
         roles = [
             {**role, "confirmed": confirmed[role["name"]], "predicted": predicted[role["name"]]}
             for role in self.store.roles
-            if confirmed[role["name"]] or predicted[role["name"]]
+            if role.get("target") or confirmed[role["name"]]
         ]
-        roles.sort(key=lambda r: -(r["confirmed"] + r["predicted"]))
+        roles.sort(key=lambda r: (not r.get("target"), -(r["confirmed"] + r["predicted"])))
         return {
             "episodes": [
                 {
@@ -134,6 +154,7 @@ class AppState:
                 for name, meta in self.workspace.episodes.items()
             ],
             "roles": roles,
+            "other": {"confirmed": confirmed[OTHER], "predicted": predicted[OTHER]},
             "special": SPECIAL,
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
@@ -199,7 +220,9 @@ class AppState:
                 continue
             clips.sort(key=lambda c: (c.episode, c.start))
             hints = Counter(
-                self.guesses[c.row].names[0] for c in clips if c.row in self.guesses
+                self.guesses[c.row].names[0]
+                for c in clips
+                if c.row in self.guesses and self.guesses[c.row].names[0] != OTHER
             ).most_common(1)
             result.append(
                 {
@@ -213,6 +236,33 @@ class AppState:
             )
         result.sort(key=lambda g: -len(g["clips"]))
         return result
+
+    def role_clips(self, role: str) -> list[dict[str, Any]]:
+        """角色视图：确认过的、机器归给 TA 的，再加「可能漏掉的」（`maybe`）。
+
+        可能漏掉的是机器没归给 TA、但「是 TA」的概率不低的片段：还没标的，以及标「其他」时
+        TA 还不是目标角色的。加了新的目标角色以后，从这里把以前的「其他」复查一遍。
+        """
+        mine, maybe = [], []
+        for clip in self.workspace.clips:
+            label = self.store.labels.get(clip.id)
+            if label == role:
+                mine.append(self.view(clip))
+                continue
+            guess = self.guesses.get(clip.row) if clip.row is not None else None
+            if guess is None or role in self.store.rejects.get(clip.id, ()):
+                continue
+            if label is None and clip.skipped:
+                continue
+            unchecked = label is None or (
+                label == OTHER and role not in self.store.against.get(clip.id, ())
+            )
+            if label is None and guess.names[0] == role:
+                mine.append(self.view(clip))
+            elif unchecked and guess.p(role) >= MAYBE_FLOOR:
+                maybe.append((guess.p(role), clip))
+        maybe.sort(key=lambda pair: -pair[0])
+        return mine + [{**self.view(c), "maybe": True} for _, c in maybe[:MAYBE_LIMIT]]
 
     def references(self, name: str) -> list[dict[str, Any]]:
         """这个角色最适合当参考音的几条：人确认过、长度在 1.5 到 6 秒之间的优先。"""
@@ -373,7 +423,7 @@ class RoleBody(BaseModel):
     name: str
     new_name: str | None = None
     color: str | None = None
-    trainable: bool | None = None
+    target: bool | None = None
 
 
 class AvatarBody(BaseModel):
@@ -448,17 +498,7 @@ def create_app(state: AppState) -> Any:
     def read_clips(episode: str | None = None, role: str | None = None) -> list[dict[str, Any]]:
         with state.lock:
             if role is not None:
-
-                def mine(c: Clip) -> bool:
-                    label = state.store.labels.get(c.id)
-                    if label is not None:
-                        return label == role
-                    if c.skipped:
-                        return False
-                    guess = state.guesses.get(c.row) if c.row is not None else None
-                    return guess is not None and guess.names[0] == role
-
-                return clips_where(mine)
+                return state.role_clips(role)
             return clips_where(lambda c: episode is None or c.episode == episode)
 
     @app.get("/api/groups")
@@ -510,7 +550,7 @@ def create_app(state: AppState) -> Any:
             if body.new_name is not None:
                 new_name = body.new_name
                 return state.change(lambda: state.store.rename_role(body.name, new_name))
-            state.store.update_role(body.name, color=body.color, trainable=body.trainable)
+            state.store.update_role(body.name, color=body.color, target=body.target)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         with state.lock:
