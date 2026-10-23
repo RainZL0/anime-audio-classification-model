@@ -22,7 +22,11 @@ const media = (kind, id, context = 0) =>
 const CONTEXTS = [0, 5, 15];
 /* 可选的播放速度，选了记在本机，刷新不变。 */
 const SPEEDS = [1, 1.25, 1.5, 2];
-const stamp = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+/* 先取到十分之一秒再拆分和秒，免得 59.96 秒写成「:60.0」而分钟没进位。 */
+const stamp = (s) => {
+  const tenths = Math.round(s * 10);
+  return `${String(Math.floor(tenths / 600)).padStart(2, "0")}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
+};
 const pct = (p) => `${Math.round(p * 100)}%`;
 /* 累计时长：不到一分钟写秒，不到一小时写分和秒，再长写小时和分。 */
 const howLong = (seconds) => {
@@ -219,10 +223,10 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
           <div><div class="who">${isOther ? labelText[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}
             ${clip.unusable && !labelText[clip.label] && html` <span class="pill unusable" title=${LOW_TIP}>质量低</span>`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低</div></div>
-          <span style="margin-left:auto;display:flex;gap:6px">
-            ${!isOther && hasVideo && html`<button class="ghost" style="font-size:12px"
+          <span class="actions">
+            ${!isOther && hasVideo && html`<button class="ghost"
               title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
-            <button class="ghost" style="font-size:12px" title="清掉这句的标签，回到机器的猜测"
+            <button class="ghost" title="清掉这句的标签，回到机器的猜测"
               onClick=${onClear}>清掉标签 <kbd>Backspace</kbd></button></span>
         </div>`
       : html`<div class="ask">${clip.guess.length ? "这是谁？机器的猜测" : clip.voiced ? "这是谁？" : "这句太短，机器听不出来，请直接选人"}</div>

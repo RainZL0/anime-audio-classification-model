@@ -153,6 +153,8 @@ kbd {
 .confirmed-box { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius);
   background: var(--ok-soft); color: var(--ok); }
 .confirmed-box .who { font-weight: 600; color: var(--text); }
+.confirmed-box .actions { margin-left: auto; display: flex; flex-direction: column; gap: 6px; }
+.confirmed-box .actions button { font-size: 12px; white-space: nowrap; }
 .stage .hint { margin-top: 16px; font-size: 12px; color: var(--text-3); line-height: 1.9; }
 
 /* 头像是认人的主要依据，名字是可选的。有截图用截图，没有就用按编号生成的图案。 */
