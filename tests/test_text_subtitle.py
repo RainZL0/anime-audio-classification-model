@@ -39,7 +39,7 @@ def test_a_line_shown_a_little_longer_than_spoken_still_counts() -> None:
 
 def test_a_line_that_runs_well_past_the_clip_is_rejected() -> None:
     lines = [TextLine(0.0, 3.0, "えっ あ… でも 学校が…", "")]
-    assert match(lines, 1.5, 2.5)[1] == "有一行台词只对上一部分"
+    assert match(lines, 1.5, 2.5)[1] == "a line only partly matches"
 
 
 def test_lines_of_someone_else_are_rejected_and_repeats_kept_once() -> None:
@@ -50,10 +50,10 @@ def test_lines_of_someone_else_are_rejected_and_repeats_kept_once() -> None:
     ]
     assert match(lines, 0.0, 1.4, "テイオー") == ("いや 全然 君のほうこそ", None)
     mixed = [*lines, TextLine(1.0, 1.4, "えっ", "マックイーン")]
-    assert match(mixed, 0.0, 1.4, "テイオー")[1] == "台词里有别人的话"
+    assert match(mixed, 0.0, 1.4, "テイオー")[1] == "someone else's line is mixed in"
     # When the subtitles' name for her is not known, touching two different names also counts
     # as mixed.
-    assert match(mixed, 0.0, 1.4)[1] == "台词里有别人的话"
+    assert match(mixed, 0.0, 1.4)[1] == "someone else's line is mixed in"
 
 
 def test_the_role_name_is_the_tag_most_of_her_lines_carry() -> None:

@@ -74,8 +74,9 @@ select = [
     "PTH",      # use pathlib
     "RUF",
 ]
-# Comments and docstrings in this project are still written in Chinese, and their full-width punctuation is intentional, not a lookalike-character attack
-ignore = ["RUF001", "RUF002", "RUF003"]
+# The Chinese side of the web app's messages, and Japanese subtitle examples, use full-width
+# punctuation on purpose; it is not a lookalike-character attack
+ignore = ["RUF001", "RUF002"]
 
 [tool.ty.environment]
 python-version = "3.12"

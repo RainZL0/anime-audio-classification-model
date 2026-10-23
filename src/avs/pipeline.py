@@ -243,10 +243,12 @@ def attach_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
 
 
 def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
-    """给一集另配一份字幕，导出时台词文字从它取，见 stages/text_subtitle.py。
+    """Attach a second subtitle file to an episode. Export takes the dialogue text from it; see
+    stages/text_subtitle.py.
 
-    偏移拿它和切片段的那份字幕比出来。两道检查，过不了就拒绝、不写进 episode.json：
-    对上之后的重合度不到 `MIN_AGREEMENT`；或者不到 `MIN_MATCHED` 的片段碰得到台词。
+    The time offset is found by comparing it with the subtitles used for cutting. Two checks; if
+    either fails, the file is refused and not written to episode.json: after lining up, the overlap
+    is below `MIN_AGREEMENT`, or fewer than `MIN_MATCHED` of the clips touch a line.
     """
     from avs.app.workspace import subtitle_lines
     from avs.language import say

@@ -42,7 +42,7 @@ def test_rename_into_an_existing_role_merges_them(tmp_path: Path) -> None:
     store.rename_role("红毛", "Nice Nature")
     assert set(store.labels.values()) == {"Nice Nature"}
     assert [r["name"] for r in LabelStore(tmp_path / "labels").roles] == ["Nice Nature"]
-    with pytest.raises(ValueError, match="不能为空"):
+    with pytest.raises(ValueError, match="cannot be empty"):
         store.rename_role("Nice Nature", "__unclear__")
 
 
@@ -77,7 +77,7 @@ def test_a_role_can_start_without_a_name_and_keeps_its_pattern(tmp_path: Path) -
     store.apply([{"clip": "a", "label": "A"}])
     first = store.new_role()
     second = store.new_role()
-    assert (first, second) == ("角色 1", "角色 2")
+    assert (first, second) == ("Character 1", "Character 2")
     assert [r["named"] for r in store.roles] == [True, False, False]
     patterns = [r["pattern"] for r in store.roles]
     assert patterns == [0, 1, 2]
