@@ -265,15 +265,16 @@ function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, se
 
 /* 角色视图里待核对的：机器归给这个角色、还没人确认的，从最没把握的排起。 */
 const pendingOf = (clips) => clips.filter((c) => !c.label && !c.maybe).sort((a, b) => confidence(a) - confidence(b));
-/* 可能漏掉的：机器没归给这个角色，但「是 TA」的概率不低，从最像的排起。 */
-const maybeListOf = (clips, role) => clips.filter((c) => c.maybe).sort((a, b) => chanceOf(b, role) - chanceOf(a, role));
+/* 可能漏掉的：机器没归给这个角色，但「是 TA」的概率不低。服务端取列表时已经从最像的排好，
+   这里不按重训后的概率重排，免得标完一句、列表在手底下跳。 */
+const maybeListOf = (clips) => clips.filter((c) => c.maybe);
 
 function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus, marks, toggleMark, onConfirmRest,
   onRename, onToggleTarget, onAvatar, canCrop, flashes, playing, setPlaying }) {
   const list = state.roles;
   const current = roles[role];
   const pending = pendingOf(clips);
-  const maybe = maybeListOf(clips, role);
+  const maybe = maybeListOf(clips);
   const confirmed = clips.filter((c) => c.label === role);
   const rest = pending.filter((c) => !marks.has(c.id)).length;
   return html`<div class="roles-grid">
@@ -737,7 +738,7 @@ function App() {
     } else if (view === "roles" && role) {
       const list = await call(`/api/clips?role=${encodeURIComponent(role)}`);
       setClips(list); setMarks(new Set());
-      setFocus((pendingOf(list)[0] || maybeListOf(list, role)[0] || list[0])?.id);
+      setFocus((pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id);
     } else if (view === "groups" && episode) {
       setGroupsLoading(true);
       const found = (await call(`/api/groups?episode=${encodeURIComponent(episode)}`)).map((g, i) => ({ ...g, key: i }));
@@ -761,7 +762,7 @@ function App() {
       return stableOrder.current;
     }
     if (view === "roles") {
-      return [...pendingOf(clips), ...maybeListOf(clips, role), ...clips.filter((c) => c.label === role)].map((c) => c.id);
+      return [...pendingOf(clips), ...maybeListOf(clips), ...clips.filter((c) => c.label === role)].map((c) => c.id);
     }
     if (view === "groups") return groups.flatMap((g) => g.clips.map((c) => c.id));
     return [];

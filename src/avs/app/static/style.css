@@ -264,8 +264,10 @@ kbd {
 .pick-row .av { cursor: pointer; }
 .pick-row .av:hover { box-shadow: 0 0 0 2px var(--accent); }
 .pill.hint { display: inline-flex; align-items: center; gap: 5px; padding-left: 2px; }
-.name-form { display: flex; gap: 8px; }
-.name-form input { flex: 1; min-width: 0; }
+/* 名字框占满第一行，按钮放不下就换到下一行，不把输入框挤没。 */
+.name-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.name-form input { flex: 1 1 140px; min-width: 120px; }
+.name-form button { white-space: nowrap; }
 
 /* 空状态与引导 */
 .empty { max-width: 560px; margin: 60px auto; text-align: center; color: var(--text-2); }
