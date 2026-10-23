@@ -4,13 +4,14 @@ import { Avatar } from "../components/Avatar";
 import { PathInput } from "../components/PathInput";
 import { RoleName } from "../components/RoleName";
 import { pct } from "../format";
-import { lines, many, tr } from "../language";
+import { languageName, lines, many, SPOKEN, tr } from "../language";
 import type { Toast } from "../toast";
 
 /* ───────────── Export ───────────── */
 
-/* Text subtitles for each episode: paste a path; the server measures the offset and refuses ones that don't fit. */
-function TextSubtitles({
+/* For each episode: the language spoken and where the text in that language comes from. Text subtitles can be
+   attached here; the server measures the offset and refuses ones that don't fit or are in another language. */
+function SpokenTexts({
   state,
   setState,
   toast,
@@ -21,26 +22,68 @@ function TextSubtitles({
 }) {
   const [paths, setPaths] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const attach = async (episode: string) => {
+  const send = async (episode: string, url: string, body: object, done: string) => {
     setBusy(episode);
     try {
-      setState(await call<Summary>("/api/text-subtitles", { episode, path: paths[episode] || "" }));
-      setPaths({ ...paths, [episode]: "" });
-      toast(tr(`${episode} 的台词字幕配好了`, `Text subtitles attached to ${episode}`));
+      setState(await call<Summary>(url, body));
+      toast(done);
+      return true;
     } catch (e) {
       toast((e as Error).message, true);
+      return false;
+    } finally {
+      setBusy(null);
     }
-    setBusy(null);
   };
+  const attach = async (episode: string) => {
+    const ok = await send(
+      episode,
+      "/api/text-subtitles",
+      { episode, path: paths[episode] || "" },
+      tr(`${episode} 的台词字幕配好了`, `Text subtitles attached to ${episode}`),
+    );
+    if (ok) setPaths((p) => ({ ...p, [episode]: "" }));
+  };
+  const speak = (episode: string, language: string) =>
+    send(
+      episode,
+      "/api/spoken-language",
+      { episode, language },
+      tr(
+        `${episode} 改成说${languageName(language)}`,
+        `${episode} now speaks ${languageName(language)}`,
+      ),
+    );
   return (
     <div className="text-subs">
       {state.episodes.map((e) => {
         const t = e.text_subtitles;
+        const s = e.spoken;
         return (
           <div className="text-sub" key={e.name}>
             <span className="ep">{e.name}</span>
             <span className="now">
-              {t ? (
+              <select
+                value={s.language}
+                disabled={busy !== null}
+                onChange={(event) => speak(e.name, event.target.value)}
+                title={
+                  s.assumed
+                    ? tr(
+                        "视频音轨没标语言，按日语算。不对就改",
+                        "The audio track has no language tag, so Japanese is taken. Change it if wrong",
+                      )
+                    : tr("这一集说的语言", "The language spoken in this episode")
+                }
+              >
+                {SPOKEN.map((code) => (
+                  <option key={code} value={code}>
+                    {languageName(code)}
+                    {code === s.language && s.assumed ? tr("（猜的）", " (assumed)") : ""}
+                  </option>
+                ))}
+              </select>{" "}
+              {s.source === "text" && t ? (
                 <>
                   {t.file}{" "}
                   <span className="min">
@@ -49,18 +92,29 @@ function TextSubtitles({
                       `offset ${t.offset} s, ${pct(t.agreement ?? 0)} overlap`,
                     )}
                   </span>
-                  {t.marked && <div className="note warn">{t.marked}</div>}
                 </>
+              ) : s.source === "cut" ? (
+                <span className="min">{tr("切片段用的字幕就是", "the cutting subtitles are")}</span>
               ) : (
-                <span className="min">{tr("还没配", "none yet")}</span>
+                <span className="note warn">{s.problem}</span>
               )}
+              {s.blocked > 0 && s.source && (
+                <span className="min">
+                  {" · "}
+                  {tr(`${s.blocked} 句对不上台词`, `${lines(s.blocked)} without matching text`)}
+                </span>
+              )}
+              {t?.marked && <div className="note warn">{t.marked}</div>}
             </span>
             <PathInput
               kind="subtitles"
               placeholder={
                 t
                   ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file")
-                  : tr("字幕文件的路径（ASS 或 SRT）", "Path to a subtitle file (ASS or SRT)")
+                  : tr(
+                      `${languageName(s.language)}字幕的路径（ASS 或 SRT）`,
+                      `Path to ${languageName(s.language)} subtitles (ASS or SRT)`,
+                    )
               }
               value={paths[e.name] || ""}
               onChange={(path) => setPaths((p) => ({ ...p, [e.name]: path }))}
@@ -78,7 +132,6 @@ function TextSubtitles({
     </div>
   );
 }
-
 type Form = "gpt-sovits" | "style-bert-vits2" | "folder";
 
 export function ExportView({
@@ -95,10 +148,6 @@ export function ExportView({
   /* Only names still on the list: a character ticked here may have been renamed or merged since. */
   const picked = new Set(trainable.map((r) => r.name).filter((n) => ticked.has(n)));
   const [form, setForm] = useState<Form>("gpt-sovits");
-  const [language, setLanguage] = useState("ja");
-  const [textSubtitles, setTextSubtitles] = useState(() =>
-    state.episodes.some((e) => e.text_subtitles),
-  );
   const [includeAuto, setIncludeAuto] = useState(false);
   /* Local date: toISOString gives UTC, which is still the day before in UTC+8 until 8 in the morning. */
   const [out, setOut] = useState(() => {
@@ -128,9 +177,7 @@ export function ExportView({
           roles: [...picked],
           include_auto: includeAuto,
           form,
-          language,
           out,
-          text_subtitles: textSubtitles,
         }),
       );
     } catch (e) {
@@ -142,11 +189,6 @@ export function ExportView({
     ["gpt-sovits", "GPT-SoVITS"],
     ["style-bert-vits2", "Style-Bert-VITS2"],
     ["folder", tr("只要音频（RVC）", "Audio only (RVC)")],
-  ];
-  const languages: [string, string][] = [
-    ["ja", tr("日语", "Japanese")],
-    ["zh", tr("中文", "Chinese")],
-    ["en", tr("英语", "English")],
   ];
   return (
     <div className="form">
@@ -209,45 +251,14 @@ export function ExportView({
       </div>
       {form !== "folder" && (
         <div className="field">
-          <label className="title">{tr("台词文字的语言", "Language of the text")}</label>
-          <span className="seg">
-            {languages.map(([v, l]) => (
-              <button key={v} className={language === v ? "on" : ""} onClick={() => setLanguage(v)}>
-                {l}
-              </button>
-            ))}
-          </span>
-        </div>
-      )}
-      {form !== "folder" && (
-        <div className="field">
-          <label className="title">{tr("台词文字从哪来", "Where the text comes from")}</label>
-          <span className="seg">
-            <button className={!textSubtitles ? "on" : ""} onClick={() => setTextSubtitles(false)}>
-              {tr("切片段用的字幕", "The subtitles used to cut clips")}
-            </button>
-            <button className={textSubtitles ? "on" : ""} onClick={() => setTextSubtitles(true)}>
-              {tr("每集另配的台词字幕", "Text subtitles for each episode")}
-            </button>
-          </span>
-          {textSubtitles ? (
-            <>
-              <div className="note" style={{ marginTop: "6px" }}>
-                {tr(
-                  "片段不变，文字换成另配字幕里同一时间的台词。找不全台词、或者混着别人的话的片段不导出，原因写进导出目录的 rejected.tsv。",
-                  "The clips stay the same; the text is taken from the lines at the same time in the text subtitles. Clips whose line can't be found in full, or that include someone else's words, are not exported; the reasons go into rejected.tsv in the export folder.",
-                )}
-              </div>
-              <TextSubtitles state={state} setState={setState} toast={toast} />
-            </>
-          ) : (
-            <div className="note warn" style={{ marginTop: "6px" }}>
-              {tr(
-                "切片段用的字幕是中文译文时，文字和日语声音对不上。训练日语模型请改用另配的日文字幕。",
-                "If the subtitles used to cut clips are a translation, the text won't match the Japanese voices. For a Japanese voice model, use separate Japanese text subtitles.",
-              )}
-            </div>
-          )}
+          <label className="title">{tr("台词文字", "Text of each line")}</label>
+          <div className="note">
+            {tr(
+              "训练要的是真正说出口的话，所以文字用每集说的语言：切片段用的字幕就是这种语言时直接用，不是的话（比如中文译文）就用下面另配的字幕。没有这种文字的片段不导出，原因写进导出目录的 rejected.tsv。",
+              "Training needs the words actually said, so the text is in the language each episode speaks: taken from the cutting subtitles when they are in that language, and otherwise (a translation, say) from the subtitles attached below. Clips without such text are not exported; the reasons go into rejected.tsv in the export folder.",
+            )}
+          </div>
+          <SpokenTexts state={state} setState={setState} toast={toast} />
         </div>
       )}
       <div className="field">

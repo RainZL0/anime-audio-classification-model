@@ -21,6 +21,7 @@ from typing import Any
 from avoc.language import Words
 from avoc.pipeline import load_embeddings
 from avoc.project import load_episode
+from avoc.stages.text_subtitle import TextLine
 
 SCENE_GAP = 3.0
 """If the pause between two lines of dialogue is longer than this many seconds, a new scene starts.
@@ -59,6 +60,9 @@ class Clip:
     """How many seconds this clip is from the nearest other line (a different subtitle line or a
     different clip). It is 0 when touching or overlapping. It is None if this is the only line in
     the episode."""
+    spoken_hits: tuple[TextLine, ...] | None = None
+    """The lines in the spoken language that touch this clip (see `touching` in
+    stages/text_subtitle.py). None when the episode has no text in the spoken language."""
 
     @property
     def duration(self) -> float:
@@ -69,6 +73,89 @@ class Clip:
         """Too short, with no line right next to it before or after. It is skipped by default, so a
         person does not need to label it."""
         return self.duration < SKIP_SECONDS and (self.gap is None or self.gap > NEIGHBOR_GAP)
+
+
+@dataclass(frozen=True)
+class SpokenText:
+    """Where an episode's text in the spoken language comes from."""
+
+    language: str
+    assumed: bool
+    """True when no tag or person said what is spoken, and Japanese was taken."""
+    source: str | None
+    """`text` (separate text subtitles), `cut` (the cutting subtitles are in that language), or
+    None when there is no such text."""
+    problem: Words | None = None
+    """Why there is no text, for the person. None when there is."""
+    lines: tuple[TextLine, ...] = ()
+    """Lines in the spoken language, in audio-track time."""
+
+
+def spoken_text(episode: dict[str, Any]) -> SpokenText:
+    """Pick the source of the spoken-language text: separate text subtitles first, as the person
+    chose them, then the cutting subtitles if they are in that language. A missing or unreadable
+    file is reported, not raised, so the interface still opens."""
+    from avoc.pipeline import spoken_language
+    from avoc.stages.text_subtitle import load_text_lines, shifted, subtitle_languages
+
+    spoken = spoken_language(episode)
+    assumed = not episode.get("spoken_language") or episode.get("spoken_from") == "assumed"
+    language = Words(name_of_in("zh", spoken), name_of_in("en", spoken))
+
+    def failed(zh: str, en: str) -> SpokenText:
+        return SpokenText(spoken, assumed, None, Words(zh, en))
+
+    attached = episode.get("text_subtitles")
+    if attached:
+        path = Path(attached)
+        if not path.is_file():
+            return failed(f"配的台词字幕不见了：{path}", f"the text subtitles are missing: {path}")
+        try:
+            lines = load_text_lines(path, spoken=spoken)
+        except ValueError as exc:
+            return failed(str(exc), str(exc))
+        if not lines:
+            return failed(
+                f"配的台词字幕里没有{language.zh}台词：{path.name}",
+                f"the text subtitles have no {language.en} lines: {path.name}",
+            )
+        offset = float(episode.get("text_subtitle_offset") or 0.0)
+        return SpokenText(spoken, assumed, "text", None, tuple(shifted(lines, offset)))
+    path = Path(episode.get("subtitles") or "")
+    if not path.is_file():
+        return failed("没记切片段用的字幕", "no subtitles are recorded for cutting")
+    styles = episode.get("subtitle_styles")
+    try:
+        if spoken in subtitle_languages(path, styles):
+            lines = load_text_lines(path, styles, spoken)
+            offset = float(episode.get("subtitle_offset") or 0.0)
+            return SpokenText(spoken, assumed, "cut", None, tuple(shifted(lines, offset)))
+    except ValueError as exc:
+        return failed(str(exc), str(exc))
+    return failed(
+        f"没有{language.zh}字幕：切片段用的字幕不是{language.zh}，也没另配",
+        f"no {language.en} subtitles: the cutting subtitles are not in {language.en}, and none "
+        "are attached",
+    )
+
+
+def name_of_in(page: str, code: str) -> str:
+    """A language's name in one page language, for messages built before a request."""
+    from avoc.stages.text_language import LANGUAGES
+
+    words = LANGUAGES.get(code)
+    return (words.zh if page == "zh" else words.en) if words else code
+
+
+def hits_for(lines: tuple[TextLine, ...], starts: list[float], reach: float, start: float,
+             end: float) -> tuple[TextLine, ...]:  # fmt: skip
+    """`touching` with a binary search: `starts` are the lines' starts and `reach` the longest
+    line, so only lines that can reach the clip are looked at."""
+    from avoc.stages.text_subtitle import touching
+
+    low = bisect.bisect_left(starts, start - reach)
+    high = bisect.bisect_right(starts, end)
+    return tuple(touching(list(lines[low:high]), start, end))
 
 
 @dataclass
@@ -83,6 +170,8 @@ class Workspace:
     skipped: dict[str, Words] = field(default_factory=dict)
     """Episode name to the reason it was not loaded. Usually the voiceprints are incomplete."""
     by_id: dict[str, Clip] = field(default_factory=dict)
+    spoken: dict[str, SpokenText] = field(default_factory=dict)
+    """Episode name to its text in the spoken language."""
 
     def __post_init__(self) -> None:
         self.by_id = {c.id: c for c in self.clips}
@@ -178,6 +267,7 @@ def load_workspace(
     feature_rows: list[Any] = []
     grouping_rows: list[Any] = []
     skipped: dict[str, Words] = {}
+    spoken: dict[str, SpokenText] = {}
     for directory in episode_dirs(root):
         episode, rows = load_episode(directory)
         try:
@@ -205,6 +295,9 @@ def load_workspace(
         feature_rows.extend(joined)
         grouping_rows.extend(parts[-1])
 
+        said = spoken[episode["name"]] = spoken_text(episode)
+        said_starts = [x.start for x in said.lines]
+        reach = max((x.end - x.start for x in said.lines), default=0.0)
         lines = subtitle_lines(episode)
         starts = [line[0] for line in lines]
         spans = sorted((float(row["start"]), float(row["end"])) for row in rows)
@@ -224,6 +317,11 @@ def load_workspace(
                     scene=scene,
                     row=position.get(row["id"]),
                     gap=gaps[(float(row["start"]), float(row["end"]))],
+                    spoken_hits=None
+                    if said.source is None
+                    else hits_for(
+                        said.lines, said_starts, reach, float(row["start"]), float(row["end"])
+                    ),
                 )
             )
     width = feature_rows[0].shape[0] if feature_rows else 0
@@ -235,6 +333,7 @@ def load_workspace(
         grouping=np.stack(grouping_rows) if grouping_rows else np.empty((0, 0)),
         models=models,
         skipped=skipped,
+        spoken=spoken,
     )
 
 

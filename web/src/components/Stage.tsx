@@ -7,6 +7,31 @@ import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
 import { RoleName } from "./RoleName";
 
+/* The text that export writes for this line, in the language spoken, when it differs from the subtitles shown
+   above. For a target character's line that cannot be exported with text, the reason. */
+function SpokenLine({ clip }: { clip: Clip }) {
+  if (clip.role && clip.spoken_problem)
+    return (
+      <div className="spoken-line warn">
+        {tr("导出时没有文字：", "No text on export: ")}
+        {clip.spoken_problem}
+        {clip.spoken && <span className="spoken-text">{clip.spoken}</span>}
+      </div>
+    );
+  if (!clip.spoken || clip.spoken === clip.text) return null;
+  return (
+    <div
+      className="spoken-line"
+      title={tr(
+        "导出时写的文字，用说话的语言",
+        "The text written on export, in the language spoken",
+      )}
+    >
+      {clip.spoken}
+    </div>
+  );
+}
+
 interface StageProps {
   clip: Clip | null;
   roles: Roles;
@@ -261,6 +286,7 @@ export function Stage({
           </span>
         )}
       </div>
+      <SpokenLine clip={clip} />
       <div className="line-meta">
         <span>{clip.episode}</span>
         <span>{stamp(clip.start)}</span>

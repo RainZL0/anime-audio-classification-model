@@ -26,6 +26,8 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Small classifier | A logistic regression trained on the manual labels, with voiceprints as input. There is one per target character. Its output is the probability that a clip is that target. |
 | Confidence | The small classifier's probability for the top-ranked character. |
 | Similarity check | Checks whether a clip is similar enough to the closest confirmed clip of the top-ranked character. If it is not, the speaker may be someone who has not been labeled yet. |
+| Spoken language | The language the voices in an episode speak, such as Japanese. Exported text must be in it, because a voice model learns which sounds go with which words. |
+| Text subtitles | A second subtitle file attached to an episode, in the spoken language, used only for the text of each clip. Needed when the subtitles used for cutting are a translation. |
 | Workspace | The folder that the interface opens. Inside it are `episodes/` (one folder per episode) and `labels/` (the labels made in the interface). |
 
 ## Flow
@@ -35,7 +37,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 `add` does the first steps in one command:
 
 1. **Reading the subtitles**: The file is read whatever its text encoding: UTF-8 and UTF-16 directly, and older Chinese, Japanese, Korean and Western encodings by trying each and keeping the reading that looks most like real text. ASS, SRT, WebVTT and a few rarer formats are told apart by their content, not by the file extension. Then the dialogue [styles](#glossary) are picked: the main one is the style with the most lines among those whose lines appear across the whole episode (an opening song has many lines, but all at the start). Styles named after it, such as "Default - Top", and other spread-out styles with at least a quarter as many lines (the second language of bilingual subtitles) are dialogue too. Comment lines, vector drawings and lines over 20 seconds are dropped. `add` prints which styles it used and which it left out, `avoc styles <file>` shows each style with sample lines, and `--styles` overrides the choice.
-2. **`prepare`**: Takes the audio from the video (or from a separate audio file given with `--audio` on the same timeline). Separates the voices for the whole episode and keeps the original sample rate. Also makes a 16 kHz copy for analysis. Then adds this episode's offset to the subtitles, so **each subtitle line becomes one clip**. If `--offset` is not given, the offset is measured with speech detection. If the alignment is too weak, it stops with an error and does not quietly switch to another method.
+2. **`prepare`**: Takes the audio from the video (or from a separate audio file given with `--audio` on the same timeline). When the video has several audio tracks (an original and a dub), it takes the one in the [spoken language](#glossary): the language given with `--spoken`, or else a Japanese track if there is one, else the track marked default, else the first. The spoken language comes from that track's language tag; with no tag, Japanese is taken and `add` says so. Separates the voices for the whole episode and keeps the original sample rate. Also makes a 16 kHz copy for analysis. Then adds this episode's offset to the subtitles, so **each subtitle line becomes one clip**. If `--offset` is not given, the offset is measured with speech detection. If the alignment is too weak, it stops with an error and does not quietly switch to another method.
 3. **`embed`**: Computes a unit-length voiceprint for every clip that is at least 0.5 seconds long, once for each of the three models the interface uses. Shorter clips stay in the clip table, but they have no voiceprint.
 
 Labeling and export then happen in the [interface](#labeling-and-correction-interface).
@@ -74,21 +76,29 @@ The small classifier only picks among the characters it already knows, so the se
 
 **Picture and sound.** ffmpeg cuts one clip at a time. The picture is 360p H.264 with 0.5 seconds of extra padding before and after. The sound is the same span of the vocal track. Both are cached in each episode's `app_media/`. Cutting one picture takes more than half a second. So when a person looks at a line, the server first cuts, in the background, the lines within 60 seconds before and after it in the same episode. Nearer lines go first, and the cutting then continues forward in time to the end of the episode. Two threads run in parallel. When the person moves to another line, the whole queue is replaced. Measured on episode 3: a line that was not cut in advance takes 0.8 to 1.1 seconds to open. A line cut in advance takes about 0.1 seconds. When More context is on, a separate copy with 5 or 15 seconds of extra time on each side is cut. Picture and sound start at the same moment. Their file names carry `.ctx5` or `.ctx15`. The server's background queue does not cut these; only the page asks for the next three lines ahead. The first time, they take about 0.6 and 1.1 seconds. Each cut is written to a temporary file whose name carries the process number, then moved into place, so two apps open on the same project cannot write into one file.
 
-**Export.** Cuts from the vocal track at the original sample rate, and evens out the loudness without clipping peaks. The formats are GPT-SoVITS `train.list` (each line is `path|character|language|text`), Style-Bert-VITS2 `esd.list`, or just one folder per character. The text, from either subtitle file, is cleaned of caption marks first ([what is removed](SUBTITLES.md#what-is-cleaned-automatically)).
+**Export.** Cuts from the vocal track at the original sample rate, and evens out the loudness without clipping peaks. The formats are GPT-SoVITS `train.list` (each line is `path|character|language|text`, with the language as `ja`, `zh`, `en` or `ko`), Style-Bert-VITS2 `esd.list` (the language as `JP`, `ZH` or `EN`; it has no Korean), or just one folder per character. For the two formats with text, the text is always in the episode's spoken language, cleaned of caption marks ([what is removed](SUBTITLES.md#what-is-cleaned-automatically)). Clips without such text are left out. The audio-only format needs no text.
 
-**Separate text subtitles.** When the subtitles used for the clips are a translation, you can attach a separate original-language subtitle file to each episode. On export, the text is taken from that file. The clips themselves do not change:
+**Text in the spoken language.** Each clip's text is matched when the workspace opens, so the Scenes and Characters views show it under the subtitle line, and mark a target character's clip that would be left out with "No text to export" and the reason. The text comes from the first of these that the episode has:
 
+1. Separate [text subtitles](#glossary) attached to the episode.
+2. The cutting subtitles, when they are in the spoken language. Bilingual subtitles count: only their lines in the spoken language are used.
+
+The language of each line is worked out from its letters. Two or more kana mean Japanese and two or more Hangul mean Korean. Any other line (Chinese characters only, Latin letters, digits) takes the language most common at its place in the file: the same style and the same line number within the entry. So in a file with Chinese on the first line and Japanese on the second, the Japanese line ６連勝 still counts as Japanese. A file has a language when at least 30% of its lines are in it. The interface's add form and the Export view show the language of each file.
+
+How text subtitles are matched to clips. The clips themselves do not change:
+
+- When attaching, a file with no lines in the spoken language is refused, and so is the offset check below. In `add`, this is checked before the slow steps start.
 - When attaching, the offset is measured. The display times of both subtitle files are drawn as timelines with 10 ms cells. One is slid against the other, and the shift with the most overlap is taken. If the overlap is below 0.6, or fewer than 95% of the clips touch any dialogue, the attach is refused.
 - When subtitles are read, the lines inside one entry are split apart, and the entry's time is shared among the lines by character count. Speaker names, sound notes and other caption marks are removed, and a speaker name is kept apart ([what is removed](SUBTITLES.md#what-is-cleaned-automatically)). Two names count as the same person when one ends with the other, such as トウカイテイオー and テイオー.
 - For a clip, every line that overlaps it by more than 0.1 seconds must mostly fall inside the clip: 70% or more of it, or extending less than 0.8 seconds past each end. Together the lines must cover more than half of the clip. Only then is the text counted as complete.
-- A character's name in the subtitles is the most common name among the named lines that overlap her clips. It must make up more than half of them. A line with a different name that overlaps a clip by more than 0.2 seconds marks that clip as mixed with someone else's speech. When the character's name cannot be found, two or more different names touching a clip also count as mixed.
-- Clips whose text is incomplete, or that are mixed with someone else's speech, are not exported. They are written to `rejected.tsv` in the export folder, with the character, episode, start and end times, the reason, the original text and the attached text.
+- A character's name in the subtitles is the most common name among the named lines that overlap her clips. It must make up more than half of them. A line with a different name that overlaps a clip by more than 0.2 seconds marks that clip as mixed with someone else's speech. When the character's name cannot be found, two or more different names touching a clip also count as mixed. The same check applies when the text comes from the cutting subtitles, so one subtitle entry with two speakers is left out.
+- Clips whose text is incomplete, or that are mixed with someone else's speech, are not exported. They are written to `rejected.tsv` in the export folder, with the character, episode, start and end times, the reason, the subtitle text and the spoken-language text.
 
 ## Data files
 
 Each episode has a folder `workspace/episodes/<episode>/`:
 
-- `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds), `text_subtitle_agreement` (the overlap) and `text_subtitle_marked` (how many lines still carry marks the cleaning does not know, with a few examples, or null).
+- `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). It also records `audio_track` (which audio track of the video, from 0), `spoken_language` (`ja`, `zh`, `en` or `ko`) and `spoken_from` (`track` for the track's tag, `person`, or `assumed`); episodes added before these were recorded count as Japanese, assumed. `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds), `text_subtitle_agreement` (the overlap) and `text_subtitle_marked` (how many lines still carry marks the cleaning does not know, with a few examples, or null).
 - Voiceprints are stored in `embeddings/<model name>/`. The matrix and its metadata line up row by row. The cache is tied to the content of the clip files, the content of the analysis audio, the model name and the minimum length. If any of these changes, the cache must be recomputed. An old cache raises an error. It is never used silently.
 - `app_media/` holds the picture and sound pieces the interface cuts.
 
@@ -107,12 +117,13 @@ src/avoc/
   doctor.py                machine checks, shown by `avoc doctor` and the welcome page
   project.py               data format for an episode and its clips, content fingerprints, cache folders
   pipeline.py              prepare and add episodes, attach video and subtitles, voiceprint cache
-  audio.py                 voice separation, making the analysis copy, the speech timeline used to measure subtitle offset
+  audio.py                 audio tracks, voice separation, the analysis copy, the speech timeline used to measure subtitle offset
   language.py              picks Chinese or English for messages the web page shows
   embeddings/extract.py    four voiceprint models and the minimum clip length
   stages/subtitle.py       read subtitles, pick dialogue styles, measure offset
   stages/captions.py       every rule for caption marks: take the spoken words and speaker out of a line
-  stages/text_subtitle.py  attached text subtitles: split lines, measure offset, give clips their text
+  stages/text_subtitle.py  text in the spoken language: split lines, measure offset, give clips their text
+  stages/text_language.py  the language of subtitle lines and of audio track tags
   stages/export.py         export at the original sample rate
   app/workspace.py         read the workspace: episodes, clips, text, scenes, assembled voiceprints
   app/labels.py            label records in the interface, undo, cast table

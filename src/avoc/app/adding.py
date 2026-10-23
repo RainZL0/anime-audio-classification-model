@@ -82,10 +82,12 @@ class Adding:
         offset: float | None = None,
         name: str | None = None,
         styles: list[str] | None = None,
+        spoken: str | None = None,
     ) -> dict[str, Any]:
         """Check what can be checked at once, then start `avoc add` in the background. Raises
         ValueError with a reason the person can act on. `styles` are the subtitle styles that hold
-        the dialogue; None lets `avoc add` pick them."""
+        the dialogue; None lets `avoc add` pick them. `spoken` is the language spoken; None lets
+        it read the audio track's tag."""
         from avoc.pipeline import NO_TOKEN_HINT, find_episode_by_video, has_hf_token
         from avoc.pipeline import next_episode_name as next_name
         from avoc.project import validate_name
@@ -137,6 +139,8 @@ class Adding:
             command += ["--offset", str(offset)]
         if styles is not None:
             command += ["--styles", ",".join(styles)]
+        if spoken is not None:
+            command += ["--spoken", spoken]
         environment = {
             **os.environ,
             "AVOC_LANGUAGE": LANGUAGE.get(),

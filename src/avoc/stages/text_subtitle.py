@@ -1,7 +1,8 @@
-"""When exporting, swap the text of each dialogue line. Clips are still cut by the subtitles they
-were cut with, but the text is taken from separately supplied subtitles.
+"""Give each clip its text in the language spoken. Clips are still cut by the subtitles they were
+cut with, but the text comes from lines in the spoken language: from the cutting subtitles when
+they are in it (bilingual ones included), otherwise from separately supplied text subtitles.
 
-The use case: Chinese subtitles are used to cut the clips, and Japanese subtitles supply the text,
+The usual case: Chinese subtitles are used to cut the clips, and Japanese subtitles supply the text,
 because training a Japanese model needs the original Japanese. The two subtitle files have
 different line breaks and times. So first measure how many seconds the separate subtitles must be
 shifted to line up with the audio. Then find the dialogue for each clip, one clip at a time. A clip
@@ -16,9 +17,10 @@ give one, is used to spot other people's lines that got mixed in.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from avoc.language import say
 
@@ -67,20 +69,55 @@ class TextLine:
     """The name in the speaker tag at the start of the line. Empty if there is none."""
 
 
-def load_text_lines(path: Path) -> list[TextLine]:
-    """Read an ASS or SRT file, split it into lines of spoken words, and sort by time. The times
-    are the subtitle file's own."""
+def _entries(path: Path, styles: list[str] | None) -> list[tuple[Any, list[tuple[str, str]]]]:
+    """Each subtitle entry with its lines of spoken words, as (entry, [(words, speaker)]). With
+    `styles`, only the dialogue lines of those styles, as clips are cut from them; without, every
+    entry with text."""
     from avoc.stages.captions import spoken_lines
-    from avoc.stages.subtitle import read_subtitles
+    from avoc.stages.subtitle import read_subtitles, usable
 
-    lines: list[TextLine] = []
+    found = []
     for event in read_subtitles(path):
         if event.end <= event.start or not event.is_text:  # Comments and drawings have no lines.
             continue
-        parts = spoken_lines(event.plaintext)
-        total = sum(len(text) for text, _ in parts)
+        if styles is not None and not (event.style in styles and usable(event)):
+            continue
+        if parts := spoken_lines(event.plaintext):
+            found.append((event, parts))
+    return found
+
+
+def _languages(entries: list[tuple[Any, list[tuple[str, str]]]]) -> list[list[str | None]]:
+    from avoc.stages.text_language import line_languages
+
+    return line_languages((e.style, [text for text, _ in parts]) for e, parts in entries)
+
+
+def subtitle_languages(path: Path, styles: list[str] | None = None) -> dict[str, float]:
+    """The languages of a subtitle file's lines, with their shares, most first. A bilingual file
+    has two. See stages/text_language.py."""
+    from avoc.stages.text_language import file_languages
+
+    return file_languages(code for codes in _languages(_entries(path, styles)) for code in codes)
+
+
+def load_text_lines(
+    path: Path, styles: list[str] | None = None, spoken: str | None = None
+) -> list[TextLine]:
+    """Read an ASS or SRT file, split it into lines of spoken words, and sort by time. The times
+    are the subtitle file's own.
+
+    With `spoken`, only the lines in that language are kept, so the Chinese half of a bilingual
+    file is dropped. An entry's time is shared, by character count, among the lines kept.
+    `styles` works as in `_entries`."""
+    entries = _entries(path, styles)
+    languages = _languages(entries) if spoken else [[None] * len(p) for _, p in entries]
+    lines: list[TextLine] = []
+    for (event, parts), codes in zip(entries, languages, strict=True):
+        kept = [part for part, code in zip(parts, codes, strict=True) if code == spoken]
+        total = sum(len(text) for text, _ in kept)
         at, span = event.start / 1000.0, (event.end - event.start) / 1000.0
-        for text, speaker in parts:
+        for text, speaker in kept:
             length = span * len(text) / total
             lines.append(TextLine(at, at + length, text, speaker))
             at += length
@@ -146,7 +183,13 @@ def match(
     with another name are someone else's speech. When it is not known, lines count as someone
     else's only if the touched lines carry two or more different names.
     """
-    hits = touching(lines, start, end)
+    return match_hits(touching(lines, start, end), start, end, tag)
+
+
+def match_hits(
+    hits: Sequence[TextLine], start: float, end: float, tag: str | None = None
+) -> tuple[str, str | None]:
+    """`match`, given the lines that touch the clip (see `touching`)."""
     named = {x.speaker for x in hits if x.speaker}
     others = [x for x in hits if x.speaker and not same_name(x.speaker, tag)] if tag else []
     if any(_shared(x, start, end) > MIXED for x in others) or (not tag and len(named) > 1):

@@ -31,6 +31,11 @@ export interface Clip {
   status: Status;
   /* Only in the Characters view's list: not given to this character, but it might be them. */
   maybe?: boolean;
+  /* The text in the language spoken, as exported, and why it would not be exported (null if it would). */
+  spoken: string;
+  spoken_problem: string | null;
+  /* The target character it belongs to, by a person's label or the machine's top guess. */
+  role: string | null;
 }
 
 /* Lines confirmed, lines the machine gave them, and the seconds of the confirmed ones. */
@@ -66,6 +71,33 @@ export interface Episode {
   offset: number | null;
   counts: Partial<Record<Status, number>>;
   text_subtitles: TextSubtitleInfo | null;
+  spoken: Spoken;
+}
+
+/* The language an episode speaks, and where its text in that language comes from. */
+export interface Spoken {
+  language: string;
+  /* No audio track tag or person said it, so Japanese is taken. */
+  assumed: boolean;
+  /* "text": separate text subtitles; "cut": the cutting subtitles are in that language; null: none. */
+  source: "text" | "cut" | null;
+  problem: string | null;
+  /* Clips of target characters that cannot be exported with text. */
+  blocked: number;
+}
+
+/* The audio tracks of a video: /api/audio-tracks. `number` is the one used when no language is given. */
+export interface AudioTracks {
+  tracks: {
+    number: number;
+    tag: string;
+    language: string | null;
+    default: boolean;
+    title: string;
+  }[];
+  number: number | null;
+  language: string | null;
+  from: "track" | "assumed" | null;
 }
 
 export interface Model {
@@ -128,6 +160,8 @@ export interface SubtitleStyles {
   styles: SubtitleStyle[];
   picked: string[];
   marked: string | null;
+  /* The languages of its lines, most first: two for a bilingual file. */
+  languages: string[];
 }
 
 /* The server's job that adds an episode: /api/add. */

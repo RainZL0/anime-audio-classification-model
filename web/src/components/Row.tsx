@@ -74,6 +74,11 @@ export function Row({
               {tr("质量低", "Low quality")}
             </span>
           )}
+          {clip.role && clip.spoken_problem && !clip.unusable && (
+            <span className="pill no-text" title={clip.spoken_problem}>
+              {tr("导不出文字", "No text to export")}
+            </span>
+          )}
           {clip.maybe && (
             <span
               className="pill maybe"

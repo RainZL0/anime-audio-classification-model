@@ -28,7 +28,7 @@ Here you label a few clips while watching the scene. A small model learns your c
 - 🧠 **Learns from your corrections.** Label a target character and "other"; the model updates as you go.
 - 📺 **Label while watching.** The video plays with each line, with more context one key away.
 - ⌨️ **Keyboard first,** with undo.
-- 🈶 **Text in the language you train on.** Cut with translated subtitles, take the exported text from a Japanese subtitle file.
+- 🈶 **Text in the language spoken.** Cut with translated or bilingual subtitles; the exported text is always the words actually said, and each clip shows it while you label.
 - 📦 **Export** to GPT-SoVITS, Style-Bert-VITS2, or one folder per character, at the original sample rate.
 - 🔒 **Runs on your machine.** Nothing is uploaded.
 
@@ -55,7 +55,8 @@ uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ass" --offset 0
 | --- | --- |
 | `--offset` | Seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and subtitle group almost always share one offset: find it once, then reuse it. |
 | *(no `--offset`)* | The offset is measured with [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1). That model is gated: accept its terms on Hugging Face, then run `uv run hf auth login`. |
-| `--text-subs "Episode 01.ja.ass"` | Attach a second subtitle file. The exported text is taken from it, useful when the first one is a translation. |
+| `--text-subs "Episode 01.ja.ass"` | When the subtitles are a translation, attach subtitles in the language spoken. The exported text is taken from them. You can also attach them later in the app. |
+| `--spoken ja` | The language spoken (`ja`, `zh`, `en`, `ko`). By default it is read from the audio track, and the matching track of a dual-audio video is used. |
 
 If a run stops halfway (out of GPU memory, for example), run the same command again. It continues where it stopped. You can also add episodes from inside the app.
 
@@ -88,7 +89,7 @@ You only name the characters you want (the targets). Everyone else gets a single
 | Style-Bert-VITS2 | Clips and `esd.list` with each line's text |
 | One folder per character | Plain audio clips |
 
-Clips are cut from the separated vocals at the original sample rate. Clips whose text cannot be matched completely are left out and listed in `rejected.tsv`.
+Clips are cut from the separated vocals at the original sample rate. The text is in the language spoken. Clips whose text cannot be matched completely are left out and listed in `rejected.tsv`.
 
 ## Platforms
 

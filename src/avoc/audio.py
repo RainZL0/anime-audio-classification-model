@@ -47,11 +47,51 @@ def _ffmpeg(args: list[str]) -> None:
         raise RuntimeError(f"ffmpeg failed: {proc.stderr.strip()[:500]}")
 
 
-def extract_audio(video: Path, dst: Path) -> None:
-    """Take the first audio track out of the video and save it losslessly as FLAC. The sample rate
-    and channels are not changed."""
+@dataclass(frozen=True)
+class AudioTrack:
+    """One audio track of a video file."""
+
+    number: int
+    """Its place among the audio tracks, from 0, as ffmpeg's `0:a:N` counts them."""
+    tag: str
+    """Its language tag as written in the file, such as `jpn`. Empty when there is none."""
+    default: bool
+    """Whether the file marks it as the track to play by default."""
+    title: str = ""
+
+
+def audio_tracks(video: Path) -> list[AudioTrack]:
+    """The audio tracks of a video, read with ffprobe. Empty if it cannot be read."""
+    import json
+
+    probe = shutil.which("ffprobe")
+    if probe is None:
+        raise RuntimeError("ffprobe not found. It is installed together with ffmpeg")
+    proc = subprocess.run(
+        [probe, "-v", "error", "-select_streams", "a", "-show_entries",
+         "stream_tags=language,title:stream_disposition=default", "-of", "json", str(video)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )  # fmt: skip
+    try:
+        streams = json.loads(proc.stdout or "{}").get("streams", [])
+    except ValueError:
+        return []
+    return [
+        AudioTrack(
+            number=k,
+            tag=str(s.get("tags", {}).get("language", "")),
+            default=bool(s.get("disposition", {}).get("default")),
+            title=str(s.get("tags", {}).get("title", "")),
+        )
+        for k, s in enumerate(streams)
+    ]
+
+
+def extract_audio(video: Path, dst: Path, track: int = 0) -> None:
+    """Take one audio track (the first by default) out of the video and save it losslessly as
+    FLAC. The sample rate and channels are not changed."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    _ffmpeg(["-i", str(video), "-vn", "-map", "0:a:0", "-c:a", "flac", str(dst)])
+    _ffmpeg(["-i", str(video), "-vn", "-map", f"0:a:{track}", "-c:a", "flac", str(dst)])
 
 
 def separate_vocals(

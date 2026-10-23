@@ -383,6 +383,20 @@ kbd {
   margin: 10px 2px 4px;
   min-height: 28px;
 }
+.spoken-line {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 2px 4px;
+  color: var(--text-2);
+}
+.spoken-line.warn {
+  font-size: 12px;
+  color: var(--warn);
+}
+.spoken-line .spoken-text {
+  margin-left: 6px;
+  color: var(--text-3);
+}
 .line-meta {
   color: var(--text-3);
   font-size: 12px;
@@ -721,6 +735,12 @@ kbd {
   color: var(--bad);
   background: transparent;
   border: 1px solid var(--bad);
+  line-height: 16px;
+}
+.pill.no-text {
+  color: var(--warn);
+  background: transparent;
+  border: 1px solid var(--warn);
   line-height: 16px;
 }
 .pill.maybe {

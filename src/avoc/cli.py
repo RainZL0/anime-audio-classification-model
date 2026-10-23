@@ -35,6 +35,13 @@ STYLES_HELP = (
 )
 
 
+SPOKEN_HELP = (
+    "Language spoken in the video: ja, zh, en or ko. The voices are taken from the audio track "
+    "tagged with it, and exported text must be in it. If omitted, it is read from the audio "
+    "track's tag, and Japanese is assumed when there is none"
+)
+
+
 def style_list(text: str | None) -> list[str] | None:
     """`--styles` as a list. ASS style names cannot contain commas, so commas separate them."""
     if text is None:
@@ -93,6 +100,7 @@ def add(
     ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
     styles: Annotated[str | None, typer.Option(help=STYLES_HELP)] = None,
+    spoken: Annotated[str | None, typer.Option(help=SPOKEN_HELP)] = None,
 ) -> None:
     """Add one episode: cut clips, compute the voiceprints the interface needs, and attach text
     subtitles if given. If it stops partway, run the same command again to continue."""
@@ -117,6 +125,7 @@ def add(
             device,
             report=report,
             styles=style_list(styles),
+            spoken=spoken,
         )
     except ValueError as exc:
         typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
@@ -151,11 +160,14 @@ def prepare(
     ] = None,
     device: Annotated[str, typer.Option(help=DEVICE_HELP)] = "auto",
     styles: Annotated[str | None, typer.Option(help=STYLES_HELP)] = None,
+    spoken: Annotated[str | None, typer.Option(help=SPOKEN_HELP)] = None,
 ) -> None:
     """Prepare an episode: extract the audio, separate the vocals, align the subtitles, and make one
     clip per dialogue line."""
     typer.echo(
-        pipeline.prepare(video, subs, out, name, vocals, offset, device, audio, style_list(styles))
+        pipeline.prepare(
+            video, subs, out, name, vocals, offset, device, audio, style_list(styles), spoken
+        )
     )
 
 
@@ -254,6 +266,22 @@ def set_text_subtitles(
     )
     if result["text_subtitle_marked"]:
         typer.echo(marked_note(result["text_subtitle_marked"]))
+
+
+@app.command("set-spoken-language")
+def set_spoken_language(
+    episode: Path,
+    language: Annotated[str, typer.Argument(help="ja, zh, en or ko")],
+) -> None:
+    """Correct the language spoken in an episode, when the audio track's tag was wrong or
+    missing. The voices already cut stay; to cut from another audio track, add the episode again
+    with --spoken."""
+    try:
+        result = pipeline.set_spoken_language(episode, language)
+    except ValueError as exc:
+        typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"{result['episode']}: spoken language {result['spoken_language']}")
 
 
 @app.command("app")

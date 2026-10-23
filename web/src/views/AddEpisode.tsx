@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { call, type Adding, type Check, type Summary, type SubtitleStyles as Styles } from "../api";
+import {
+  call,
+  type Adding,
+  type AudioTracks,
+  type Check,
+  type Summary,
+  type SubtitleStyles as Styles,
+} from "../api";
 import { PathInput } from "../components/PathInput";
 import { minutes } from "../format";
-import { lines, many, tr } from "../language";
+import { languageName, languageNames, lines, many, SPOKEN, tr } from "../language";
 import type { Toast } from "../toast";
 
 /* ───────────── Adding an episode ───────────── */
@@ -61,7 +68,8 @@ function SubtitleStyles({
   if (!found.styles)
     return <div className="note">{tr("正在读字幕…", "Reading the subtitles…")}</div>;
   const format = (found.format ?? "").toUpperCase();
-  const read = tr(`${format}，${found.encoding}`, `${format}, ${found.encoding}`);
+  const said = languageNames(found.languages ?? []);
+  const read = tr(`${format}，${found.encoding}，${said}`, `${format}, ${found.encoding}, ${said}`);
   if (found.styles.length === 0)
     return (
       <div className="note warn">
@@ -135,6 +143,62 @@ function SubtitleStyles({
   );
 }
 
+/* Ask the server about a path shortly after it stops changing. An answer for an older path is dropped. `null`
+   while there is no path or no answer yet. */
+type Answer<T> = Partial<T> & { error?: string };
+
+function useAnswer<T>(url: string, path: string): Answer<T> | null {
+  const [answer, setAnswer] = useState<{ for: string; found: Answer<T> } | null>(null);
+  useEffect(() => {
+    const clean = path.trim();
+    if (!clean) return;
+    let current = true;
+    const timer = setTimeout(
+      () =>
+        call<T>(url, { path: clean })
+          .then((found) => current && setAnswer({ for: path, found: found as Answer<T> }))
+          .catch(
+            (e: Error) =>
+              current && setAnswer({ for: path, found: { error: e.message } as Answer<T> }),
+          ),
+      300,
+    );
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [url, path]);
+  return path.trim() && answer?.for === path ? answer.found : null;
+}
+
+/* Which audio track the voices are taken from, and the language it speaks. */
+function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) {
+  if (!tracks.tracks.length)
+    return <div className="note warn">{tr("视频里没有音轨", "The video has no audio track")}</div>;
+  const tagged = tracks.tracks.find((t) => t.language === spoken);
+  const used = tagged ?? tracks.tracks.find((t) => t.default) ?? tracks.tracks[0];
+  const what = [
+    used.language ? languageName(used.language) : used.tag || tr("没标语言", "no language tag"),
+    used.title,
+  ]
+    .filter(Boolean)
+    .join(tr("，", ", "));
+  return (
+    <div className={`note ${tagged || tracks.tracks.length === 1 ? "" : "warn"}`}>
+      {tr(
+        `共 ${tracks.tracks.length} 条音轨，人声从第 ${used.number + 1} 条（${what}）取`,
+        `${many(tracks.tracks.length, "audio track")}; the voices are taken from track ${used.number + 1} (${what})`,
+      )}
+      {!tagged &&
+        tracks.tracks.length > 1 &&
+        tr(
+          `。没有标成${languageName(spoken)}的音轨，确认一下`,
+          `. No track is tagged ${languageName(spoken)}; check it`,
+        )}
+    </div>
+  );
+}
+
 export interface AddEpisodeProps {
   state: Summary;
   adding: Adding | null;
@@ -151,6 +215,11 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
   const [subtitles, setSubtitles] = useState("");
   const [textSubtitles, setTextSubtitles] = useState("");
   const [offset, setOffset] = useState(last ? String(last.offset) : "");
+  /* "" lets the audio track's tag decide. */
+  const [spoken, setSpoken] = useState("");
+  const tracks = useAnswer<AudioTracks>("/api/audio-tracks", video);
+  const textFound = useAnswer<Styles>("/api/subtitle-styles", textSubtitles);
+  const heard = spoken || tracks?.language || "ja";
   const [busy, setBusy] = useState(false);
   /* The server's answer, and the text of the box it answers. */
   const [answer, setAnswer] = useState<{ for: string; found: Found } | null>(null);
@@ -209,7 +278,14 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
     const styles = found?.styles
       ? found.styles.map((s) => s.name).filter((n) => chosen.has(n))
       : null;
-    run({ video, subtitles, text_subtitles: textSubtitles, offset: seconds, styles });
+    run({
+      video,
+      subtitles,
+      text_subtitles: textSubtitles,
+      offset: seconds,
+      styles,
+      spoken: spoken || null,
+    });
   };
   const stop = async () => {
     setBusy(true);
@@ -301,6 +377,36 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
             placeholder="D:\anime\Episode 01.mkv"
             toast={toast}
           />
+          {tracks &&
+            (tracks.error ? (
+              <div className="note warn">{tracks.error}</div>
+            ) : (
+              tracks.tracks && <TrackNote tracks={tracks as AudioTracks} spoken={heard} />
+            ))}
+        </div>
+        <div className="field">
+          <label className="title">{tr("说的语言", "Language spoken")}</label>
+          <select value={spoken} onChange={(e) => setSpoken(e.target.value)}>
+            <option value="">
+              {tracks?.language
+                ? tr(
+                    `按音轨标的：${languageName(tracks.language)}`,
+                    `From the audio track: ${languageName(tracks.language)}`,
+                  )
+                : tr("按音轨标的（没标就算日语）", "From the audio track (Japanese if not tagged)")}
+            </option>
+            {SPOKEN.map((code) => (
+              <option key={code} value={code}>
+                {languageName(code)}
+              </option>
+            ))}
+          </select>
+          <div className="note">
+            {tr(
+              "人声从这种语言的音轨取，导出的文字也要是这种语言。双语视频里想要配音版的声音，就在这里选配音的语言。",
+              "The voices are taken from the audio track in this language, and exported text must be in it too. For the dub of a dual-audio video, pick the dub's language here.",
+            )}
+          </div>
         </div>
         <div className="field">
           <label className="title">
@@ -334,6 +440,31 @@ export function AddEpisode({ state, adding, setAdding, onOpen, toast }: AddEpiso
             placeholder="D:\anime\Episode 01.ja.srt"
             toast={toast}
           />
+          {textFound?.error && <div className="note warn">{textFound.error}</div>}
+          {textFound?.languages && (
+            <div className={`note ${textFound.languages.includes(heard) ? "" : "warn"}`}>
+              {textFound.languages.includes(heard)
+                ? tr(
+                    `${languageNames(textFound.languages)}，导出的文字取其中的${languageName(heard)}`,
+                    `${languageNames(textFound.languages)}; the ${languageName(heard)} lines are exported`,
+                  )
+                : tr(
+                    `这份字幕是${languageNames(textFound.languages)}，不是${languageName(heard)}，会被拒绝`,
+                    `These subtitles are in ${languageNames(textFound.languages)}, not ${languageName(heard)}, so they will be refused`,
+                  )}
+            </div>
+          )}
+          {!textSubtitles.trim() &&
+            found?.languages &&
+            found.languages.length > 0 &&
+            !found.languages.includes(heard) && (
+              <div className="note warn">
+                {tr(
+                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。导出 GPT-SoVITS 或 Style-Bert-VITS2 要有${languageName(heard)}台词：现在配上，或者以后在导出页配。只导出音频（RVC）不需要。`,
+                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the ${languageName(heard)} text: attach it now, or later on the Export page. Audio-only export (RVC) does not need it.`,
+                )}
+              </div>
+            )}
         </div>
         <div className="field">
           <label className="title">{tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>

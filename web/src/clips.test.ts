@@ -18,6 +18,9 @@ const clip = (id: string, extra: Partial<Clip> = {}): Clip => ({
   guess: [],
   familiar: null,
   status: "review",
+  spoken: "",
+  spoken_problem: null,
+  role: null,
   ...extra,
 });
 

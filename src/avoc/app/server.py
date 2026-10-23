@@ -26,7 +26,7 @@ from avoc.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
 from avoc.app.video import VIDEO_PAD, cut_video
 from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avoc.language import LANGUAGE, Words, say
-from avoc.stages.captions import marked_note, spoken
+from avoc.stages.captions import marked_note
 
 STATIC = Path(__file__).parent / "static"
 GROUP_THRESHOLD = 0.70
@@ -37,6 +37,8 @@ MAYBE_FLOOR = 0.05
 target is at least this number."""
 UNUSABLE = Words("人标了质量低", "marked low quality")
 """Why a clip someone marked low quality was skipped on export, as written in rejected.tsv."""
+STYLE_BERT_VITS2 = {"ja": "JP", "zh": "ZH", "en": "EN"}
+"""The language codes Style-Bert-VITS2 writes in esd.list. It has no Korean."""
 MAYBE_LIMIT = 100
 """The "possibly missed" list shows at most this many clips, most likely first."""
 CONTEXT_SECONDS = (5, 15)
@@ -62,6 +64,7 @@ class AppState:
         self.lock = threading.RLock()
         self.guesses: dict[int, Guess] = {}
         self.trained: dict[str, Any] = {}
+        self.tags: dict[str, str | None] = {}
         self._cutting: dict[str, threading.Lock] = {}
         self._prefetch: list[tuple[str, str]] = []
         """The (kind, clip) pairs waiting to be cut in the background, nearest first. Each time the
@@ -121,6 +124,43 @@ class AppState:
             "seconds": round(time.perf_counter() - began, 2),
             "familiar_threshold": trained.threshold,
         }
+        self._find_tags(set(targets))
+
+    def _find_tags(self, targets: set[str]) -> None:
+        """Each target character's name in the subtitles, from the lines their clips touch. It
+        tells their lines from someone else's in a clip; see `own_tag`."""
+        from avoc.stages.text_subtitle import own_tag
+
+        hits: dict[str, list[Any]] = {t: [] for t in targets}
+        for clip in self.workspace.clips:
+            role = self.role_of(clip, targets)
+            if role is not None and clip.spoken_hits:
+                hits[role].extend(clip.spoken_hits)
+        self.tags = {role: own_tag(found) for role, found in hits.items()}
+
+    def role_of(self, clip: Clip, targets: set[str] | None = None) -> str | None:
+        """The target character a clip belongs to, by a person's label or else the machine's top
+        guess. None for "other" and for clips nobody has an answer for."""
+        targets = set(self.store.targets()) if targets is None else targets
+        label = self.store.labels.get(clip.id)
+        if label is not None:
+            return label if label in targets else None
+        guess = self.guesses.get(clip.row) if clip.row is not None else None
+        return guess.names[0] if guess and guess.names[0] in targets else None
+
+    def spoken_of(self, clip: Clip, role: str | None) -> tuple[str, str | None]:
+        """The clip's text in the spoken language, and why it cannot be exported (None if it
+        can). `role` picks whose name in the subtitles counts as their own."""
+        return self.text_of(clip, self.tags.get(role) if role else None)
+
+    def text_of(self, clip: Clip, tag: str | None) -> tuple[str, str | None]:
+        """`spoken_of`, with the character's name in the subtitles given (see `own_tag`)."""
+        from avoc.stages.text_subtitle import match_hits
+
+        if clip.spoken_hits is None:
+            said = self.workspace.spoken.get(clip.episode)
+            return "", str(said.problem) if said and said.problem else say("没有台词", "no text")
+        return match_hits(clip.spoken_hits, clip.start, clip.end, tag)
 
     # Views
 
@@ -140,7 +180,12 @@ class AppState:
 
     def view(self, clip: Clip) -> dict[str, Any]:
         guess = self.guesses.get(clip.row) if clip.row is not None else None
+        role = self.role_of(clip)
+        spoken, problem = self.spoken_of(clip, role)
         return {
+            "spoken": spoken,
+            "spoken_problem": problem,
+            "role": role,
             "id": clip.id,
             "episode": clip.episode,
             "start": round(clip.start, 3),
@@ -198,6 +243,7 @@ class AppState:
             if role.get("target") or confirmed[role["name"]]
         ]
         roles.sort(key=lambda r: (not r.get("target"), -(r["confirmed"] + r["predicted"])))
+        blocked = self._blocked()
         return {
             "episodes": [
                 {
@@ -206,6 +252,7 @@ class AppState:
                     "offset": meta.get("subtitle_offset"),
                     "counts": dict(per_episode[name]),
                     "text_subtitles": _text_subtitles(meta),
+                    "spoken": self._spoken_summary(name, blocked[name]),
                 }
                 for name, meta in self.workspace.episodes.items()
             ],
@@ -215,6 +262,26 @@ class AppState:
             "other": counts(OTHER),
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
+        }
+
+    def _blocked(self) -> Counter[str]:
+        """Per episode, how many clips of target characters cannot be exported with text."""
+        targets = set(self.store.targets())
+        blocked: Counter[str] = Counter()
+        for clip in self.workspace.clips:
+            if role := self.role_of(clip, targets):
+                blocked[clip.episode] += self.spoken_of(clip, role)[1] is not None
+        return blocked
+
+    def _spoken_summary(self, episode: str, blocked: int) -> dict[str, Any]:
+        """The episode's spoken language and where its text comes from."""
+        said = self.workspace.spoken[episode]
+        return {
+            "language": said.language,
+            "assumed": said.assumed,
+            "source": said.source,
+            "problem": str(said.problem) if said.problem else None,
+            "blocked": blocked,
         }
 
     # Changes
@@ -446,55 +513,58 @@ class AppState:
         if meta is None:
             raise ValueError(say(f"没有 {episode} 这一集", f"there is no episode {episode}"))
         result = attach_text_subtitles(Path(meta["directory"]), path)
-        meta.update({k: v for k, v in result.items() if k.startswith("text_subtitle")})
+        self.reload()  # Every clip's text changes.
         return result
 
-    def _retext(
-        self, assigned: dict[str, list[Clip]]
-    ) -> tuple[dict[str, str], list[dict[str, Any]]]:
-        """Swap the exported dialogue for the text from the separately supplied subtitles. Returns
-        (clip ID to text, clips not accepted)."""
-        from avoc.stages.text_subtitle import load_text_lines, match, own_tag, shifted, touching
+    def set_spoken(self, episode: str, code: str) -> dict[str, Any]:
+        from avoc.pipeline import set_spoken_language
 
-        needed = sorted({c.episode for clips in assigned.values() for c in clips})
-        missing = [e for e in needed if not self.workspace.episodes[e].get("text_subtitles")]
-        if missing:
-            raise ValueError(
-                say(
-                    f"{'、'.join(missing)} 还没配台词字幕，先在下面配上，或者改用原字幕的文字",
-                    f"{', '.join(missing)} has no text subtitles yet. Attach them below, "
-                    "or take the text from the original subtitles",
-                )
-            )
-        lines = {}
-        for name in needed:
-            meta = self.workspace.episodes[name]
-            path = Path(meta["text_subtitles"])
-            if not path.is_file():
-                raise ValueError(
-                    say(
-                        f"{name} 配的台词字幕不见了：{path}",
-                        f"the text subtitles of {name} are missing: {path}",
-                    )
-                )
-            lines[name] = shifted(load_text_lines(path), float(meta["text_subtitle_offset"]))
-        texts: dict[str, str] = {}
-        rejected: list[dict[str, Any]] = []
+        meta = self.workspace.episodes.get(episode)
+        if meta is None:
+            raise ValueError(say(f"没有 {episode} 这一集", f"there is no episode {episode}"))
+        result = set_spoken_language(Path(meta["directory"]), code)
+        self.reload()
+        return result
+
+    def _text_for_export(
+        self, assigned: dict[str, list[Clip]], form: str, texts: dict[str, str],
+        rejected: list[dict[str, Any]],
+    ) -> str:  # fmt: skip
+        """Fill `texts` with each clip's spoken text, move the clips without it from `assigned`
+        to `rejected`, and return the languages wanted, for a message when none is left."""
+        from avoc.stages.text_language import name_of
+        from avoc.stages.text_subtitle import own_tag
+
+        wanted: set[str] = set()
         for role, clips in assigned.items():
-            tag = own_tag(x for c in clips for x in touching(lines[c.episode], c.start, c.end))
+            # Whose name in the subtitles is this character's, from the clips exported for them.
+            tag = own_tag(x for c in clips for x in c.spoken_hits or ())
             kept = []
             for clip in clips:
-                text, reason = match(lines[clip.episode], clip.start, clip.end, tag)
+                language = self.workspace.spoken[clip.episode].language
+                wanted.add(language)
+                text, reason = self.text_of(clip, tag)
+                if (
+                    reason is None
+                    and form == "style-bert-vits2"
+                    and language not in STYLE_BERT_VITS2
+                ):
+                    reason = say(
+                        f"Style-Bert-VITS2 不支持{name_of(language)}",
+                        f"Style-Bert-VITS2 does not take {name_of(language)}",
+                    )
                 if reason is None:
                     texts[clip.id] = text
                     kept.append(clip)
                 else:
                     rejected.append({"role": role, "clip": clip, "reason": reason, "text": text})
             clips[:] = kept
-        return texts, rejected
+        return say("、", ", ").join(name_of(code) for code in sorted(wanted))
 
-    def export(self, roles: list[str], include_auto: bool, form: str, language: str,
-               out: Path, text_subtitles: bool = False) -> dict[str, Any]:  # fmt: skip
+    def export(self, roles: list[str], include_auto: bool, form: str, out: Path) -> dict[str, Any]:
+        """Export the clips of these characters. For the formats with text, each clip's text is in
+        the language spoken in its episode, and clips without it are left out and listed in
+        rejected.tsv; see `spoken_of`."""
         from avoc.stages.export import export, summarize
 
         if form not in ("gpt-sovits", "style-bert-vits2", "folder"):
@@ -532,18 +602,16 @@ class AppState:
                 if rejected
                 else say("没有可导出的片段", "nothing to export")
             )
-        # Without text subtitles, the text of the subtitles used for cutting, with the same
-        # cleaning: names, sound notes and caption marks are not spoken.
-        texts = {c.id: spoken(c.text) for c in self.workspace.clips}
-        if text_subtitles and form != "folder":
-            texts, unmatched = self._retext(assigned)
-            rejected += unmatched
+        texts: dict[str, str] = {}
+        if form != "folder":
+            problems = self._text_for_export(assigned, form, texts, rejected)
             if not any(assigned.values()):
                 raise ValueError(
                     say(
-                        f"{len(unmatched)} 条片段全都对不上台词字幕，一条也没导出",
-                        f"none of the {len(unmatched)} clips match the text subtitles; "
-                        "nothing was exported",
+                        f"一条也没导出：没有一条片段有{problems}台词。先给这些集配上台词字幕，"
+                        "或者改成只导出音频",
+                        f"nothing was exported: no clip has {problems} text. Attach subtitles "
+                        "in that language to these episodes first, or export audio only",
                     )
                 )
         vocals = {name: Path(meta["vocals"]) for name, meta in self.workspace.episodes.items()}
@@ -556,11 +624,12 @@ class AppState:
             clip_id = by_span.get((item.episode, round(item.start, 6), round(item.end, 6)))
             text = texts.get(clip_id, "") if clip_id else ""
             text = text.replace("|", " ").replace("\n", " ")
+            language = self.workspace.spoken[item.episode].language
             if form == "gpt-sovits":
                 lines.append(f"{item.path.resolve()}|{item.name}|{language}|{text}")
             elif form == "style-bert-vits2":
                 rel = item.path.relative_to(out).as_posix()
-                lines.append(f"{rel}|{item.name}|{language.upper()[:2]}|{text}")
+                lines.append(f"{rel}|{item.name}|{STYLE_BERT_VITS2[language]}|{text}")
         if lines:
             listing = out / ("esd.list" if form == "style-bert-vits2" else "train.list")
             listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -606,11 +675,7 @@ class ExportBody(BaseModel):
     roles: list[str]
     include_auto: bool = False
     form: str = "gpt-sovits"
-    language: str = "ja"
     out: str
-    text_subtitles: bool = False
-    """The dialogue text comes from each episode's separately supplied subtitles, not from the
-    subtitles used for cutting."""
 
 
 class AddBody(BaseModel):
@@ -620,6 +685,8 @@ class AddBody(BaseModel):
     offset: float | None = None
     styles: list[str] | None = None
     """The subtitle styles that hold the dialogue. None picks them automatically."""
+    spoken: str | None = None
+    """The language spoken. None takes it from the video's audio track."""
     resume: str | None = None
     """Carry on with an episode that was not finished, using the files recorded for it."""
 
@@ -638,6 +705,11 @@ class PickBody(BaseModel):
 class TextSubtitlesBody(BaseModel):
     episode: str
     path: str
+
+
+class SpokenBody(BaseModel):
+    episode: str
+    language: str
 
 
 def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
@@ -821,16 +893,42 @@ def create_app(state: AppState) -> Any:
     def post_export(body: ExportBody) -> dict[str, Any]:
         try:
             with state.lock:
-                return state.export(
-                    body.roles,
-                    body.include_auto,
-                    body.form,
-                    body.language,
-                    Path(body.out),
-                    body.text_subtitles,
-                )
+                return state.export(body.roles, body.include_auto, body.form, Path(body.out))
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/spoken-language")
+    def post_spoken_language(body: SpokenBody) -> dict[str, Any]:
+        try:
+            with state.lock:
+                state.set_spoken(body.episode, body.language)
+                return state.summary()
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/audio-tracks")
+    def post_audio_tracks(body: SubtitleStylesBody) -> dict[str, Any]:
+        """The audio tracks of a video, and the one `avoc add` would take with no language given,
+        so the add form can show them."""
+        from dataclasses import asdict
+
+        from avoc.audio import audio_tracks
+        from avoc.pipeline import choose_track
+        from avoc.stages.text_language import from_tag
+
+        path = clean_path(body.path)
+        if not path.is_file():
+            raise HTTPException(400, say(f"找不到视频：{path}", f"cannot find the video: {path}"))
+        tracks = audio_tracks(path)
+        if not tracks:
+            return {"tracks": [], "number": None, "language": None, "from": None}
+        number, language, how = choose_track(tracks, None)
+        return {
+            "tracks": [{**asdict(t), "language": from_tag(t.tag)} for t in tracks],
+            "number": number,
+            "language": language,
+            "from": how,
+        }
 
     @app.post("/api/text-subtitles")
     def post_text_subtitles(body: TextSubtitlesBody) -> dict[str, Any]:
@@ -869,6 +967,7 @@ def create_app(state: AppState) -> Any:
                 text,
                 body.offset,
                 styles=body.styles,
+                spoken=body.spoken or None,
             )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
@@ -878,6 +977,7 @@ def create_app(state: AppState) -> Any:
         """The styles in a subtitle file and the ones picked as dialogue, so the person can check
         and change them before adding the episode."""
         from avoc.stages.subtitle import describe_styles
+        from avoc.stages.text_subtitle import subtitle_languages
 
         path = clean_path(body.path)
         try:
@@ -886,9 +986,14 @@ def create_app(state: AppState) -> Any:
                     say(f"找不到字幕文件：{path}", f"cannot find the subtitles: {path}")
                 )
             found = describe_styles(path)
+            languages = subtitle_languages(path, found["picked"] or None)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        return {**found, "marked": marked_note(found["marked"]) if found["marked"] else None}
+        return {
+            **found,
+            "marked": marked_note(found["marked"]) if found["marked"] else None,
+            "languages": list(languages),
+        }
 
     @app.post("/api/pick")
     def post_pick(body: PickBody) -> dict[str, Any]:

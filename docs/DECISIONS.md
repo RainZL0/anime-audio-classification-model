@@ -50,7 +50,12 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 
 **Export**
 
-- **When the subtitles used for cutting are a translation, the dialogue text is taken from a separate original-language subtitle file for each episode.** This is still done without speech-to-text. The offset is measured by comparing the two subtitle files. If the overlap is below 0.6, attaching is refused. Clips that cannot get complete dialogue, or that mix in someone else's speech, are not exported. They are recorded in `rejected.tsv`, and half-matched text is not forced into a clip.
+- **Exported text is always in the language spoken in the video.** Voice training needs the words that are actually said, so a translation is never written as training text. The cutting subtitles may be in any language. The text comes from them when they are in the spoken language (bilingual files included), and otherwise from a separate subtitle file in that language attached to the episode. Still no speech-to-text.
+- **Each episode records the language spoken, and the audio track is chosen to match.** It comes from the language tag of the video's audio tracks, or from the person; with no tag it is taken to be Japanese, and the person is told. A video with a dub as its first track would otherwise give the wrong voice.
+- **The language of subtitle text is worked out from its letters by fixed rules.** Two or more kana mean Japanese and two or more Hangul mean Korean; other lines follow the language most common at their place in the file (their style and their line number within the entry), which tells Chinese from kanji-only Japanese and handles bilingual files. No language model is used.
+- **Clips are matched to the spoken text when the workspace opens, not on export.** The labeling views then show each clip's text and whether it will be exported, before the person spends time on it.
+- **Text in the spoken language is required only for export with text.** GPT-SoVITS and Style-Bert-VITS2 exports leave out clips without it; audio-only export does not need it. Adding an episode without it only gives a warning, because audio-only users do not need it and original-language subtitles are often found later.
+- When separate text subtitles are attached, the offset is measured by comparing them with the cutting subtitles. If the overlap is below 0.6, or the file has no lines in the spoken language, attaching is refused. Clips that cannot get complete dialogue, or that mix in someone else's speech, are not exported. They are recorded in `rejected.tsv`, and half-matched text is not forced into a clip.
 
 ## Ruled out
 

@@ -39,3 +39,21 @@ export function setLanguage(next: Language) {
   localStorage.setItem("lang", lang);
   showLanguage();
 }
+
+/* The languages a voice can speak, as the server's codes. */
+export const SPOKEN = ["ja", "zh", "en", "ko"] as const;
+
+export const languageName = (code: string | null | undefined) =>
+  ({
+    ja: tr("日语", "Japanese"),
+    zh: tr("中文", "Chinese"),
+    en: tr("英语", "English"),
+    ko: tr("韩语", "Korean"),
+  })[code ?? ""] ??
+  (code || tr("认不出", "unknown"));
+
+/* "Chinese", or "Chinese and Japanese" for a bilingual file. */
+export const languageNames = (codes: string[]) =>
+  codes.length
+    ? codes.map(languageName).join(tr("和", " and "))
+    : tr("认不出语言", "language not recognized");
