@@ -41,6 +41,9 @@ PALETTE = (
 )
 """角色的颜色按出现顺序轮流取。颜色只帮人一眼认出是谁，不带别的意思。"""
 
+UNNAMED = "角色 {}"
+"""用户还没起名字的角色先叫这个。名字只是标签记录里的键，起名字就是改名。"""
+
 
 def is_special(name: str | None) -> bool:
     return name is not None and name in SPECIAL
@@ -61,6 +64,10 @@ class LabelStore:
         folder.mkdir(parents=True, exist_ok=True)
         if self.cast_path.exists():
             self.roles = list(read_json(self.cast_path)["roles"])
+        # 早期的角色表没有这两项：那时的名字都是人敲的；图案编号按表里的顺序补。
+        for index, role in enumerate(self.roles):
+            role.setdefault("named", True)
+            role.setdefault("pattern", index)
         if self.events_path.exists():
             for line in self.events_path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
@@ -162,8 +169,18 @@ class LabelStore:
             self._save_cast()
             return role
 
+    def new_role(self) -> str:
+        """建一个还没起名字的角色，返回它的临时名字。"""
+        with self._lock:
+            number = 1
+            while self.role(UNNAMED.format(number)) is not None:
+                number += 1
+            name = UNNAMED.format(number)
+            self._ensure_role(name, named=False)
+            return name
+
     def rename_role(self, old: str, new: str) -> dict[str, Any] | None:
-        """改名。新名字已经存在时就是合并，两个角色的片段归到一起。"""
+        """改名，也就是起名字。新名字已经存在时就是合并，两个角色的片段归到一起。"""
         new = new.strip()
         with self._lock:
             if self.role(old) is None:
@@ -179,6 +196,7 @@ class LabelStore:
                 role = self.role(old)
                 assert role is not None
                 role["name"] = new
+                role["named"] = True
             else:
                 self.roles = [r for r in self.roles if r["name"] != old]
             self._save_cast()
@@ -212,12 +230,16 @@ class LabelStore:
             else:
                 self.labels[clip] = change["after"]
 
-    def _ensure_role(self, name: str, save: bool = True) -> None:
+    def _ensure_role(self, name: str, save: bool = True, named: bool = True) -> None:
         if self.role(name) is None:
+            # 图案编号只增不复用：删掉或合并掉的角色，它的图案不会落到新角色头上。
+            pattern = max((int(r["pattern"]) for r in self.roles), default=-1) + 1
             self.roles.append(
                 {
                     "name": name,
-                    "color": PALETTE[len(self.roles) % len(PALETTE)],
+                    "named": named,
+                    "color": PALETTE[pattern % len(PALETTE)],
+                    "pattern": pattern,
                     "trainable": True,
                     "avatar": None,
                 }

@@ -21,7 +21,7 @@ const stamp = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).
 const pct = (p) => `${Math.round(p * 100)}%`;
 const STATUS_TEXT = {
   confirmed: "已确认", auto: "机器有把握", review: "待确认", novoice: "太短，没有声纹",
-  unlabeled: "还没有模型", special: "特殊",
+  unlabeled: "还没有模型", special: "特殊", skipped: "太短，默认跳过",
 };
 const NEEDS_WORK = new Set(["review", "novoice", "unlabeled"]);
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
@@ -46,13 +46,63 @@ function warm(clips, kind) {
 
 /* ───────────── 小部件 ───────────── */
 
-function Avatar({ role, name, size = "", special }) {
+/* 没截头像的角色用的图：底色 × 白色形状 × 花纹。
+   编号由服务端分配、存在角色表里，所以同一个角色每次打开都是同一张图。 */
+const PALETTE = ["#7F77DD", "#1D9E75", "#D85A30", "#D4537E", "#378ADD", "#639922", "#BA7517", "#E24B4A",
+  "#5F5E5A", "#534AB7", "#0F6E56", "#993C1D", "#993556", "#185FA5", "#3B6D11", "#854F0B"];
+/* 以 (20, 20) 为中心、半径轮流取 radii 里的值的多边形顶点。 */
+const ring = (corners, radii, turn = -Math.PI / 2) => Array.from({ length: corners }, (_, i) => {
+  const r = radii[i % radii.length];
+  const a = turn + 2 * Math.PI * i / corners;
+  return `${(20 + r * Math.cos(a)).toFixed(1)},${(20 + r * Math.sin(a)).toFixed(1)}`;
+}).join(" ");
+const SHAPES = [
+  html`<circle cx="20" cy="20" r="9" />`,
+  html`<polygon points="20,8 32,20 20,32 8,20" />`,
+  html`<polygon points="20,9 32,30 8,30" />`,
+  html`<rect x="11" y="11" width="18" height="18" rx="2.5" />`,
+  html`<polygon points=${ring(10, [12, 5])} />`,
+  html`<polygon points=${ring(6, [11], 0)} />`,
+  html`<path d="M16 9h8v7h7v8h-7v7h-8v-7H9v-8h7z" />`,
+  html`<circle cx="20" cy="20" r="8" fill="none" stroke="#fff" stroke-width="4.5" />`,
+];
+function hashed(text) {
+  let h = 0;
+  for (const ch of text) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return h;
+}
+/* 编号 p 的颜色取 p % 16；形状每过一轮 16 色就错开 3 格（3 与 8 互质），
+   所以前 128 个编号的「颜色 × 形状」两两不同，再往后才靠花纹区分。 */
+function Pattern({ role, name }) {
+  const p = role?.pattern ?? hashed(name);
+  const color = role?.color || PALETTE[p % PALETTE.length];
+  const round = Math.floor(p / PALETTE.length);
+  const shape = (p % SHAPES.length + 3 * round) % SHAPES.length;
+  const variant = Math.floor(p / (PALETTE.length * SHAPES.length)) % 3;
+  return html`<svg viewBox="0 0 40 40" aria-hidden="true">
+    <rect width="40" height="40" fill=${color} />
+    ${variant === 1 && html`<path d="M0 40L40 0V40z" fill="rgba(0,0,0,.22)" />`}
+    ${variant === 2 && html`<circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" />`}
+    <g fill="#fff">${SHAPES[shape]}</g>
+  </svg>`;
+}
+
+function Avatar({ role, name, size = "", special, onClick, title }) {
   if (special) return html`<div class="av ${size} unknown">·</div>`;
   if (!name) return html`<div class="av ${size} unknown">?</div>`;
-  const style = role?.avatar
-    ? `background-image:url(/media/avatar/${role.avatar})`
-    : `background:${role?.color || "#888"}`;
-  return html`<div class="av ${size}" style=${style}>${role?.avatar ? "" : [...name][0]}</div>`;
+  const click = onClick ? { onClick, role: "button" } : {};
+  if (role?.avatar) {
+    return html`<div class="av ${size} ${onClick ? "edit" : ""}" title=${title || name} ...${click}
+      style=${`background-image:url(/media/avatar/${role.avatar})`}></div>`;
+  }
+  return html`<div class="av ${size} ${onClick ? "edit" : ""}" title=${title || name} ...${click}>
+    <${Pattern} role=${role} name=${name} /></div>`;
+}
+
+/* 角色名：还没起名字的角色显示得淡一些，提醒人这是临时叫法。 */
+function RoleName({ role, name, cls = "" }) {
+  return html`<span class="rn ${cls} ${role?.named === false ? "unnamed" : ""}"
+    title=${role?.named === false ? "还没起名字，在「角色」视图里可以起" : ""}>${name}</span>`;
 }
 
 function Pill({ clip }) {
@@ -67,7 +117,8 @@ function Pill({ clip }) {
 
 /* ───────────── 舞台：画面、台词、这是谁 ───────────── */
 
-function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPlayRef, hasVideo, videoRef, onAvatar }) {
+function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPlayRef, hasVideo, videoRef, onAvatar,
+  onNewRole }) {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   useEffect(() => { setLoading(true); }, [clip?.id, sound]);
@@ -100,30 +151,35 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
     ${clip.label
       ? html`<div class="ask">已经确认</div>
         <div class="confirmed-box">
-          <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} />
-          <div><div class="who">${isSpecial ? special[clip.label] : clip.label}</div>
+          <${Avatar} role=${roles[clip.label]} name=${clip.label} special=${isSpecial} size="lg"
+            onClick=${!isSpecial && useVideo ? () => onAvatar(clip.label) : null} title="从画面里截一块当头像" />
+          <div><div class="who">${isSpecial ? special[clip.label] : html`<${RoleName} role=${roles[clip.label]} name=${clip.label} />`}</div>
           <div style="font-size:12px">要改的话，直接按别的数字键或在下面选</div></div>
           ${!isSpecial && useVideo && html`<button class="ghost" style="margin-left:auto;font-size:12px"
-            title="把当前这一帧截下来当这个角色的头像" onClick=${() => onAvatar(clip.label)}>设为头像</button>`}
+            title="从当前画面里框出一块当这个角色的头像" onClick=${() => onAvatar(clip.label)}>截取头像</button>`}
         </div>`
       : html`<div class="ask">${clip.guess.length ? "这是谁？机器的猜测" : clip.voiced ? "这是谁？" : "这句太短，机器听不出来，请直接选人"}</div>
         ${clip.familiar === false && html`<div class="stranger">
-          跟已经确认过的角色都不太像，可能是还没标过的人。是新角色就按 <kbd>/</kbd> 输入名字新建。</div>`}
+          跟已经确认过的角色都不太像，可能是还没标过的人。是新角色就按 <kbd>N</kbd> 新建，名字以后再起也行。</div>`}
         ${clip.familiar === null && clip.guess.length > 0 && html`<div class="stranger early">
-          机器现在只会在底部这几个角色里挑。都不是就按 <kbd>/</kbd> 新建；确认满 20 句后，它会自己提醒你哪句像新面孔。</div>`}
+          机器现在只会在底部这几个角色里挑。都不是就按 <kbd>N</kbd> 新建；确认满 20 句后，它会自己提醒你哪句像新面孔。</div>`}
         <div class="cands">
           ${clip.guess.filter((g) => g.p >= 0.02 || g === clip.guess[0]).map((g, i) => html`
             <div class="cand ${i === 0 ? "top" : ""}" onClick=${() => onAssign(g.name)}>
-              <${Avatar} role=${roles[g.name]} name=${g.name} />
-              <div><div class="name">${g.name}</div><div class="meter"><i style="width:${pct(g.p)}"></i></div></div>
+              <${Avatar} role=${roles[g.name]} name=${g.name} size="md" />
+              <div><div class="name"><${RoleName} role=${roles[g.name]} name=${g.name} /></div>
+                <div class="meter"><i style="width:${pct(g.p)}"></i></div></div>
               <span class="pct">${pct(g.p)}</span>
               <button class="ref" title="听这个角色确认过的一句" onClick=${(e) => { e.stopPropagation(); onPlayRef(g.name); }}>
                 参考音${i === 0 ? html` <kbd>R</kbd>` : ""}</button>
             </div>`)}
         </div>
-        ${clip.guess.length > 0 && html`<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-          <button class="primary" onClick=${onAccept}>是 ${clip.guess[0].name} <kbd style="margin-left:4px">Enter</kbd></button>
-          <span style="font-size:12px;color:var(--text-3)">不是的话按数字键选人，或按 <kbd>/</kbd> 搜索</span></div>`}`}
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${clip.guess.length > 0 && html`<button class="primary" onClick=${onAccept}>是 ${clip.guess[0].name}
+            <kbd style="margin-left:4px">Enter</kbd></button>`}
+          <button onClick=${onNewRole} title="新建一个角色，名字可以以后再起；有画面时接着截头像">
+            新角色 <kbd style="margin-left:4px">N</kbd></button>
+          <span style="font-size:12px;color:var(--text-3)">已有的人按数字键，或按 <kbd>/</kbd> 搜索</span></div>`}
 
     <div class="specials">
       ${Object.entries(special).map(([value, label], i) => html`
@@ -132,7 +188,7 @@ function Stage({ clip, roles, special, sound, setSound, onAssign, onAccept, onPl
     ${clip.rejects.length > 0 && html`<div class="note" style="margin-top:8px">你说过这句不是：${clip.rejects.join("、")}</div>`}
     <div class="hint">
       <kbd>J</kbd> <kbd>K</kbd> 上下一句 · <kbd>空格</kbd> 重播 · <kbd>1</kbd>–<kbd>9</kbd> 选下面的角色 ·
-      <kbd>/</kbd> 搜索或新建角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键
+      <kbd>N</kbd> 新角色 · <kbd>/</kbd> 搜索角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键
     </div>
   </aside>`;
 }
@@ -153,7 +209,8 @@ function Row({ clip, roles, special, selected, marked, onSelect, flash }) {
     <div>
       <div class="who">
         <span class="n" style=${who && !who.human ? "color:var(--text-2);font-weight:500" : ""}>
-          ${isSpecial ? special[clip.label] : stranger ? `最像 ${who.name}` : who ? who.name : "未知"}</span>
+          ${isSpecial ? special[clip.label] : stranger ? `最像 ${who.name}`
+            : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : "未知"}</span>
         <${Pill} clip=${clip} />
         ${marked && html`<span class="pill reject">不是这个角色</span>`}
       </div>
@@ -175,10 +232,13 @@ function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, se
     else last.clips.push(clip);
   }
   const left = clips.filter((c) => NEEDS_WORK.has(c.status)).length;
+  const skipped = clips.filter((c) => c.status === "skipped").length;
   return html`<div>
     <div class="toolbar">
       <h2>${episode}</h2>
       <span class="sub">${clips.length} 句 · 还有 ${left} 句要你看</span>
+      ${skipped > 0 && html`<span class="sub" title="短于 1 秒、前后 0.5 秒内没有别的台词，训练用不上。在「整集」里还能看到，想标也可以标">
+        · 跳过 ${skipped} 句短句</span>`}
       <span class="spacer"></span>
       <span class="seg">
         <button class=${!onlyWork ? "on" : ""} onClick=${() => setOnlyWork(false)}>整集</button>
@@ -199,7 +259,7 @@ function SceneView({ clips, order, focus, setFocus, roles, special, onlyWork, se
 /* ───────────── 角色视图：按人核对机器的判断 ───────────── */
 
 function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus, marks, toggleMark, onConfirmRest,
-  onRename, onToggleTrain, flashes, playing, setPlaying }) {
+  onRename, onToggleTrain, onAvatar, canCrop, flashes, playing, setPlaying }) {
   const list = state.roles;
   const current = roles[role];
   const pending = clips.filter((c) => !c.label).sort((a, b) => confidence(a) - confidence(b));
@@ -209,8 +269,8 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
     <div class="role-list">
       ${list.map((r) => html`<div class="role-item ${r.name === role ? "on" : ""} ${r.trainable ? "" : "off"}"
           onClick=${() => setRole(r.name)}>
-        <${Avatar} role=${r} name=${r.name} size="sm" />
-        <span class="nm">${r.name}</span>
+        <${Avatar} role=${r} name=${r.name} size="md" />
+        <${RoleName} role=${r} name=${r.name} cls="nm" />
         <span class="c">${r.confirmed}${r.predicted ? html` · <b>${r.predicted}</b>` : ""}</span>
       </div>`)}
     </div>
@@ -218,13 +278,17 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
       ${!current ? html`<div class="empty"><h2>选一个角色</h2><p>左边是全部角色。灰色数字是确认过的句数，橙色是机器归给 TA、还没人确认的句数。</p></div>`
       : html`
         <div class="role-head">
-          <${Avatar} role=${current} name=${role} size="lg" />
-          <div><h2>${role}</h2>
+          <${Avatar} role=${current} name=${role} size="xl" onClick=${canCrop ? onAvatar : null}
+            title=${canCrop ? "从左边的画面里截一块当头像" : "左边放出画面后，可以从画面里截头像"} />
+          <div><h2><${RoleName} role=${current} name=${role} /></h2>
             <div class="stats">确认过 ${confirmed.length} 句 · 机器归给 TA ${pending.length} 句
               ${current.trainable ? "" : " · 不参与训练"}</div></div>
           <div class="role-actions">
             <button onClick=${() => setPlaying(!playing)}>${playing ? "停止连播" : "连播待核对"} <kbd>P</kbd></button>
-            <button onClick=${onRename}>改名或合并</button>
+            <button onClick=${onAvatar} disabled=${!canCrop}
+              title=${canCrop ? "从左边的画面里框出一块" : "左边放出画面后才能截"}>截取头像</button>
+            <button class=${current.named === false ? "primary" : ""} onClick=${onRename}>
+              ${current.named === false ? "起名字" : "改名或合并"}</button>
             <button onClick=${onToggleTrain} title="一群人共用的名字（比如路人）不该拿来训练">
               ${current.trainable ? "不参与训练" : "参与训练"}</button>
           </div>
@@ -248,14 +312,14 @@ function RoleView({ state, roles, special, role, setRole, clips, focus, setFocus
 
 /* ───────────── 起步分组：给声音相近的一组起名字 ───────────── */
 
-function GroupsView({ groups, loading, roles, onName, focus, setFocus, firstRun }) {
+function GroupsView({ groups, loading, roles, onName, onNew, focus, setFocus, firstRun }) {
   const [out, setOut] = useState({});
   const [names, setNames] = useState({});
   if (loading) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>正在把声音相近的台词分组…</p></div>`;
   return html`<div>
     ${firstRun && html`<div class="welcome"><div>
       <h3>第一步：给声音相近的一组起个名字</h3>
-      <p>机器先把听起来像同一个人的台词放在一起。点一句听一听，确认是谁，在下面填上名字。</p>
+      <p>机器先把听起来像同一个人的台词放在一起。点一句听一听，按「是新角色」把这一组定成一个人，再从画面里截一张头像。名字可以现在填，也可以以后再起。</p>
       <ol><li>听到混进来的别人，点那一行右边的 × 把它剔出去。</li>
       <li>每命名一组，机器就会重新学一次，其余台词的猜测随之变准。</li>
       <li>命名五六个主要角色以后，去「场景」视图逐句确认会快得多。</li></ol></div></div>`}
@@ -268,10 +332,18 @@ function GroupsView({ groups, loading, roles, onName, focus, setFocus, firstRun 
         /* 机器的猜测只放在提示里，不直接填进框：先听再认，回车才采用。 */
         const value = names[g.key] ?? "";
         const chosen = value.trim() || g.hint?.name || "";
-        const submit = (e) => { e.preventDefault(); if (chosen && keep.length) onName(keep.map((c) => c.id), chosen); };
+        const ids = keep.map((c) => c.id);
+        /* 没填名字、机器也没提示时，回车就是新建一个还没起名字的角色。 */
+        const submit = (e) => {
+          e.preventDefault();
+          if (!keep.length) return;
+          if (chosen) onName(ids, chosen); else onNew(ids);
+        };
+        const known = Object.values(roles).filter((r) => r.name !== g.hint?.name).slice(0, 8);
         return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""}">
           <h3>第 ${gi + 1} 组 <span class="meta">${g.size} 句 · ${g.seconds} 秒</span>
-            ${g.hint && html`<span class="pill auto" title="机器的分类器在这组里最常猜的名字">可能是 ${g.hint.name}</span>`}</h3>
+            ${g.hint && html`<span class="pill auto hint" title="机器的分类器在这组里最常猜的角色">
+              <${Avatar} role=${roles[g.hint.name]} name=${g.hint.name} size="xs" />可能是 ${g.hint.name}</span>`}</h3>
           <div class="members">
             ${g.clips.map((c) => html`<div class="member ${excluded.has(c.id) ? "out" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
@@ -281,12 +353,19 @@ function GroupsView({ groups, loading, roles, onName, focus, setFocus, firstRun 
                 ${excluded.has(c.id) ? "↺" : "×"}</button>
             </div>`)}
           </div>
+          ${known.length > 0 && html`<div class="pick-row">
+            <span class="note">是已有的人：</span>
+            ${known.map((r) => html`<${Avatar} key=${r.name} role=${r} name=${r.name} size="md"
+              title=${`这 ${keep.length} 句都是 ${r.name}`} onClick=${() => keep.length && onName(ids, r.name)} />`)}
+          </div>`}
           <form class="name-form" onSubmit=${submit}>
             <input list="role-names" value=${value}
-              placeholder=${g.hint ? `可能是 ${g.hint.name}，听过确认是 TA 就回车` : "这是谁？输入名字"}
+              placeholder=${g.hint ? `可能是 ${g.hint.name}，听过确认是 TA 就回车` : "名字（可以不填）"}
               onInput=${(e) => setNames({ ...names, [g.key]: e.target.value })} />
-            <button class="primary" type="submit" disabled=${!chosen || !keep.length}>
-              ${chosen ? `${keep.length} 句都是 ${chosen}` : `命名这 ${keep.length} 句`}</button>
+            ${chosen
+              ? html`<button class="primary" type="submit" disabled=${!keep.length}>${keep.length} 句都是 ${chosen}</button>
+                ${!value.trim() && html`<button type="button" disabled=${!keep.length} onClick=${() => onNew(ids)}>是新角色</button>`}`
+              : html`<button class="primary" type="submit" disabled=${!keep.length}>${keep.length} 句是一个新角色</button>`}
           </form>
         </div>`;
       })}
@@ -297,20 +376,58 @@ function GroupsView({ groups, loading, roles, onName, focus, setFocus, firstRun 
 
 /* ───────────── 导出 ───────────── */
 
-function ExportView({ state, toast }) {
+/* 每集另配一份台词字幕：贴上路径，服务端量偏移、对不上就拒绝。 */
+function TextSubtitles({ state, setState, toast }) {
+  const [paths, setPaths] = useState({});
+  const [busy, setBusy] = useState(null);
+  const attach = async (episode) => {
+    setBusy(episode);
+    try {
+      setState(await call("/api/text-subtitles", { episode, path: paths[episode] || "" }));
+      setPaths({ ...paths, [episode]: "" });
+      toast(`${episode} 的台词字幕配好了`);
+    } catch (e) { toast(e.message, true); }
+    setBusy(null);
+  };
+  return html`<div class="text-subs">
+    ${state.episodes.map((e) => {
+      const t = e.text_subtitles;
+      return html`<div class="text-sub">
+        <span class="ep">${e.name}</span>
+        <span class="now">${t
+          ? html`${t.file} <span class="min">偏移 ${t.offset} 秒，重合 ${pct(t.agreement)}</span>`
+          : html`<span class="min">还没配</span>`}</span>
+        <input placeholder=${t ? "换一份：字幕文件的路径" : "字幕文件的路径（ASS 或 SRT）"} value=${paths[e.name] || ""}
+          onInput=${(ev) => setPaths({ ...paths, [e.name]: ev.target.value })} />
+        <button disabled=${busy !== null || !(paths[e.name] || "").trim()} onClick=${() => attach(e.name)}>
+          ${busy === e.name ? "正在对…" : "对齐并配上"}</button>
+      </div>`;
+    })}
+  </div>`;
+}
+
+function ExportView({ state, setState, toast }) {
   const trainable = state.roles.filter((r) => r.confirmed > 0);
   const [picked, setPicked] = useState(() => new Set());
   const [form, setForm] = useState("gpt-sovits");
   const [language, setLanguage] = useState("ja");
+  const [textSubtitles, setTextSubtitles] = useState(() => state.episodes.some((e) => e.text_subtitles));
   const [includeAuto, setIncludeAuto] = useState(false);
-  const [out, setOut] = useState(() => `exports/${new Date().toISOString().slice(0, 10)}`);
+  /* 用本地日期：toISOString 给的是 UTC，东八区早上八点前会变成前一天。 */
+  const [out, setOut] = useState(() => {
+    const d = new Date();
+    const two = (n) => String(n).padStart(2, "0");
+    return `exports/${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+  });
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const toggle = (name) => { const next = new Set(picked); next.has(name) ? next.delete(name) : next.add(name); setPicked(next); };
   const run = async () => {
     setBusy(true); setResult(null);
     try {
-      setResult(await call("/api/export", { roles: [...picked], include_auto: includeAuto, form, language, out }));
+      setResult(await call("/api/export", {
+        roles: [...picked], include_auto: includeAuto, form, language, out, text_subtitles: textSubtitles,
+      }));
     } catch (e) { toast(e.message, true); }
     setBusy(false);
   };
@@ -320,7 +437,7 @@ function ExportView({ state, toast }) {
     <div class="field"><label class="title">导出哪些角色</label>
       <div class="role-checks">
         ${trainable.map((r) => html`<div class="check ${picked.has(r.name) ? "on" : ""}" onClick=${() => toggle(r.name)}>
-          <${Avatar} role=${r} name=${r.name} size="sm" /><span>${r.name}</span>
+          <${Avatar} role=${r} name=${r.name} size="md" /><${RoleName} role=${r} name=${r.name} />
           <span class="min">${r.confirmed} 句${includeAuto && r.predicted ? ` + ${r.predicted}` : ""}</span></div>`)}
       </div></div>
     <div class="field"><label class="title">包括哪些台词</label>
@@ -339,19 +456,30 @@ function ExportView({ state, toast }) {
     ${form !== "folder" && html`<div class="field"><label class="title">台词文字的语言</label>
       <span class="seg">${[["ja", "日语"], ["zh", "中文"], ["en", "英语"]].map(([v, l]) =>
         html`<button class=${language === v ? "on" : ""} onClick=${() => setLanguage(v)}>${l}</button>`)}</span>
-      <div class="note warn" style="margin-top:6px">文字取自字幕。字幕是中文译文时，文字和日语声音对不上，训练日语模型前需要另做日语转写。</div></div>`}
+      </div>`}
+    ${form !== "folder" && html`<div class="field"><label class="title">台词文字从哪来</label>
+      <span class="seg">
+        <button class=${!textSubtitles ? "on" : ""} onClick=${() => setTextSubtitles(false)}>切片段用的字幕</button>
+        <button class=${textSubtitles ? "on" : ""} onClick=${() => setTextSubtitles(true)}>每集另配的台词字幕</button>
+      </span>
+      ${textSubtitles
+        ? html`<div class="note" style="margin-top:6px">片段不变，文字换成另配字幕里同一时间的台词。找不全台词、或者混着别人的话的片段不导出，原因写进导出目录的 rejected.tsv。</div>
+          <${TextSubtitles} state=${state} setState=${setState} toast=${toast} />`
+        : html`<div class="note warn" style="margin-top:6px">切片段用的字幕是中文译文时，文字和日语声音对不上。训练日语模型请改用另配的日文字幕。</div>`}</div>`}
     <div class="field"><label class="title">输出到（相对路径从启动目录算起）</label>
       <input style="width:100%" value=${out} onInput=${(e) => setOut(e.target.value)} /></div>
     <div><button class="primary" disabled=${busy || picked.size === 0} onClick=${run}>
       ${busy ? "正在导出…" : `导出 ${picked.size} 个角色`}</button></div>
     ${result && html`<div class="result"><b>导出好了：</b>${result.files} 个文件，共 ${Math.round(result.total_sec / 6) / 10} 分钟<br />
+      ${Object.keys(result.rejected || {}).length > 0 && html`<span>没导出：${Object.entries(result.rejected)
+        .map(([why, n]) => `${why} ${n} 条`).join("，")}。明细见 rejected.tsv<br /></span>`}
       <span class="note">${result.out}</span></div>`}
   </div>`;
 }
 
 /* ───────────── 搜索或新建角色 ───────────── */
 
-function Palette({ roles, onPick, onClose }) {
+function Palette({ roles, onPick, onNew, onClose }) {
   const [query, setQuery] = useState("");
   const [at, setAt] = useState(0);
   const input = useRef(null);
@@ -361,22 +489,24 @@ function Palette({ roles, onPick, onClose }) {
   const found = names.filter((r) => !q || r.name.toLowerCase().includes(q)).slice(0, 12);
   const options = [...found.map((r) => ({ name: r.name, role: r }))];
   if (q && !names.some((r) => r.name.toLowerCase() === q)) options.push({ name: query.trim(), fresh: true });
+  options.push({ unnamed: true });
+  const pick = (o) => (o.unnamed ? onNew() : onPick(o.name));
   const key = (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setAt(Math.min(at + 1, options.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setAt(Math.max(at - 1, 0)); }
-    else if (e.key === "Enter" && options[at]) { e.preventDefault(); onPick(options[at].name); }
+    else if (e.key === "Enter" && options[at]) { e.preventDefault(); pick(options[at]); }
     else if (e.key === "Escape") onClose();
   };
   return html`<div class="overlay" onClick=${onClose}><div class="palette" onClick=${(e) => e.stopPropagation()}>
-    <input ref=${input} placeholder="输入角色名，回车确定；没有就新建" value=${query}
+    <input ref=${input} placeholder="搜索角色；敲一个新名字就是新建" value=${query}
       onInput=${(e) => { setQuery(e.target.value); setAt(0); }} onKeyDown=${key} />
     <div class="opts">
-      ${options.map((o, i) => html`<div class="opt ${i === at ? "on" : ""}" onMouseEnter=${() => setAt(i)} onClick=${() => onPick(o.name)}>
-        ${o.fresh ? html`<div class="av sm unknown">+</div><span>新建角色「${o.name}」</span>`
-          : html`<${Avatar} role=${o.role} name=${o.name} size="sm" /><span>${o.name}</span>
+      ${options.map((o, i) => html`<div class="opt ${i === at ? "on" : ""}" onMouseEnter=${() => setAt(i)} onClick=${() => pick(o)}>
+        ${o.unnamed ? html`<div class="av md unknown">+</div><span>新角色，先不起名字</span><span class="c"><kbd>N</kbd></span>`
+          : o.fresh ? html`<div class="av md unknown">+</div><span>新建角色「${o.name}」</span>`
+          : html`<${Avatar} role=${o.role} name=${o.name} size="md" /><${RoleName} role=${o.role} name=${o.name} />
             <span class="c">${o.role.confirmed} 句</span>`}
       </div>`)}
-      ${options.length === 0 && html`<div class="opt" style="color:var(--text-3)">输入名字</div>`}
     </div>
   </div></div>`;
 }
@@ -384,14 +514,124 @@ function Palette({ roles, onPick, onClose }) {
 function Help({ onClose }) {
   const rows = [
     ["J / ↓，K / ↑", "下一句，上一句"], ["空格", "从头重播这一句"], ["Enter", "接受机器猜的第一个"],
-    ["1 – 9", "标成底部角色栏里对应的角色"], ["/", "搜索角色，或者新建一个"], ["X / C / V", "不止一个人 / 听不清 / 不是说话"],
+    ["1 – 9", "标成底部角色栏里对应的角色"], ["N", "标成一个新角色，名字以后再起；有画面时接着截头像"],
+    ["/", "搜索角色，或者敲名字新建"], ["X / C / V", "不止一个人 / 听不清 / 不是说话"],
     ["Backspace", "清掉这句的标签"], ["R", "听机器最像的那个角色的参考音"], ["Z", "撤销上一步（可以一直往回撤）"],
     ["F", "场景视图里只看要处理的"], ["角色视图里 X", "这句不是这个角色"], ["角色视图里 Shift+Enter", "确认其余，剔除标出来的"],
     ["角色视图里 P", "从最没把握的开始连着播"], ["G / S / O / E", "切到起步分组 / 场景 / 角色 / 导出"],
+    ["截头像时 Enter / Esc", "保存 / 放弃"],
   ];
   return html`<div class="overlay" onClick=${onClose}><div class="help" onClick=${(e) => e.stopPropagation()}>
     <h2>快捷键</h2><table>${rows.map(([k, v]) => html`<tr><td><kbd>${k}</kbd></td><td>${v}</td></tr>`)}</table>
     <p class="note" style="margin-top:12px">每次标注都立刻保存，并让机器重新学一次。所有操作都能撤销。</p>
+  </div></div>`;
+}
+
+/* ───────────── 截头像：从画面里框出一块 ───────────── */
+
+const AVATAR_SIDE = 256;
+
+function Cropper({ source, name, role, onSave, onClose }) {
+  const canvas = useRef(null);
+  const preview = useRef(null);
+  const drag = useRef(null);
+  const W = source.videoWidth;
+  const H = source.videoHeight;
+  /* 框是正方形，坐标用视频本身的像素。默认取画面正中、高度六成的一块。 */
+  const [box, setBox] = useState(() => {
+    const s = Math.round(H * 0.6);
+    return { x: Math.round((W - s) / 2), y: Math.round((H - s) / 2), s };
+  });
+  const [time, setTime] = useState(source.currentTime);
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    source.pause();
+    const draw = () => {
+      canvas.current?.getContext("2d").drawImage(source, 0, 0, W, H);
+      setFrame((n) => n + 1);
+    };
+    draw();
+    source.addEventListener("seeked", draw);
+    return () => source.removeEventListener("seeked", draw);
+  }, []);
+
+  useEffect(() => {
+    if (!canvas.current || !preview.current) return;
+    const ctx = preview.current.getContext("2d");
+    ctx.clearRect(0, 0, 96, 96);
+    ctx.drawImage(canvas.current, box.x, box.y, box.s, box.s, 0, 0, 96, 96);
+  }, [box, frame]);
+
+  const clamp = (b) => {
+    const s = Math.max(24, Math.min(b.s, W, H));
+    return { s, x: Math.min(Math.max(b.x, 0), W - s), y: Math.min(Math.max(b.y, 0), H - s) };
+  };
+  const at = (e) => {
+    const r = canvas.current.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  };
+  /* 拖框里面是挪动，拖右下角是缩放，在框外按下就从那里重新画一个。 */
+  const down = (e) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const p = at(e);
+    const inside = p.x >= box.x && p.x <= box.x + box.s && p.y >= box.y && p.y <= box.y + box.s;
+    if (e.target.classList.contains("handle")) drag.current = { mode: "size", ox: box.x, oy: box.y };
+    else if (inside) drag.current = { mode: "move", dx: p.x - box.x, dy: p.y - box.y };
+    else { drag.current = { mode: "size", ox: p.x, oy: p.y }; setBox(clamp({ x: p.x, y: p.y, s: 24 })); }
+  };
+  const moveTo = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const p = at(e);
+    if (d.mode === "move") setBox(clamp({ ...box, x: p.x - d.dx, y: p.y - d.dy }));
+    else {
+      const s = Math.max(p.x - d.ox, p.y - d.oy, 24);
+      setBox(clamp({ x: d.ox, y: d.oy, s: Math.min(s, W - d.ox, H - d.oy) }));
+    }
+  };
+  const up = () => { drag.current = null; };
+  const wheel = (e) => {
+    e.preventDefault();
+    const grow = e.deltaY < 0 ? 1.06 : 1 / 1.06;
+    const s = box.s * grow;
+    setBox(clamp({ x: box.x + (box.s - s) / 2, y: box.y + (box.s - s) / 2, s }));
+  };
+  const save = () => {
+    const out = document.createElement("canvas");
+    out.width = out.height = AVATAR_SIDE;
+    out.getContext("2d").drawImage(canvas.current, box.x, box.y, box.s, box.s, 0, 0, AVATAR_SIDE, AVATAR_SIDE);
+    onSave(out.toDataURL("image/jpeg", 0.9));
+  };
+  useEffect(() => {
+    const key = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      else if (e.key === "Enter") { e.preventDefault(); save(); }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
+
+  const left = (v, total) => `${v / total * 100}%`;
+  return html`<div class="overlay" onClick=${onClose}><div class="cropper" onClick=${(e) => e.stopPropagation()}>
+    <h2>给 <${RoleName} role=${role} name=${name} /> 截一张头像</h2>
+    <div class="crop-area" onPointerDown=${down} onPointerMove=${moveTo} onPointerUp=${up} onWheel=${wheel}>
+      <canvas ref=${canvas} width=${W} height=${H}></canvas>
+      <div class="crop-box" style=${`left:${left(box.x, W)};top:${left(box.y, H)};width:${left(box.s, W)};height:${left(box.s, H)}`}>
+        <div class="handle"></div></div>
+    </div>
+    <div class="crop-bar">
+      <label class="note">换一帧</label>
+      <input type="range" min="0" max=${source.duration || 0} step="0.04" value=${time}
+        onInput=${(e) => { const t = Number(e.target.value); setTime(t); source.currentTime = t; }} />
+      <canvas ref=${preview} class="crop-preview" width="96" height="96"></canvas>
+    </div>
+    <p class="note">拖动方框挪位置，拖右下角或滚轮缩放，在框外按下可以重新画。</p>
+    <div class="crop-actions">
+      <button class="ghost" onClick=${onClose}>放弃 <kbd>Esc</kbd></button>
+      <button class="primary" onClick=${save}>用这张 <kbd>Enter</kbd></button>
+    </div>
   </div></div>`;
 }
 
@@ -416,6 +656,8 @@ function App() {
   const [sound, setSound] = useState("original");
   const [flashes, setFlashes] = useState(() => new Set());
   const [playing, setPlaying] = useState(false);
+  const [crop, setCrop] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem("avs-theme") || "light");
   const dockOrder = useRef([]);
   const playerRef = useRef(null);
   const refAudio = useRef(null);
@@ -427,6 +669,12 @@ function App() {
   const episodeInfo = state?.episodes.find((e) => e.name === episode);
   const totalConfirmed = state ? state.roles.reduce((s, r) => s + r.confirmed, 0) : 0;
   const firstRun = state && totalConfirmed === 0;
+
+  useEffect(() => {
+    if (theme === "dark") document.documentElement.dataset.theme = "dark";
+    else delete document.documentElement.dataset.theme;
+    localStorage.setItem("avs-theme", theme);
+  }, [theme]);
 
   const showToast = useCallback((message, isError = false, extra = null) => {
     clearTimeout(toastTimer.current);
@@ -495,7 +743,8 @@ function App() {
   useEffect(() => { stableOrder.current = null; }, [onlyWork, episode]);
 
   const byId = useMemo(() => Object.fromEntries(clips.map((c) => [c.id, c])), [clips]);
-  const current = focus ? byId[focus] : null;
+  /* 场景视图筛掉了这一句时舞台留空，免得快捷键改到列表里看不见的句子。 */
+  const current = focus && (view !== "scene" || order.includes(focus)) ? byId[focus] : null;
 
   useEffect(() => {
     const at = order.indexOf(focus);
@@ -607,24 +856,49 @@ function App() {
     setMarks(next);
   };
   const renameRole = async () => {
-    const next = prompt(`把「${role}」改成什么名字？填一个已有的名字就是把两个角色合并。`, role);
+    const unnamed = roles[role]?.named === false;
+    const next = unnamed
+      ? prompt(`给「${role}」起个名字。填一个已有的名字就是把两个角色合并。`, "")
+      : prompt(`把「${role}」改成什么名字？填一个已有的名字就是把两个角色合并。`, role);
     if (!next || next.trim() === role) return;
-    const result = await send("/api/roles", { name: role, new_name: next.trim() }, `已改名为 ${next.trim()}`);
+    const result = await send("/api/roles", { name: role, new_name: next.trim() },
+      roles[next.trim()] ? `已并进 ${next.trim()}` : `已改名为 ${next.trim()}`);
     if (result) { setRole(next.trim()); }
   };
   const toggleTrain = () => send("/api/roles", { name: role, trainable: !roles[role].trainable },
     roles[role].trainable ? `${role} 不再参与训练` : `${role} 重新参与训练`);
-  const saveAvatar = async (name) => {
-    const video = playerRef.current;
-    if (!video || !video.videoWidth) { showToast("画面还没出来", true); return; }
-    const side = Math.min(video.videoWidth, video.videoHeight);
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 160;
-    canvas.getContext("2d").drawImage(video, (video.videoWidth - side) / 2, 0, side, side, 0, 0, 160, 160);
+  /* 截头像要用舞台上正在放的视频。`then` 在截完或放弃之后执行，比如标完新角色再往下走。 */
+  const hasFrame = () => !!playerRef.current?.videoWidth;
+  const openCrop = (name, then = null) => {
+    if (!hasFrame()) {
+      showToast(episodeInfo?.video ? "画面还没出来，或者正在只听人声" : "这一集没有视频，截不了头像", true);
+      then?.();
+      return;
+    }
+    setCrop({ name, then });
+  };
+  const closeCrop = () => { const then = crop?.then; setCrop(null); then?.(); };
+  const saveAvatar = async (image) => {
+    const name = crop.name;
+    closeCrop();
     try {
-      setState(await call("/api/roles/avatar", { name, image: canvas.toDataURL("image/jpeg", 0.88) }));
-      showToast(`已把这一帧设为 ${name} 的头像`);
+      setState(await call("/api/roles/avatar", { name, image }));
+      showToast(`已换好 ${name} 的头像`);
     } catch (e) { showToast(e.message, true); }
+  };
+  /* 标成一个还没起名字的新角色。当前这句在这批里、又有画面，就接着从这一帧截头像。 */
+  const newRole = async (ids = current ? [current.id] : []) => {
+    if (!ids.length) return;
+    const from = focus;
+    const onward = () => {
+      if (view === "groups") setFocus(order.find((id) => !ids.includes(id)));
+      else if (ids.length === 1) advance(from);
+    };
+    const result = await send("/api/label", { clips: ids, new_role: true },
+      ids.length > 1 ? `${ids.length} 句标成了一个新角色` : "已标成一个新角色");
+    if (!result) return;
+    if (ids.includes(from) && hasFrame()) openCrop(result.role, onward);
+    else onward();
   };
 
   /* 角色视图的连播：放完一句自动跳到下一句待核对的 */
@@ -640,6 +914,7 @@ function App() {
   /* 全部快捷键 */
   useEffect(() => {
     const onKey = (e) => {
+      if (crop) return;
       if (palette || help) { if (e.key === "Escape") { setPalette(false); setHelp(false); } return; }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.ctrlKey && e.key !== "z" || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -658,6 +933,7 @@ function App() {
         if (name) { handled(); assign(name); }
       }
       else if (e.key === "/") { handled(); setPalette(true); }
+      else if (k === "n" && current && view !== "export") { handled(); newRole(); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
       else if (k === "x" && view === "roles" && current && !current.label) { handled(); toggleMark(current.id); move(1); }
@@ -686,7 +962,8 @@ function App() {
   }
 
   const counts = episodeInfo?.counts || {};
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  /* 默认跳过的短句不要人标，不算进进度。 */
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) - (counts.skipped || 0) || 1;
   const done = (counts.confirmed || 0) + (counts.special || 0);
   const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
   const showStage = view !== "export";
@@ -713,38 +990,46 @@ function App() {
           ? `机器学过 ${state.model.labels} 句 · ${state.model.roles} 个角色`
           : "机器还没学过"}</span>
       <button class="ghost" disabled=${!state.can_undo} onClick=${undo} title="撤销上一步">撤销 <kbd>Z</kbd></button>
+      <button class="ghost theme" onClick=${() => setTheme(theme === "dark" ? "light" : "dark")}
+        title=${theme === "dark" ? "换成白天配色" : "换成夜间配色"}>${theme === "dark" ? "☀" : "☾"}</button>
       <button class="ghost" onClick=${() => setHelp(true)} title="全部快捷键"><kbd>?</kbd></button>
     </header>
 
     <div class="body" style=${showStage ? "" : "grid-template-columns:1fr"}>
       ${showStage && html`<${Stage} clip=${current} roles=${roles} special=${special} sound=${sound} setSound=${setSound}
         hasVideo=${!!episodeInfo?.video} videoRef=${playerRef} onAssign=${(n) => assign(n)} onAccept=${accept}
-        onPlayRef=${playRef} onAvatar=${saveAvatar} />`}
+        onPlayRef=${playRef} onAvatar=${(name) => openCrop(name)} onNewRole=${() => newRole()} />`}
       <main class="main">
         ${view === "scene" && html`<${SceneView} clips=${clips} order=${order} focus=${focus} setFocus=${setFocus}
           roles=${roles} special=${special} onlyWork=${onlyWork} setOnlyWork=${setOnlyWork} flashes=${flashes} episode=${episode} />`}
         ${view === "roles" && html`<${RoleView} state=${state} roles=${roles} special=${special} role=${role} setRole=${setRole}
           clips=${clips} focus=${focus} setFocus=${setFocus} marks=${marks} toggleMark=${toggleMark}
           onConfirmRest=${confirmRest} onRename=${renameRole} onToggleTrain=${toggleTrain} flashes=${flashes}
+          onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video && sound === "original"}
           playing=${playing} setPlaying=${setPlaying} />`}
         ${view === "groups" && html`<${GroupsView} groups=${groups} loading=${groupsLoading} roles=${roles}
           focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
-          onName=${(ids, name) => assign(name, ids)} />`}
-        ${view === "export" && html`<${ExportView} state=${state} toast=${showToast} />`}
+          onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
+        ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}
       </main>
     </div>
 
     <footer class="dock">
       ${dockOrder.current.slice(0, 9).map((name, i) => roles[name] && html`<div class="chip" key=${name}
           title=${`按 ${i + 1} 标成 ${name}`} onClick=${() => assign(name)}>
-        <${Avatar} role=${roles[name]} name=${name} size="sm" /><span>${name}</span><span class="k">${i + 1}</span></div>`)}
-      <button class="ghost" onClick=${() => setPalette(true)}>其他角色或新建 <kbd>/</kbd></button>
+        <${Avatar} role=${roles[name]} name=${name} size="md" /><${RoleName} role=${roles[name]} name=${name} />
+        <span class="k">${i + 1}</span></div>`)}
+      <button class="ghost" onClick=${() => current && newRole()} disabled=${!current || view === "export"}>新角色 <kbd>N</kbd></button>
+      <button class="ghost" onClick=${() => setPalette(true)}>其他角色 <kbd>/</kbd></button>
       <span class="more">${dockOrder.current.length > 9 ? `另有 ${dockOrder.current.length - 9} 个角色在搜索里` : ""}</span>
     </footer>
 
     <audio ref=${refAudio} hidden></audio>
     ${palette && html`<${Palette} roles=${roles} onClose=${() => setPalette(false)}
-      onPick=${(name) => { setPalette(false); assign(name); }} />`}
+      onPick=${(name) => { setPalette(false); assign(name); }}
+      onNew=${() => { setPalette(false); newRole(); }} />`}
+    ${crop && html`<${Cropper} source=${playerRef.current} name=${crop.name} role=${roles[crop.name]}
+      onSave=${saveAvatar} onClose=${closeCrop} />`}
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
     ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span>
       ${toast.extra && html`<button onClick=${undo}>撤销 Z</button>`}</div>`}

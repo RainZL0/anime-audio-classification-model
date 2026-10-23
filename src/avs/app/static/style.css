@@ -23,28 +23,27 @@
   --mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161615;
-    --panel: #1f1f1e;
-    --panel-2: #242423;
-    --line: rgba(255, 255, 255, 0.08);
-    --line-strong: rgba(255, 255, 255, 0.16);
-    --text: #ecebe8;
-    --text-2: #b0aea8;
-    --text-3: #7d7b76;
-    --accent: #8b85ff;
-    --accent-soft: rgba(139, 133, 255, 0.14);
-    --accent-ring: rgba(139, 133, 255, 0.45);
-    --ok: #4cc497;
-    --ok-soft: rgba(76, 196, 151, 0.14);
-    --warn: #f0a83a;
-    --warn-soft: rgba(240, 168, 58, 0.15);
-    --bad: #f07a72;
-    --bad-soft: rgba(240, 122, 114, 0.14);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
-    color-scheme: dark;
-  }
+/* 默认白天。夜间只在用户点了顶栏的切换之后才用，不跟系统走。 */
+:root[data-theme="dark"] {
+  --bg: #161615;
+  --panel: #1f1f1e;
+  --panel-2: #242423;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #ecebe8;
+  --text-2: #b0aea8;
+  --text-3: #7d7b76;
+  --accent: #8b85ff;
+  --accent-soft: rgba(139, 133, 255, 0.14);
+  --accent-ring: rgba(139, 133, 255, 0.45);
+  --ok: #4cc497;
+  --ok-soft: rgba(76, 196, 151, 0.14);
+  --warn: #f0a83a;
+  --warn-soft: rgba(240, 168, 58, 0.15);
+  --bad: #f07a72;
+  --bad-soft: rgba(240, 122, 114, 0.14);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -155,13 +154,24 @@ kbd {
 .specials button { font-size: 12px; padding: 4px 9px; color: var(--text-2); }
 .stage .hint { margin-top: 16px; font-size: 12px; color: var(--text-3); line-height: 1.9; }
 
-/* 头像：有截图用截图，没有用名字首字加颜色 */
-.av { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center;
+/* 头像是认人的主要依据，名字是可选的。有截图用截图，没有就用按编号生成的图案。 */
+.av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
   font-size: 13px; font-weight: 600; color: #fff; background-size: cover; background-position: center;
-  user-select: none; }
-.av.sm { width: 22px; height: 22px; font-size: 11px; }
-.av.lg { width: 44px; height: 44px; font-size: 17px; }
+  user-select: none; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.av svg { width: 100%; height: 100%; display: block; }
+.av.xs { width: 16px; height: 16px; font-size: 9px; }
+.av.sm { width: 26px; height: 26px; font-size: 11px; }
+.av.md { width: 40px; height: 40px; font-size: 15px; }
+.av.lg { width: 56px; height: 56px; font-size: 19px; }
+.av.xl { width: 88px; height: 88px; font-size: 26px; }
 .av.unknown { background: var(--line-strong); color: var(--text-2); }
+.av.edit { cursor: pointer; position: relative; }
+.av.edit:hover { box-shadow: 0 0 0 2px var(--accent); }
+.av.edit:hover::after { content: "截取"; position: absolute; inset: auto 0 0 0; font-size: 10px; line-height: 1.6;
+  text-align: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-weight: 500; }
+.av.xs.edit:hover::after, .av.sm.edit:hover::after { content: none; }
+.rn.unnamed { color: var(--text-3); font-style: italic; font-weight: 500; }
+.theme { font-size: 15px; padding: 4px 9px; }
 
 /* 场景列表：每句一行，像聊天记录 */
 .scene-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 14px 4px 6px;
@@ -190,6 +200,7 @@ kbd {
 .pill.review { color: var(--warn); background: var(--warn-soft); }
 .pill.stranger { color: var(--text-2); background: transparent; border: 1px dashed var(--text-3); line-height: 16px; }
 .pill.novoice, .pill.unlabeled { color: var(--text-2); background: var(--line); }
+.pill.skipped { color: var(--text-3); background: transparent; border: 1px solid var(--line); line-height: 16px; }
 .pill.special { color: var(--text-2); background: var(--line); }
 .pill.reject { color: var(--bad); background: var(--bad-soft); }
 
@@ -209,6 +220,7 @@ kbd {
 .chip .k { font: 11px var(--mono); color: var(--text-3); }
 .chip.flash { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
+.dock > button { white-space: nowrap; flex: none; }
 
 /* 角色视图 */
 .roles-grid { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding-top: 10px; }
@@ -244,6 +256,10 @@ kbd {
 .member.playing { background: var(--accent-soft); }
 .member .t { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .member .x { padding: 0 6px; font-size: 12px; border: 0; background: transparent; color: var(--text-3); }
+.pick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pick-row .av { cursor: pointer; }
+.pick-row .av:hover { box-shadow: 0 0 0 2px var(--accent); }
+.pill.hint { display: inline-flex; align-items: center; gap: 5px; padding-left: 2px; }
 .name-form { display: flex; gap: 8px; }
 .name-form input { flex: 1; min-width: 0; }
 
@@ -264,6 +280,12 @@ kbd {
   border-radius: 8px; background: var(--panel); cursor: pointer; }
 .check.on { border-color: var(--accent-ring); background: var(--accent-soft); }
 .check .min { margin-left: auto; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.text-subs { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.text-sub { display: grid; grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 8px;
+  align-items: center; font-size: 12px; }
+.text-sub .ep { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.text-sub .now { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-sub .min { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .note { font-size: 12px; color: var(--text-3); }
 .note.warn { color: var(--warn); }
 .result { background: var(--ok-soft); border-radius: var(--radius); padding: 12px 14px; }
@@ -285,6 +307,21 @@ kbd {
 .help table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .help td { padding: 5px 4px; border-top: 1px solid var(--line); }
 .help td:first-child { width: 150px; }
+.cropper { width: min(760px, 94vw); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; margin-top: -6vh; }
+.cropper h2 { margin: 0; font-size: 16px; }
+.crop-area { position: relative; touch-action: none; cursor: crosshair; border-radius: 8px; overflow: hidden;
+  background: #0e0e0e; line-height: 0; }
+.crop-area canvas { width: 100%; height: auto; display: block; }
+.crop-box { position: absolute; cursor: move; border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); outline: 2px solid #fff; outline-offset: 0; }
+.crop-box::before { content: ""; position: absolute; inset: 0; border: 1px dashed rgba(255, 255, 255, 0.6); }
+.crop-box .handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 3px;
+  background: #fff; cursor: nwse-resize; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.crop-bar { display: flex; align-items: center; gap: 12px; }
+.crop-bar input[type="range"] { flex: 1; accent-color: var(--accent); }
+.crop-preview { width: 72px; height: 72px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line-strong); flex: none; }
+.crop-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #1d1c1a; color: #f3f2ef;
   padding: 9px 14px; border-radius: 10px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: center;
   z-index: 30; font-size: 13px; animation: rise 0.18s ease-out; }

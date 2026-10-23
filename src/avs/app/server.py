@@ -71,6 +71,8 @@ class AppState:
         label = self.store.labels.get(clip.id)
         if label is not None:
             return "special" if is_special(label) else "confirmed"
+        if clip.skipped:
+            return "skipped"
         if clip.row is None:
             return "novoice"
         guess = self.guesses.get(clip.row)
@@ -88,6 +90,7 @@ class AppState:
             "start": round(clip.start, 3),
             "end": round(clip.end, 3),
             "duration": round(clip.duration, 2),
+            "gap": None if clip.gap is None else round(clip.gap, 2),
             "text": clip.text,
             "scene": clip.scene,
             "voiced": clip.row is not None,
@@ -122,7 +125,12 @@ class AppState:
         roles.sort(key=lambda r: -(r["confirmed"] + r["predicted"]))
         return {
             "episodes": [
-                {"name": name, "video": bool(meta.get("video")), "counts": dict(per_episode[name])}
+                {
+                    "name": name,
+                    "video": bool(meta.get("video")),
+                    "counts": dict(per_episode[name]),
+                    "text_subtitles": _text_subtitles(meta),
+                }
                 for name, meta in self.workspace.episodes.items()
             ],
             "roles": roles,
@@ -169,6 +177,7 @@ class AppState:
             c
             for c in self.workspace.clips
             if c.row is not None
+            and not c.skipped
             and self.store.labels.get(c.id) is None
             and (episode is None or c.episode == episode)
         ]
@@ -256,8 +265,52 @@ class AppState:
 
     # 导出
 
+    def set_text_subtitles(self, episode: str, path: Path) -> dict[str, Any]:
+        from avs.pipeline import attach_text_subtitles
+
+        meta = self.workspace.episodes.get(episode)
+        if meta is None:
+            raise ValueError(f"没有 {episode} 这一集")
+        result = attach_text_subtitles(Path(meta["directory"]), path)
+        meta.update({k: v for k, v in result.items() if k.startswith("text_subtitle")})
+        return result
+
+    def _retext(
+        self, assigned: dict[str, list[Clip]]
+    ) -> tuple[dict[str, str], list[dict[str, Any]]]:
+        """导出的台词换成另配字幕的文字。返回（片段 ID 到文字, 不收的片段）。"""
+        from avs.stages.text_subtitle import load_text_lines, match, own_tag, shifted, touching
+
+        needed = sorted({c.episode for clips in assigned.values() for c in clips})
+        missing = [e for e in needed if not self.workspace.episodes[e].get("text_subtitles")]
+        if missing:
+            raise ValueError(
+                f"{'、'.join(missing)} 还没配台词字幕，先在下面配上，或者改用原字幕的文字"
+            )
+        lines = {}
+        for name in needed:
+            meta = self.workspace.episodes[name]
+            path = Path(meta["text_subtitles"])
+            if not path.is_file():
+                raise ValueError(f"{name} 配的台词字幕不见了：{path}")
+            lines[name] = shifted(load_text_lines(path), float(meta["text_subtitle_offset"]))
+        texts: dict[str, str] = {}
+        rejected: list[dict[str, Any]] = []
+        for role, clips in assigned.items():
+            tag = own_tag(x for c in clips for x in touching(lines[c.episode], c.start, c.end))
+            kept = []
+            for clip in clips:
+                text, reason = match(lines[clip.episode], clip.start, clip.end, tag)
+                if reason is None:
+                    texts[clip.id] = text
+                    kept.append(clip)
+                else:
+                    rejected.append({"role": role, "clip": clip, "reason": reason, "text": text})
+            clips[:] = kept
+        return texts, rejected
+
     def export(self, roles: list[str], include_auto: bool, form: str, language: str,
-               out: Path) -> dict[str, Any]:  # fmt: skip
+               out: Path, text_subtitles: bool = False) -> dict[str, Any]:  # fmt: skip
         from avs.stages.export import export, summarize
 
         if form not in ("gpt-sovits", "style-bert-vits2", "folder"):
@@ -274,14 +327,21 @@ class AppState:
                 top = self.guesses[clip.row].names[0]
                 if top in assigned:
                     assigned[top].append(clip)
+        texts = {c.id: c.text for c in self.workspace.clips}
+        rejected: list[dict[str, Any]] = []
+        if text_subtitles and form != "folder":
+            texts, rejected = self._retext(assigned)
+            if not any(assigned.values()):
+                raise ValueError(f"{len(rejected)} 条片段全都对不上台词字幕，一条也没导出")
         vocals = {name: Path(meta["vocals"]) for name, meta in self.workspace.episodes.items()}
         written = export({k: v for k, v in assigned.items() if v}, vocals, out)
-        texts = {
-            (c.episode, round(c.start, 6), round(c.end, 6)): c.text for c in self.workspace.clips
+        by_span = {
+            (c.episode, round(c.start, 6), round(c.end, 6)): c.id for c in self.workspace.clips
         }
         lines = []
         for item in written:
-            text = texts.get((item.episode, round(item.start, 6), round(item.end, 6)), "")
+            clip_id = by_span.get((item.episode, round(item.start, 6), round(item.end, 6)))
+            text = texts.get(clip_id, "") if clip_id else ""
             text = text.replace("|", " ").replace("\n", " ")
             if form == "gpt-sovits":
                 lines.append(f"{item.path.resolve()}|{item.name}|{language}|{text}")
@@ -291,13 +351,18 @@ class AppState:
         if lines:
             listing = out / ("esd.list" if form == "style-bert-vits2" else "train.list")
             listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return {"out": str(out.resolve()), **summarize(written)}
+        if rejected:
+            _write_rejected(out / "rejected.tsv", rejected)
+        reasons = Counter(r["reason"] for r in rejected)
+        return {"out": str(out.resolve()), **summarize(written), "rejected": dict(reasons)}
 
 
 class LabelBody(BaseModel):
     clips: list[str]
     label: str | None = None
     """角色名或特殊标签；空表示清掉标签。"""
+    new_role: bool = False
+    """标成一个新建的、还没起名字的角色，这时 `label` 不用给。"""
 
 
 class ChangesBody(BaseModel):
@@ -323,6 +388,35 @@ class ExportBody(BaseModel):
     form: str = "gpt-sovits"
     language: str = "ja"
     out: str
+    text_subtitles: bool = False
+    """台词文字从每集另配的字幕里取，而不是切片段用的那份。"""
+
+
+class TextSubtitlesBody(BaseModel):
+    episode: str
+    path: str
+
+
+def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
+    """一集另配的台词字幕，给界面显示。"""
+    if not meta.get("text_subtitles"):
+        return None
+    return {
+        "file": Path(meta["text_subtitles"]).name,
+        "offset": meta.get("text_subtitle_offset"),
+        "agreement": meta.get("text_subtitle_agreement"),
+    }
+
+
+def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:
+    """对不上台词字幕、没导出的片段，一行一条，好回界面里找。"""
+    rows = ["角色\t集\t开始\t结束\t原因\t原字幕\t台词字幕"]
+    for item in rejected:
+        clip = item["clip"]
+        cells = [item["role"], clip.episode, f"{clip.start:.2f}", f"{clip.end:.2f}",
+                 item["reason"], clip.text, item["text"]]  # fmt: skip
+        rows.append("\t".join(c.replace("\t", " ").replace("\n", " ") for c in cells))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
 def _cut_audio(vocals: Path, start: float, end: float, target: Path) -> None:
@@ -359,6 +453,8 @@ def create_app(state: AppState) -> Any:
                     label = state.store.labels.get(c.id)
                     if label is not None:
                         return label == role
+                    if c.skipped:
+                        return False
                     guess = state.guesses.get(c.row) if c.row is not None else None
                     return guess is not None and guess.names[0] == role
 
@@ -380,8 +476,10 @@ def create_app(state: AppState) -> Any:
         unknown = [c for c in body.clips if c not in state.workspace.by_id]
         if unknown or not body.clips:
             raise HTTPException(400, "片段不存在")
-        changes = [{"clip": c, "label": body.label} for c in body.clips]
-        return state.change(lambda: state.store.apply(changes))
+        with state.lock:
+            label = state.store.new_role() if body.new_role else body.label
+            changes = [{"clip": c, "label": label} for c in body.clips]
+            return {"role": label, **state.change(lambda: state.store.apply(changes))}
 
     @app.post("/api/changes")
     def post_changes(body: ChangesBody) -> dict[str, Any]:
@@ -433,10 +531,32 @@ def create_app(state: AppState) -> Any:
         try:
             with state.lock:
                 return state.export(
-                    body.roles, body.include_auto, body.form, body.language, Path(body.out)
+                    body.roles,
+                    body.include_auto,
+                    body.form,
+                    body.language,
+                    Path(body.out),
+                    body.text_subtitles,
                 )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/text-subtitles")
+    def post_text_subtitles(body: TextSubtitlesBody) -> dict[str, Any]:
+        try:
+            with state.lock:
+                state.set_text_subtitles(body.episode, Path(body.path.strip().strip('"')))
+                return state.summary()
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    # 头像的路由要排在 /media/{kind}/{clip_id} 前面，否则 avatar 会被当成 kind 拦下来。
+    @app.get("/media/avatar/{file}")
+    def read_avatar(file: str) -> Any:
+        path = state.workspace.labels_dir / "avatars" / file
+        if not re.fullmatch(r"[0-9a-f]{16}\.(jpg|png)", file) or not path.exists():
+            raise HTTPException(404)
+        return FileResponse(path)
 
     @app.get("/media/{kind}/{clip_id}")
     def read_media(kind: str, clip_id: str) -> Any:
@@ -449,13 +569,6 @@ def create_app(state: AppState) -> Any:
             raise HTTPException(404) from exc
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(404, str(exc)) from exc
-
-    @app.get("/media/avatar/{file}")
-    def read_avatar(file: str) -> Any:
-        path = state.workspace.labels_dir / "avatars" / file
-        if not re.fullmatch(r"[0-9a-f]{16}\.(jpg|png)", file) or not path.exists():
-            raise HTTPException(404)
-        return FileResponse(path)
 
     @app.get("/favicon.ico")
     def favicon() -> Any:

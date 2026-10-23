@@ -3,6 +3,8 @@
 载入时把每条片段的台词文字从字幕里找回来，按停顿切成场景，再把几个声纹模型的缓存
 拼成一张表。片段短于 0.5 秒没有声纹（见 embeddings/extract.py 的 MIN_SECONDS），
 这些片段照样出现在界面上，只是机器给不出预测，要人来认。
+
+短于 `SKIP_SECONDS` 又和前后台词都隔得远的片段默认跳过，不要人标，见 `Clip.skipped`。
 """
 
 from __future__ import annotations
@@ -24,6 +26,14 @@ DEFAULT_MODELS = ("anime-va", "anime-char", "redimnet2-b6")
 GROUPING_MODEL = "anime-va"
 """起步分组只用这一个模型，它的分界线 0.70 是量过的，拼起来的声纹没有量过。"""
 
+SKIP_SECONDS = 1.0
+"""短于这么多秒的片段拿去训练语音合成基本用不上，默认不要人标。"""
+
+NEIGHBOR_GAP = 0.5
+"""短片段和前后台词的间隔不超过这么多秒，就可能是一句长话被字幕切碎了，仍然留给人标。
+
+第 3 集 36 条有名字的 1 秒以下片段里，只有 4 条在 0.5 秒内紧挨同一角色的台词。"""
+
 
 @dataclass(frozen=True)
 class Clip:
@@ -35,10 +45,17 @@ class Clip:
     scene: int
     row: int | None
     """在声纹表里的行号；没有声纹时是 None。"""
+    gap: float | None = None
+    """和最近的另一句台词（别的字幕行或别的片段）隔几秒，挨着或重叠是 0；这一集只有它时是 None。"""
 
     @property
     def duration(self) -> float:
         return self.end - self.start
+
+    @property
+    def skipped(self) -> bool:
+        """太短又前后没有紧挨的台词，默认不要人标。"""
+        return self.duration < SKIP_SECONDS and (self.gap is None or self.gap > NEIGHBOR_GAP)
 
 
 @dataclass
@@ -102,6 +119,34 @@ def text_for(
     return " / ".join(found)
 
 
+def neighbor_gap(
+    spans: list[tuple[float, float]],
+    at: int,
+    lines: list[tuple[float, float, str]],
+    line_starts: list[float],
+) -> float | None:
+    """`spans[at]` 和最近的另一句台词隔几秒。`spans` 是这一集全部片段，按开始时间排好。
+
+    另一句台词可以是别的片段，也可以是没切出片段的字幕行；这条片段自己的台词那几行
+    （按 `text_for` 的规则算进它的字幕行）不算。前后 20 秒内都没有就是 None。
+    """
+    start, end = spans[at]
+    span_starts = [s[0] for s in spans]
+    low_at = bisect.bisect_left(span_starts, start - 20.0)
+    high_at = bisect.bisect_left(span_starts, end + 20.0)
+    others = [spans[k] for k in range(low_at, high_at) if k != at]
+    for low, high, _ in lines[bisect.bisect_left(line_starts, start - 20.0) :]:
+        if low >= end + 20.0:
+            break
+        shared = min(high, end) - max(low, start)
+        shorter = min(high - low, end - start)
+        if not (shorter > 0 and shared >= MIN_TEXT_OVERLAP * shorter):
+            others.append((low, high))
+    if not others:
+        return None
+    return max(min(max(low - end, start - high) for low, high in others), 0.0)
+
+
 def load_workspace(
     root: Path, models: tuple[str, ...] = DEFAULT_MODELS, grouping: str = GROUPING_MODEL
 ) -> Workspace:
@@ -133,6 +178,8 @@ def load_workspace(
 
         lines = subtitle_lines(episode)
         starts = [line[0] for line in lines]
+        spans = sorted((float(row["start"]), float(row["end"])) for row in rows)
+        gaps = {spans[k]: neighbor_gap(spans, k, lines, starts) for k in range(len(spans))}
         scene, previous_end = 0, None
         for row in rows:
             if previous_end is not None and row["start"] - previous_end > SCENE_GAP:
@@ -147,6 +194,7 @@ def load_workspace(
                     text=text_for(lines, starts, float(row["start"]), float(row["end"])),
                     scene=scene,
                     row=position.get(row["id"]),
+                    gap=gaps[(float(row["start"]), float(row["end"]))],
                 )
             )
     width = feature_rows[0].shape[0] if feature_rows else 0
