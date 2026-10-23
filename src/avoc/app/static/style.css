@@ -102,6 +102,11 @@ kbd {
 .tabs button { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; color: var(--text-2); }
 .tabs button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .tabs .count { margin-left: 6px; font-size: 11px; color: var(--warn); font-variant-numeric: tabular-nums; }
+/* Two boxes of tabs: the episode picker with the views of that one episode, then the views of all episodes. */
+.tabs { align-items: center; }
+.tabs select { border: 0; background: var(--panel); font-weight: 600; padding: 4px 8px; border-radius: 7px; }
+.tabs .scope { padding: 0 6px 0 8px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.tabs.away select { color: var(--text-3); font-weight: normal; }
 .spacer { flex: 1; }
 .progress { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 12px;
   font-variant-numeric: tabular-nums; }
@@ -268,15 +273,16 @@ kbd {
 .group h3 { margin: 0; font-size: 14px; display: flex; gap: 8px; align-items: center; }
 .group .meta { color: var(--text-3); font-size: 12px; }
 .group .members { display: flex; flex-direction: column; gap: 2px; max-height: 210px; overflow-y: auto; }
-.member { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font-size: 13px;
+/* Columns: tick box (blank once labeled), text, label, time. */
+.member { display: grid; grid-template-columns: 16px 1fr auto auto; gap: 8px; align-items: center; font-size: 13px;
   padding: 3px 6px; border-radius: 6px; cursor: pointer; }
 .member:hover { background: var(--panel-2); }
-.member.out { color: var(--text-3); text-decoration: line-through; }
+.member input[type="checkbox"] { margin: 0; cursor: pointer; accent-color: var(--accent); }
+.member.picked > span:nth-child(2) { font-weight: 600; }
 .member.playing { background: var(--accent-soft); }
-.member.labeled > span:first-child { color: var(--text-3); }
+.member.labeled > span:nth-child(2) { color: var(--text-3); }
 .group.done { opacity: .6; }
 .member .t { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-.member .x { padding: 0 6px; font-size: 12px; border: 0; background: transparent; color: var(--text-3); }
 .pick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pick-row .av { cursor: pointer; }
 .pick-row .av:hover { box-shadow: 0 0 0 2px var(--accent); }

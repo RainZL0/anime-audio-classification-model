@@ -482,15 +482,19 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
 /* ───────────── Groups view: name a group of similar voices ───────────── */
 
 function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, setFocus, firstRun }) {
-  const [out, setOut] = useState({});
+  /* The ticked lines in each group. The label buttons act only on these. */
+  const [picked, setPicked] = useState({});
+  /* The last line ticked in each group, so Shift+click can tick the lines between. */
+  const [anchor, setAnchor] = useState({});
   const [names, setNames] = useState({});
   if (loading) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>${tr("正在把声音相近的台词分组…", "Grouping lines with similar voices…")}</p></div>`;
   return html`<div>
     ${firstRun && html`<div class="welcome"><div>
       <h3>${tr("第一步：给声音相近的一组起个名字", "Step one: name a group of similar voices")}</h3>
-      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听：是你要收集的人，就按「是新角色」把这一组定成一个目标角色，再从画面里截一张头像，名字可以现在填，也可以以后再起；不是你要的人，就按「都是其他」。",
-        "The machine puts lines that sound like the same person together. Click a line to hear it. If it is someone you want to collect, press \"New character\" to make the group a target character, then crop an avatar from the picture; you can type a name now or later. If it is not someone you want, press \"All other\".")}</p>
-      <ol><li>${tr("听到混进来的别人，点那一行右边的 × 把它剔出去。", "If you hear someone else mixed in, click the × on the right of that line to take it out.")}</li>
+      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。是你要收集的人，就按「是新角色」把勾上的台词定成一个目标角色，再从画面里截一张头像，名字可以现在填，也可以以后再起；不是你要的人，就按「是其他」。",
+        "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". If it is someone you want to collect, press \"New character\" to make the ticked lines a target character, then crop an avatar from the picture; you can type a name now or later. If it is not someone you want, press \"Other\".")}</p>
+      <ol><li>${tr("一组里混着几个人时，分几次勾、几次标。按住 Shift 点，能一下勾上中间的几句。",
+        "When a group mixes several people, tick and label them in turns. Shift+click ticks all the lines in between.")}</li>
       <li>${tr("每命名一组，机器就会重新学一次，其余台词的猜测随之变准。", "Each group you name retrains the machine, and its guesses for the other lines get better.")}</li>
       <li>${tr("定下目标角色、再标几组「其他」以后，去「场景」视图逐句确认会快得多。",
         "Once you have your target characters and a few groups of \"other\", confirming line by line in the Scenes view goes much faster.")}</li></ol></div></div>`}
@@ -499,10 +503,24 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
         "The unlabeled lines in this episode are either not much alike, or all named already. Go confirm them line by line in the Scenes view.")}</p></div>`}
     <div class="groups">
       ${groups.map((g, gi) => {
-        const excluded = out[g.key] || new Set();
-        /* Labeled lines stay in the group for you to see, but the group buttons only act on unlabeled ones. */
-        const keep = g.clips.filter((c) => !excluded.has(c.id) && !c.label);
-        const done = g.clips.every((c) => c.label);
+        const ticked = picked[g.key] || new Set();
+        /* Labeled lines stay in the group for you to see, but can't be ticked. */
+        const open = g.clips.filter((c) => !c.label);
+        const keep = open.filter((c) => ticked.has(c.id));
+        const all = open.length > 0 && keep.length === open.length;
+        const done = open.length === 0;
+        const tick = (c, e) => {
+          e.stopPropagation();
+          const next = new Set(ticked);
+          const on = !next.has(c.id);
+          const from = open.findIndex((o) => o.id === anchor[g.key]);
+          const to = open.findIndex((o) => o.id === c.id);
+          const span = e.shiftKey && from >= 0 ? open.slice(Math.min(from, to), Math.max(from, to) + 1) : [c];
+          span.forEach((o) => (on ? next.add(o.id) : next.delete(o.id)));
+          setPicked({ ...picked, [g.key]: next });
+          setAnchor({ ...anchor, [g.key]: c.id });
+        };
+        const tickAll = () => setPicked({ ...picked, [g.key]: new Set(all ? [] : open.map((c) => c.id)) });
         /* The machine's guess only goes in the placeholder, not in the box: listen first, Enter to accept it. */
         const value = names[g.key] ?? "";
         const chosen = value.trim() || g.hint?.name || "";
@@ -520,21 +538,25 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
             ${g.hint && html`<span class="pill auto hint" title=${tr("机器的分类器在这组里最常猜的角色", "The character the machine guesses most often in this group")}>
               <${Avatar} role=${roles[g.hint.name]} name=${g.hint.name} size="xs" />${tr("可能是", "Maybe")} ${g.hint.name}</span>`}</h3>
           <div class="members">
-            ${g.clips.map((c) => html`<div class="member ${excluded.has(c.id) ? "out" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
+            ${g.clips.map((c) => html`<div class="member ${ticked.has(c.id) && !c.label ? "picked" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
+              ${c.label ? html`<span></span>` : html`<input type="checkbox" checked=${ticked.has(c.id)} onClick=${(e) => tick(c, e)}
+                title=${tr("勾上，下面的按钮就标这一句；按住 Shift 点，勾上中间的几句", "Tick it for the buttons below to label it; Shift+click ticks the lines in between")} />`}
               <span>${c.text || tr("（没有字幕文字）", "(no subtitle text)")}</span>
-              ${c.label && html`<span class="pill done" title=${tr("已经标了；按 Z 撤销，或在左边改", "Already labeled. Press Z to undo, or change it on the left")}>
-                ${labelText[c.label] || c.label}${c.unusable ? tr("·质量低", " · low quality") : ""}</span>`}
+              ${c.label ? html`<span class="pill done" title=${tr("已经标了；按 Z 撤销，或在左边改", "Already labeled. Press Z to undo, or change it on the left")}>
+                ${labelText[c.label] || c.label}${c.unusable ? tr("·质量低", " · low quality") : ""}</span>` : html`<span></span>`}
               <span class="t">${c.episode} ${stamp(c.start)}</span>
-              ${!c.label && html`<button class="x" title=${excluded.has(c.id) ? tr("放回这一组", "Put back in this group") : tr("这句不是这组的人", "This line is not this group's person")}
-                onClick=${(e) => { e.stopPropagation(); const next = new Set(excluded); next.has(c.id) ? next.delete(c.id) : next.add(c.id); setOut({ ...out, [g.key]: next }); }}>
-                ${excluded.has(c.id) ? "↺" : "×"}</button>`}
             </div>`)}
           </div>
-          ${known.length > 0 && html`<div class="pick-row">
+          ${!done && html`<div class="pick-row">
+            <button type="button" onClick=${tickAll}>${all ? tr("全不选", "Select none") : tr("全选", "Select all")}</button>
+            <span class="note">${keep.length ? tr(`勾了 ${keep.length} 句`, `${lines(keep.length)} ticked`)
+              : tr("先勾上同一个人的台词，再选是谁", "Tick the lines of one person first, then pick who it is")}</span>
+          </div>`}
+          ${known.length > 0 && keep.length > 0 && html`<div class="pick-row">
             <span class="note">${tr("是已有的人：", "An existing character:")}</span>
             ${known.map((r) => html`<${Avatar} key=${r.name} role=${r} name=${r.name} size="md"
-              title=${tr(`这 ${keep.length} 句都是 ${r.name}`, `All ${lines(keep.length)} are ${r.name}`)} onClick=${() => keep.length && onName(ids, r.name)} />`)}
+              title=${tr(`勾上的 ${keep.length} 句是 ${r.name}`, `The ${lines(keep.length)} ticked are ${r.name}`)} onClick=${() => onName(ids, r.name)} />`)}
           </div>`}
           <form class="name-form" onSubmit=${submit}>
             <input list="role-names" value=${value}
@@ -542,11 +564,11 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
                 : tr("名字（可以不填）", "Name (optional)")}
               onInput=${(e) => setNames({ ...names, [g.key]: e.target.value })} />
             ${chosen
-              ? html`<button class="primary" type="submit" disabled=${!keep.length}>${tr(`${keep.length} 句都是 ${chosen}`, `All ${lines(keep.length)} are ${chosen}`)}</button>
+              ? html`<button class="primary" type="submit" disabled=${!keep.length}>${tr(`${keep.length} 句是 ${chosen}`, `${lines(keep.length)}: ${chosen}`)}</button>
                 ${!value.trim() && html`<button type="button" disabled=${!keep.length} onClick=${() => onNew(ids)}>${tr("是新角色", "New character")}</button>`}`
               : html`<button class="primary" type="submit" disabled=${!keep.length}>${tr(`${keep.length} 句是一个新角色`, `${lines(keep.length)}: one new character`)}</button>`}
             <button type="button" disabled=${!keep.length} onClick=${() => onName(ids, OTHER)}
-              title=${tr("都不是你要收集的人", "None of them is someone you want to collect")}>${tr(`${keep.length} 句都是其他`, `All ${lines(keep.length)} are other`)}</button>
+              title=${tr("不是你要收集的人", "Not someone you want to collect")}>${tr(`${keep.length} 句是其他`, `${lines(keep.length)}: other`)}</button>
           </form>
         </div>`;
       })}
@@ -1427,31 +1449,39 @@ function App() {
   const done = counts.confirmed || 0;
   const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
   const showStage = view !== "export";
-  const tabs = [["groups", tr("起步分组", "Groups"), "G"], ["scene", tr("场景", "Scenes"), "S"],
-    ["roles", tr("角色", "Characters"), "O"], ["export", tr("导出", "Export"), "E"]];
+  /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
+  const episodeTabs = [["groups", tr("起步分组", "Groups"), "G"], ["scene", tr("场景", "Scenes"), "S"]];
+  const allTabs = [["roles", tr("角色", "Characters"), "O"], ["export", tr("导出", "Export"), "E"]];
+  const perEpisode = episodeTabs.some(([v]) => v === view);
+  const tabButtons = (list) => list.map(([v, l, key]) => html`
+    <button class=${view === v ? "on" : ""} title=${tr(`快捷键 ${key}`, `Shortcut ${key}`)} onClick=${() => setView(v)}>${l}
+      ${v === "scene" && work > 0 ? html`<span class="count">${work}</span>` : ""}</button>`);
 
   return html`<div class="shell">
     <header class="top">
       <div class="brand"><span class="dot"></span>avoc</div>
-      <select value=${episode} title=${tr("换一集", "Switch episode")}
-        onChange=${(e) => { if (e.target.value === "+") { e.target.value = episode; setAddOpen(true); } else setEpisode(e.target.value); }}>
-        ${state.episodes.map((e) => html`<option value=${e.name}>${e.name}</option>`)}
-        <option value="+">${tr("＋ 加一集…", "+ Add an episode…")}${Object.keys(state.skipped || {}).length
-          ? tr(`（${Object.keys(state.skipped).length} 集没做完）`, ` (${Object.keys(state.skipped).length} unfinished)`) : ""}</option>
-      </select>
+      <nav class="tabs ${perEpisode ? "" : "away"}">
+        <select value=${episode} title=${perEpisode ? tr("换一集", "Switch episode")
+            : tr("「角色」和「导出」看的是全部集数，换集只影响「起步分组」和「场景」", "Characters and Export cover all episodes; switching only changes Groups and Scenes")}
+          onChange=${(e) => { if (e.target.value === "+") { e.target.value = episode; setAddOpen(true); } else setEpisode(e.target.value); }}>
+          ${state.episodes.map((e) => html`<option value=${e.name}>${e.name}</option>`)}
+          <option value="+">${tr("＋ 加一集…", "+ Add an episode…")}${Object.keys(state.skipped || {}).length
+            ? tr(`（${Object.keys(state.skipped).length} 集没做完）`, ` (${Object.keys(state.skipped).length} unfinished)`) : ""}</option>
+        </select>
+        ${tabButtons(episodeTabs)}
+      </nav>
+      <nav class="tabs">
+        <span class="scope">${tr("全部集数", "All episodes")}</span>
+        ${tabButtons(allTabs)}
+      </nav>
       ${addingState === "running" && !addOpen && html`<button class="ghost adding-chip" onClick=${() => setAddOpen(true)}
         title=${tr("点开看进度", "Click to see the progress")}><span class="spinner small"></span>${tr(`正在加 ${adding.episode}`, `Adding ${adding.episode}`)}</button>`}
-      <nav class="tabs">
-        ${tabs.map(([v, l, key]) => html`
-          <button class=${view === v ? "on" : ""} title=${tr(`快捷键 ${key}`, `Shortcut ${key}`)} onClick=${() => setView(v)}>${l}
-            ${v === "scene" && work > 0 ? html`<span class="count">${work}</span>` : ""}</button>`)}
-      </nav>
       <span class="spacer"></span>
-      <div class="progress" title=${tr("绿色是已经确认的，浅绿是机器有把握的", "Green is confirmed, light green is the machine's confident ones")}>
+      ${perEpisode && html`<div class="progress" title=${tr("绿色是已经确认的，浅绿是机器有把握的", "Green is confirmed, light green is the machine's confident ones")}>
         <span>${tr(`${episode}：确认 ${Math.round(done / total * 100)}%`, `${episode}: ${Math.round(done / total * 100)}% confirmed`)}</span>
         <div class="bar"><i class="ok" style="width:${done / total * 100}%"></i>
           <i class="auto" style="width:${(counts.auto || 0) / total * 100}%"></i></div>
-      </div>
+      </div>`}
       <span class="model-chip ${busy ? "busy" : ""}" title=${tr("机器每次标注后都会重新学一次", "The machine retrains after every label")}>
         ${busy ? tr("正在重新学习…", "Retraining…") : state.model.labels
           ? tr(`机器学过 ${state.model.labels} 句 · ${targetCount} 个目标角色`,
