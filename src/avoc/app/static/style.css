@@ -248,7 +248,6 @@ kbd {
   background: transparent; margin-left: 2px; white-space: nowrap; }
 .chip .low:hover, .cand .low:hover { border-color: var(--bad); }
 .cand .low .k { font: 11px var(--mono); color: var(--text-3); }
-.dock .more { color: var(--text-3); font-size: 12px; margin-left: 6px; flex: none; }
 .dock > button { white-space: nowrap; flex: none; }
 .chip.off { opacity: 0.45; cursor: default; }
 .chip.off:hover { border-color: var(--line-strong); }
@@ -294,7 +293,9 @@ kbd {
 .group.done { opacity: .6; }
 .member .t { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .pick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.pill.hint { display: inline-flex; align-items: center; gap: 5px; padding-left: 2px; }
+/* "Closest X": the machine's guess of who it is. One look everywhere; see docs/UI_DESIGN.md. */
+.pill.closest { display: inline-flex; align-items: center; gap: 4px; padding-left: 2px; color: var(--text-2);
+  background: var(--panel-2); border: 1px solid var(--line); line-height: 16px; font-weight: 500; }
 /* Who the ticked lines are: every choice looks the same, like the character bar at the bottom.
    Only the machine's guess is marked, as on the left. */
 .who-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -302,9 +303,6 @@ kbd {
 .who-row .chip.top { border-color: var(--accent-ring); background: var(--accent-soft); }
 .who-row .chip:disabled:hover { border-color: var(--line-strong); background: var(--panel); }
 .who-row .chip.top:disabled:hover { border-color: var(--accent-ring); background: var(--accent-soft); }
-.name-form { display: flex; gap: 8px; }
-.name-form input { flex: 1 1 140px; min-width: 120px; }
-.name-form button { white-space: nowrap; }
 
 /* Empty state and onboarding */
 .empty { max-width: 560px; margin: 60px auto; text-align: center; color: var(--text-2); }
@@ -376,17 +374,9 @@ kbd {
 .note.warn { color: var(--warn); }
 .result { background: var(--ok-soft); border-radius: var(--radius); padding: 12px 14px; }
 
-/* Overlays: character search, keyboard shortcuts, hint bar */
+/* Overlays: keyboard shortcuts, avatar cropper, hint bar */
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start;
   justify-content: center; padding-top: 14vh; z-index: 20; }
-.palette { width: min(460px, 92vw); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
-  border: 1px solid var(--line); overflow: hidden; }
-.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 14px 16px;
-  font-size: 16px; box-shadow: none !important; }
-.palette .opts { max-height: 320px; overflow-y: auto; padding: 6px; }
-.palette .opt { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
-.palette .opt.on { background: var(--accent-soft); }
-.palette .opt .c { margin-left: auto; color: var(--text-3); font-size: 12px; }
 .help { width: min(620px, 92vw); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
   padding: 18px 22px; }
 .help h2 { margin: 0 0 12px; font-size: 16px; }
@@ -408,6 +398,8 @@ kbd {
 .crop-bar input[type="range"] { flex: 1; accent-color: var(--accent); }
 .crop-preview { width: 72px; height: 72px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line-strong); flex: none; }
 .crop-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.crop-name input { width: 100%; font-size: 15px; }
+.crop-name .bad { color: var(--bad); margin: 6px 0 0; }
 .toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #1d1c1a; color: #f3f2ef;
   padding: 9px 14px; border-radius: 10px; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: center;
   z-index: 30; font-size: 13px; animation: rise 0.18s ease-out; }

@@ -23,14 +23,7 @@ Updated: 2026-10-23, evening. This page covers the goals, the direction and the 
 
 ## Labeling interface
 
-The first version is done, with four views: Groups, Scenes, Characters and Export. How to use each view and its shortcuts are in [USAGE.md](USAGE.md#labeling-and-correction-interface). How the machine guesses and where the labels are stored is in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface). These design rules must be kept:
-
-- Avatars are the main way to identify people, and names can be left blank. Until an avatar is cropped, a default picture that is easy to tell apart from the others is shown. Users crop the avatars from the picture themselves.
-- Keyboard first. Most of the time, pressing Enter accepts the prediction. Every step can be undone.
-- The day color scheme is the default.
-- Clips that are hard to call do not get a separate view. Filter them out in Scenes with "Only to do". The Characters view starts with the least confident clips, so the wrong ones can be picked out, and the rest are confirmed with one key.
-- When a clip is not similar to any known character, show "may be someone not seen before", and do not force a name onto it.
-- **Label only the characters you want.** A user may want one character or several, and may change their mind halfway through. They should not be forced to name every line of the whole episode. Only the target characters get names. Everyone else is "Other". Target characters can be added or removed at any time, and existing labels stay valid. This is built. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
+The first version is done, with four views: Groups, Scenes, Characters and Export. How to use each view and its shortcuts are in [USAGE.md](USAGE.md#labeling-and-correction-interface). How the machine guesses and where the labels are stored is in [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface). The design rules that must be kept are in [UI_DESIGN.md](UI_DESIGN.md).
 
 Not done yet:
 

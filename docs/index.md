@@ -15,6 +15,7 @@
 | How to type the commands | [USAGE.md](USAGE.md) | [Processing a new episode](USAGE.md#processing-a-new-episode), [Labeling and correction interface](USAGE.md#labeling-and-correction-interface) |
 | How things work, and what the terms mean | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [Glossary](HOW_IT_WORKS.md#glossary), [Flow](HOW_IT_WORKS.md#flow), [Labeling and correction interface](HOW_IT_WORKS.md#labeling-and-correction-interface), [Data files](HOW_IT_WORKS.md#data-files) |
 | Dependencies, models, runtime environment | [TOOLS.md](TOOLS.md) | |
+| How the web app must look and behave, so each thing is learned once | [UI_DESIGN.md](UI_DESIGN.md) | [The same thing looks the same everywhere](UI_DESIGN.md#the-same-thing-looks-the-same-everywhere), [Color](UI_DESIGN.md#color), [Typing](UI_DESIGN.md#typing) |
 
 ## Conclusions
 
@@ -29,12 +30,13 @@ One fact is written in one place only. Elsewhere, only a link.
 | Doc | Only covers | Does not cover |
 | --- | --- | --- |
 | STATUS | Current numbers, questions being tested, next steps, files in use now | Settled approaches, experiment process, long-term route |
-| ROADMAP | Goals, users, direction, interface design, release standards and how to release, all for the first release | Next steps for now, experiment numbers |
+| ROADMAP | Goals, users, direction, interface plans, release standards and how to release, all for the first release | Next steps for now, experiment numbers, interface design rules |
 | COMPETITORS | Similar tools, training-side formats, survey date, and what was not verified | Our own plans |
 | USAGE | Commands and options | Why these were chosen |
 | HOW_IT_WORKS | Terms, flow, data formats | Rules, experiment numbers |
 | DECISIONS | Settled and ruled-out technical choices, each with one reason | Numeric details, approaches not fully tested yet |
 | TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
+| UI_DESIGN | Design rules of the web app: what looks the same, colors, when to type, layout | How to use each view (USAGE), how it works inside (HOW_IT_WORKS) |
 
 When maintaining: if the plan for now changes, change STATUS. If the route changes, change ROADMAP. While a question is being tested, its numbers stay in STATUS. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
 

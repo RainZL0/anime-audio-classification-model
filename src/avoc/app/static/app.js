@@ -171,6 +171,13 @@ function RoleName({ role, name, cls = "" }) {
     title=${role?.named === false ? tr("还没起名字，在「角色」视图里可以起", "Not named yet. You can name it in the Characters view") : ""}>${name}</span>`;
 }
 
+/* The machine's guess of who someone is, shown the same way everywhere: a small avatar, "Closest" and the name,
+   and the chance when there is one. */
+function Closest({ roles, name, p, title }) {
+  return html`<span class="pill closest" title=${title || tr("机器觉得最像的角色", "The character the machine finds closest")}>
+    <${Avatar} role=${roles[name]} name=${name} size="xs" />${tr("最像", "Closest:")} ${name}${p != null ? ` ${pct(p)}` : ""}</span>`;
+}
+
 function Pill({ clip }) {
   if (clip.status === "review" && clip.familiar === false) {
     return html`<span class="pill stranger" title=${tr("跟已知角色确认过的台词都不太像", "Not much like any confirmed line of a known character")}>
@@ -302,14 +309,13 @@ function Stage({ clip, roles, labelText, sound, setSound, speed, setSpeed, onAss
           <button onClick=${onNewRole} title=${tr("新建一个目标角色，名字可以以后再起；有画面时接着截头像",
             "Make a new target character; you can name it later. With video, crop an avatar next")}>
             ${tr("新角色", "New character")} <kbd style="margin-left:4px">N</kbd></button>
-          <span style="font-size:12px;color:var(--text-3)">${tr(html`已有的人按数字键，或按 <kbd>/</kbd> 搜索`,
-            html`Existing characters: number keys, or <kbd>/</kbd> to search`)}</span></div>`}
+          <span style="font-size:12px;color:var(--text-3)">${tr("已有的人按数字键，或点底部的头像", "Existing characters: number keys, or click an avatar at the bottom")}</span></div>`}
 
     <div class="hint">
       ${tr(html`<kbd>J</kbd> <kbd>K</kbd> 上下一句 · <kbd>空格</kbd> 重播 · <kbd>1</kbd>–<kbd>9</kbd> 选下面的角色 ·
-        <kbd>N</kbd> 新角色 · <kbd>/</kbd> 搜索角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键`,
+        <kbd>N</kbd> 新角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键`,
         html`<kbd>J</kbd> <kbd>K</kbd> next / previous · <kbd>Space</kbd> replay · <kbd>1</kbd>–<kbd>9</kbd> pick a character below ·
-        <kbd>N</kbd> new character · <kbd>/</kbd> search · <kbd>Z</kbd> undo · <kbd>?</kbd> all shortcuts`)}
+        <kbd>N</kbd> new character · <kbd>Z</kbd> undo · <kbd>?</kbd> all shortcuts`)}
     </div>
   </aside>`;
 }
@@ -330,15 +336,15 @@ function Row({ clip, roles, labelText, selected, onSelect, flash, maybeOf, showT
     <div>
       <div class="who">
         <span class="n" style=${who && !who.human ? "color:var(--text-2);font-weight:500" : ""}>
-          ${stranger ? tr(`最像 ${labelText[who.name] || who.name}`, `Closest: ${labelText[who.name] || who.name}`)
-            : isOther ? labelText[who.name]
+          ${stranger ? "" : isOther ? labelText[who.name]
             : who ? html`<${RoleName} role=${roles[who.name]} name=${who.name} />` : tr("未知", "Unknown")}</span>
         <${Pill} clip=${clip} />
+        ${stranger && bestTarget(clip) && html`<${Closest} roles=${roles} name=${bestTarget(clip).name} p=${bestTarget(clip).p} />`}
         ${clip.unusable && !labelText[clip.label] && html`<span class="pill unusable" title=${lowTip()}>${tr("质量低", "Low quality")}</span>`}
         ${clip.maybe && html`<span class="pill maybe" title=${tr("机器没归给这个角色，但听起来有可能是", "The machine didn't give it to this character, but it might be")}>
           ${tr("可能漏掉", "Maybe missed")} ${pct(chanceOf(clip, maybeOf))}</span>`}
-        ${showTarget && bestTarget(clip) && html`<span class="pill maybe" title=${tr("机器觉得这句是这个目标角色的概率", "The machine's chance that this line is this target character")}>
-          ${tr("最像", "Closest:")} ${bestTarget(clip).name} ${pct(bestTarget(clip).p)}</span>`}
+        ${showTarget && bestTarget(clip) && html`<${Closest} roles=${roles} name=${bestTarget(clip).name} p=${bestTarget(clip).p}
+          title=${tr("机器觉得这句是这个目标角色的概率", "The machine's chance that this line is this target character")} />`}
       </div>
       <div class="say ${clip.text ? "" : "empty"}">${clip.text || tr("（没有字幕文字）", "(no subtitle text)")}</div>
     </div>
@@ -492,13 +498,12 @@ function RoleView({ state, roles, labelText, role, setRole, clips, focus, setFoc
 function GroupsView({ groups, loading, roles, dock, labelText, onName, onNew, focus, setFocus, firstRun, picked, setPicked }) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState({});
-  const [names, setNames] = useState({});
   if (loading) return html`<div class="empty"><div class="spinner" style="margin:auto"></div><p>${tr("正在把声音相近的台词分组…", "Grouping lines with similar voices…")}</p></div>`;
   return html`<div>
     ${firstRun && html`<div class="welcome"><div>
       <h3>${tr("第一步：给声音相近的一组起个名字", "Step one: name a group of similar voices")}</h3>
-      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。再在下面选是谁：是你要收集的新面孔，就按「新角色」把勾上的台词定成一个目标角色，再从画面里截一张头像，名字可以以后再起；不是你要的人，就按「其他」。",
-        "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". Then pick who it is below: if it is a new face you want to collect, press \"New character\" to make the ticked lines a target character, then crop an avatar from the picture; you can name it later. If it is not someone you want, press \"Other\".")}</p>
+      <p>${tr("机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。再在下面选是谁：是你要收集的新面孔，就按「新角色」把勾上的台词定成一个目标角色，接着可以起名字、从画面里截一张头像，都可以以后再做；不是你要的人，就按「其他」。",
+        "The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press \"Select all\". Then pick who it is below: if it is a new face you want to collect, press \"New character\" to make the ticked lines a target character, then you can type a name and crop an avatar from the picture, or do both later. If it is not someone you want, press \"Other\".")}</p>
       <ol><li>${tr("一组里混着几个人时，分几次勾、几次标。按住 Shift 点，能一下勾上中间的几句。",
         "When a group mixes several people, tick and label them in turns. Shift+click ticks all the lines in between.")}</li>
       <li>${tr("有勾选时，数字键、Q、N 标勾上的台词；没勾选时，标正在播放的那一句。",
@@ -533,24 +538,12 @@ function GroupsView({ groups, loading, roles, dock, labelText, onName, onNew, fo
           setAnchor((a) => ({ ...a, [g.key]: c.id }));
         };
         const tickAll = () => setPicked((p) => ({ ...p, [g.key]: new Set(all ? [] : open.map((c) => c.id)) }));
-        const value = names[g.key] ?? "";
         const ids = keep.map((c) => c.id);
-        const submit = (e) => {
-          e.preventDefault();
-          if (!keep.length || !value.trim()) return;
-          onName(ids, otherName(value) ? OTHER : value.trim());
-          /* The name was for these lines; the lines left in the group may be someone else. */
-          setNames({ ...names, [g.key]: "" });
-        };
-        /* The same characters in the same order as the bottom bar, with the same number keys. The machine's guess is
-           marked the same way as its top guess on the left; if it is past the ninth, it is added at the end. */
-        const who = dock.slice(0, 9);
-        if (g.hint && roles[g.hint.name] && !who.includes(g.hint.name)) who.push(g.hint.name);
         return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""} ${done ? "done" : ""}">
           <h3>${tr(`第 ${gi + 1} 组`, `Group ${gi + 1}`)} <span class="meta">${lines(g.size)} · ${tr(`${g.seconds} 秒`, `${g.seconds} s`)}${
             done ? tr(" · 都标好了", " · all labeled") : ""}</span>
-            ${g.hint && html`<span class="pill auto hint" title=${tr("机器的分类器在这组里最常猜的角色", "The character the machine guesses most often in this group")}>
-              <${Avatar} role=${roles[g.hint.name]} name=${g.hint.name} size="xs" />${tr("可能是", "Maybe")} ${g.hint.name}</span>`}</h3>
+            ${g.hint && html`<${Closest} roles=${roles} name=${g.hint.name}
+              title=${tr("机器在这组里最常猜的角色", "The character the machine guesses most often in this group")} />`}</h3>
           <div class="members">
             ${g.clips.map((c) => html`<div class="member ${ticked.has(c.id) && !c.label ? "picked" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
@@ -568,8 +561,9 @@ function GroupsView({ groups, loading, roles, dock, labelText, onName, onNew, fo
             <span class="note">${keep.length ? tr(`勾了 ${keep.length} 句；数字键、Q、N 也标勾上的`, `${lines(keep.length)} ticked; number keys, Q and N label them too`)
               : tr("先勾上同一个人的台词，再选是谁", "Tick the lines of one person first, then pick who it is")}</span>
           </div>`}
+          ${/* The same choices in the same order as the bottom bar, with the same keys. */ ""}
           ${!done && html`<div class="who-row">
-            ${who.map((name, i) => html`<button type="button" key=${name} class="chip ${name === g.hint?.name ? "top" : ""}" disabled=${!keep.length}
+            ${dock.map((name, i) => html`<button type="button" key=${name} class="chip ${name === g.hint?.name ? "top" : ""}" disabled=${!keep.length}
                 title=${name === g.hint?.name ? tr("机器在这组里最常猜的角色", "The character the machine guesses most often in this group") : ""}
                 onClick=${() => onName(ids, name)}>
               <${Avatar} role=${roles[name]} name=${name} size="sm" /><${RoleName} role=${roles[name]} name=${name} />${
@@ -580,16 +574,11 @@ function GroupsView({ groups, loading, roles, dock, labelText, onName, onNew, fo
             <button type="button" class="chip" disabled=${!keep.length} onClick=${() => onNew(ids)}
                 title=${tr("新建一个目标角色，名字可以以后再起；有画面时接着截头像", "Make a new target character; you can name it later. With video, crop an avatar next")}>
               <div class="av sm unknown">+</div><span class="rn">${tr("新角色", "New character")}</span><span class="k">N</span></button>
-          </div>
-          <form class="name-form" onSubmit=${submit}>
-            <input list="role-names" value=${value} placeholder=${tr("或者输入名字：已有的或新的", "Or type a name: existing or new")}
-              onInput=${(e) => setNames({ ...names, [g.key]: e.target.value })} />
-            <button type="submit" disabled=${!keep.length || !value.trim()}>${tr("用这个名字", "Use this name")}</button>
-          </form>`}
+          </div>`}
         </div>`;
       })}
     </div>
-    <datalist id="role-names">${Object.keys(roles).map((n) => html`<option value=${n} />`)}</datalist>
+
   </div>`;
 }
 
@@ -871,42 +860,6 @@ function Welcome(props) {
   </div>`;
 }
 
-/* ───────────── Search or make a character ───────────── */
-
-function Palette({ roles, onPick, onNew, onClose }) {
-  const [query, setQuery] = useState("");
-  const [at, setAt] = useState(0);
-  const input = useRef(null);
-  useEffect(() => input.current?.focus(), []);
-  const names = Object.values(roles);
-  const q = query.trim().toLowerCase();
-  const found = names.filter((r) => !q || r.name.toLowerCase().includes(q)).slice(0, 12);
-  const options = [...found.map((r) => ({ name: r.name, role: r }))];
-  if (otherName(query)) options.unshift({ name: OTHER, other: true });
-  else if (q && !names.some((r) => r.name.toLowerCase() === q)) options.push({ name: query.trim(), fresh: true });
-  options.push({ unnamed: true });
-  const pick = (o) => (o.unnamed ? onNew() : onPick(o.name));
-  const key = (e) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setAt(Math.min(at + 1, options.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setAt(Math.max(at - 1, 0)); }
-    else if (e.key === "Enter" && options[at]) { e.preventDefault(); pick(options[at]); }
-    else if (e.key === "Escape") onClose();
-  };
-  return html`<div class="overlay" onClick=${onClose}><div class="palette" onClick=${(e) => e.stopPropagation()}>
-    <input ref=${input} placeholder=${tr("搜索角色；敲一个新名字就是新建", "Search characters; type a new name to make one")} value=${query}
-      onInput=${(e) => { setQuery(e.target.value); setAt(0); }} onKeyDown=${key} />
-    <div class="opts">
-      ${options.map((o, i) => html`<div class="opt ${i === at ? "on" : ""}" onMouseEnter=${() => setAt(i)} onClick=${() => pick(o)}>
-        ${o.unnamed ? html`<div class="av md unknown">+</div><span>${tr("新角色，先不起名字", "New character, no name yet")}</span><span class="c"><kbd>N</kbd></span>`
-          : o.fresh ? html`<div class="av md unknown">+</div><span>${tr(`新建角色「${o.name}」`, `New character "${o.name}"`)}</span>`
-          : o.other ? html`<${Avatar} blank=${true} size="md" /><span>${tr("其他", "Other")}</span><span class="c"><kbd>Q</kbd></span>`
-          : html`<${Avatar} role=${o.role} name=${o.name} size="md" /><${RoleName} role=${o.role} name=${o.name} />
-            <span class="c">${lines(o.role.confirmed)}</span>`}
-      </div>`)}
-    </div>
-  </div></div>`;
-}
-
 function Help({ onClose }) {
   const rows = [
     [tr("J / ↓，K / ↑", "J / ↓, K / ↑"), tr("下一句，上一句", "Next line, previous line")],
@@ -917,8 +870,7 @@ function Help({ onClose }) {
       "The same target character, but low quality: too much background sound or someone talking at the same time. Not used to recognize anyone, skipped on export")],
     ["Q", tr("其他：不是任何一个目标角色", "Other: not any of the target characters")],
     ["N", tr("标成一个新的目标角色，名字以后再起；有画面时接着截头像", "Label as a new target character, to be named later; with video, crop an avatar next")],
-    ["/", tr("搜索角色，或者敲名字新建", "Search characters, or type a name to make one")],
-    ["Backspace", tr("清掉这句的标签，回到机器的猜测（Z 是撤回上一步，不一定是清掉）",
+   ["Backspace", tr("清掉这句的标签，回到机器的猜测（Z 是撤回上一步，不一定是清掉）",
       "Clear this line's label and go back to the machine's guess (Z undoes the last step, which is not always the same)")],
     ["R", tr("听机器最像的那个角色的参考音", "Hear a reference line of the machine's top guess")],
     ["L", tr("看不出是谁时，这句临时前后各多放 5 秒；再按 15 秒，再按回到平常",
@@ -942,21 +894,28 @@ function Help({ onClose }) {
 
 const AVATAR_SIDE = 256;
 
-function Cropper({ source, name, role, onSave, onClose }) {
+function Cropper({ source, name, role, naming, taken, onSave, onClose }) {
   const canvas = useRef(null);
   const preview = useRef(null);
   const drag = useRef(null);
-  const W = source.videoWidth;
-  const H = source.videoHeight;
+  const nameBox = useRef(null);
+  /* For a new character there is also a name box. Without a picture (no video, or the frame shows someone else),
+     there is only the name box. */
+  const W = source?.videoWidth || 0;
+  const H = source?.videoHeight || 0;
+  const [typed, setTyped] = useState("");
+  const [problem, setProblem] = useState("");
   /* The box is square, in the video's own pixels. By default it is the middle of the picture, 60% of its height. */
   const [box, setBox] = useState(() => {
     const s = Math.round(H * 0.6);
     return { x: Math.round((W - s) / 2), y: Math.round((H - s) / 2), s };
   });
-  const [time, setTime] = useState(source.currentTime);
+  const [time, setTime] = useState(source?.currentTime || 0);
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
+    if (naming) nameBox.current?.focus();
+    if (!source) return;
     source.pause();
     const draw = () => {
       canvas.current?.getContext("2d").drawImage(source, 0, 0, W, H);
@@ -1009,14 +968,25 @@ function Cropper({ source, name, role, onSave, onClose }) {
     const s = box.s * grow;
     setBox(clamp({ x: box.x + (box.s - s) / 2, y: box.y + (box.s - s) / 2, s }));
   };
-  const save = () => {
-    const out = document.createElement("canvas");
-    out.width = out.height = AVATAR_SIDE;
-    out.getContext("2d").drawImage(canvas.current, box.x, box.y, box.s, box.s, 0, 0, AVATAR_SIDE, AVATAR_SIDE);
-    onSave(out.toDataURL("image/jpeg", 0.9));
+  /* withAvatar false: keep only the name. */
+  const save = (withAvatar = true) => {
+    /* Read the box itself: a quick Enter can come before the page has drawn the last letter typed. */
+    const newName = naming ? (nameBox.current?.value ?? typed).trim() : "";
+    const wrong = newName ? taken(newName) : "";
+    if (wrong) { setProblem(wrong); nameBox.current?.focus(); return; }
+    let image = null;
+    if (source && withAvatar) {
+      const out = document.createElement("canvas");
+      out.width = out.height = AVATAR_SIDE;
+      out.getContext("2d").drawImage(canvas.current, box.x, box.y, box.s, box.s, 0, 0, AVATAR_SIDE, AVATAR_SIDE);
+      image = out.toDataURL("image/jpeg", 0.9);
+    }
+    onSave(image, newName);
   };
   useEffect(() => {
     const key = (e) => {
+      /* While an input method is still putting a word together, Enter and Escape belong to it. */
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Escape") { e.preventDefault(); onClose(); }
       else if (e.key === "Enter") { e.preventDefault(); save(); }
     };
@@ -1026,7 +996,14 @@ function Cropper({ source, name, role, onSave, onClose }) {
 
   const left = (v, total) => `${v / total * 100}%`;
   return html`<div class="overlay" onClick=${onClose}><div class="cropper" onClick=${(e) => e.stopPropagation()}>
-    <h2>${tr(html`给 <${RoleName} role=${role} name=${name} /> 截一张头像`, html`Crop an avatar for <${RoleName} role=${role} name=${name} />`)}</h2>
+    <h2>${naming ? tr("新角色", "New character")
+      : tr(html`给 <${RoleName} role=${role} name=${name} /> 截一张头像`, html`Crop an avatar for <${RoleName} role=${role} name=${name} />`)}</h2>
+    ${naming && html`<div class="crop-name">
+      <input ref=${nameBox} value=${typed} placeholder=${tr(`名字，可以不填，先叫「${name}」`, `Name, optional. For now it is "${name}"`)}
+        onInput=${(e) => { setTyped(e.target.value); setProblem(""); }} />
+      ${problem && html`<p class="note bad">${problem}</p>`}
+    </div>`}
+    ${source && html`${naming && html`<p class="note">${tr("再从画面里截一张头像：", "And crop an avatar from the picture:")}</p>`}
     <div class="crop-area" onPointerDown=${down} onPointerMove=${moveTo} onPointerUp=${up} onWheel=${wheel}>
       <canvas ref=${canvas} width=${W} height=${H}></canvas>
       <div class="crop-box" style=${`left:${left(box.x, W)};top:${left(box.y, H)};width:${left(box.s, W)};height:${left(box.s, H)}`}>
@@ -1039,10 +1016,11 @@ function Cropper({ source, name, role, onSave, onClose }) {
       <canvas ref=${preview} class="crop-preview" width="96" height="96"></canvas>
     </div>
     <p class="note">${tr("拖动方框挪位置，拖右下角或滚轮缩放，在框外按下可以重新画。",
-      "Drag the box to move it, drag its bottom-right corner or use the wheel to resize, press outside it to draw a new one.")}</p>
+      "Drag the box to move it, drag its bottom-right corner or use the wheel to resize, press outside it to draw a new one.")}</p>`}
     <div class="crop-actions">
-      <button class="ghost" onClick=${onClose}>${tr("放弃", "Cancel")} <kbd>Esc</kbd></button>
-      <button class="primary" onClick=${save}>${tr("用这张", "Use this")} <kbd>Enter</kbd></button>
+      <button class="ghost" onClick=${onClose}>${naming ? tr("跳过", "Skip") : tr("放弃", "Cancel")} <kbd>Esc</kbd></button>
+      ${naming && source && html`<button onClick=${() => save(false)}>${tr("不要头像", "No avatar")}</button>`}
+      <button class="primary" onClick=${() => save()}>${naming ? tr("保存", "Save") : tr("用这张", "Use this")} <kbd>Enter</kbd></button>
     </div>
   </div></div>`;
 }
@@ -1079,8 +1057,7 @@ function App() {
     pickedNow.current = typeof next === "function" ? next(pickedNow.current) : next;
     setPickedState(pickedNow.current);
   }, []);
-  const [palette, setPalette] = useState(false);
-  const [help, setHelp] = useState(false);
+ const [help, setHelp] = useState(false);
   /* The server's job that adds an episode (see AddEpisode), and whether its dialog is open. */
   const [adding, setAdding] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -1488,16 +1465,28 @@ function App() {
     setCrop({ name, then });
   };
   const closeCrop = () => { const then = crop?.then; setCrop(null); then?.(); };
-  const saveAvatar = async (image) => {
-    const name = crop.name;
+  /* A name for a new character must not be taken: that would be a merge, which belongs in the Characters view. */
+  const nameTaken = (typed) => otherName(typed) ? tr("「其他」是标签，不能当名字", "\"Other\" is a label, not a name")
+    : roles[typed] ? tr(`已经有叫「${typed}」的角色了。换一个名字；是同一个人的话，以后在「角色」里合并`,
+      `There is already a character called "${typed}". Pick another name; if it is the same person, merge them later in Characters`)
+    : "";
+  const saveCrop = async (image, typed) => {
+    let name = crop.name;
     closeCrop();
+    if (typed && typed !== name) {
+      /* Like a rename in the Characters view: the new name keeps the number key. */
+      dockOrder.current = dockOrder.current.flatMap((n) => (n === name ? [n, typed] : [n]));
+      if (!(await send("/api/roles", { name, new_name: typed }, tr(`已起名为 ${typed}`, `Named ${typed}`)))) return;
+      name = typed;
+    }
+    if (!image) return;
     try {
       setState(await call("/api/roles/avatar", { name, image }));
       showToast(tr(`已换好 ${name} 的头像`, `Avatar of ${name} updated`));
     } catch (e) { showToast(e.message, true); }
   };
-  /* Label as a new character without a name. If the current line is in the batch and there is a picture, go on to
-     crop an avatar from this frame. */
+  /* Label as a new character, then ask for a name (optional). If the current line is in the batch and there is a
+     picture, the same dialog also crops an avatar from this frame. */
   /* Each request makes a fresh character, so a second press before the answer would make an empty second one. */
   const makingRole = useRef(false);
   const newRole = async (ids = now() ? [now().id] : []) => {
@@ -1518,8 +1507,7 @@ function App() {
       if (view === "groups") setFocus(nextUnlabeled(ids));
       else if (ids.length === 1) advance(from);
     };
-    if (ids.includes(from) && hasFrame()) openCrop(result.role, onward);
-    else onward();
+    setCrop({ name: result.role, then: onward, naming: true, frame: ids.includes(from) && hasFrame() });
   };
 
   /* Replay this line from the start. Clicking a line in the list selects it if not selected (it then plays by
@@ -1565,7 +1553,7 @@ function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (crop) return;
-      if (palette || help || addOpen) { if (e.key === "Escape") { setPalette(false); setHelp(false); setAddOpen(false); } return; }
+      if (help || addOpen) { if (e.key === "Escape") { setHelp(false); setAddOpen(false); } return; }
       if (typing(e.target) || e.ctrlKey && e.key !== "z" || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       /* Holding a key down repeats only moving between lines; a held Enter, digit or Z would label or undo a
@@ -1584,8 +1572,7 @@ function App() {
         if (name) { handled(); assign(name, keyTargets(), e.shiftKey); }
       }
       else if (k === "q") { handled(); assign(OTHER, keyTargets()); }
-      else if (e.key === "/") { handled(); setPalette(true); }
-      else if (k === "n" && now() && view !== "export") { handled(); newRole(keyTargets()); }
+     else if (k === "n" && now() && view !== "export") { handled(); newRole(keyTargets()); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
       else if (e.key === "Backspace" || e.key === "Delete") { handled(); clear(); }
@@ -1690,27 +1677,25 @@ function App() {
     </div>
 
     ${view !== "export" && html`<footer class="dock">
-      ${dock.slice(0, 9).map((name, i) => html`<div class="chip" key=${name}
-          title=${tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`)} onClick=${() => assign(name, keyTargets())}>
+      ${dock.map((name, i) => html`<div class="chip" key=${name}
+          title=${i < 9 ? tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`) : tr(`标成 ${name}`, `Label as ${name}`)}
+          onClick=${() => assign(name, keyTargets())}>
         <${Avatar} role=${roles[name]} name=${name} size="md" /><${RoleName} role=${roles[name]} name=${name} />
-        <span class="k">${i + 1}</span>
-        <button class="low" title=${tr(`按 Shift + ${i + 1} 标成 ${name}·质量低：`, `Press Shift + ${i + 1} to label as ${name}, low quality: `) + lowTip()}
-          onClick=${(e) => { e.stopPropagation(); assign(name, keyTargets(), true); }}>${tr("质量低", "Low quality")} <span class="k">⇧${i + 1}</span></button></div>`)}
+        ${i < 9 && html`<span class="k">${i + 1}</span>`}
+        <button class="low" title=${(i < 9 ? tr(`按 Shift + ${i + 1} 标成 ${name}·质量低：`, `Press Shift + ${i + 1} to label as ${name}, low quality: `)
+            : tr(`标成 ${name}·质量低：`, `Label as ${name}, low quality: `)) + lowTip()}
+          onClick=${(e) => { e.stopPropagation(); assign(name, keyTargets(), true); }}>${tr("质量低", "Low quality")}${
+            i < 9 ? html` <span class="k">⇧${i + 1}</span>` : ""}</button></div>`)}
       <div class="chip" title=${tr("不是任何一个目标角色", "Not any of the target characters")} onClick=${() => assign(OTHER, keyTargets())}>
         <${Avatar} blank=${true} size="md" /><span class="rn">${labelText[OTHER]}</span><span class="k">Q</span></div>
       <div class="chip ${current ? "" : "off"}" title=${tr("新建一个目标角色，名字可以以后再起；有画面时接着截头像", "Make a new target character; you can name it later. With video, crop an avatar next")}
           onClick=${() => current && newRole(keyTargets())}>
         <div class="av md unknown">+</div><span class="rn">${tr("新角色", "New character")}</span><span class="k">N</span></div>
-      <button class="ghost" onClick=${() => setPalette(true)}>${tr("搜索角色", "Search characters")} <kbd>/</kbd></button>
-      <span class="more">${dock.length > 9 ? tr(`另有 ${dock.length - 9} 个目标角色在搜索里`, `${many(dock.length - 9, "more target")} in search`) : ""}</span>
     </footer>`}
 
     <audio ref=${refAudio} hidden></audio>
-    ${palette && html`<${Palette} roles=${roles} onClose=${() => setPalette(false)}
-      onPick=${(name) => { setPalette(false); assign(name, keyTargets()); }}
-      onNew=${() => { setPalette(false); newRole(keyTargets()); }} />`}
-    ${crop && html`<${Cropper} source=${playerRef.current} name=${crop.name} role=${roles[crop.name]}
-      onSave=${saveAvatar} onClose=${closeCrop} />`}
+   ${crop && html`<${Cropper} source=${!crop.naming || crop.frame ? playerRef.current : null} name=${crop.name} role=${roles[crop.name]}
+      naming=${crop.naming} taken=${nameTaken} onSave=${saveCrop} onClose=${closeCrop} />`}
     ${help && html`<${Help} onClose=${() => setHelp(false)} />`}
     ${addOpen && html`<${AddDialog} onClose=${() => setAddOpen(false)} ...${addProps} />`}
     ${toast && html`<div class="toast ${toast.isError ? "error" : ""}"><span>${toast.message}</span>
