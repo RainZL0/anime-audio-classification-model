@@ -8,6 +8,7 @@ dependencies = [
     "anime-speaker-embedding>=0.2",
     "audio-separator[gpu]>=0.45.0",
     "audioread>=3.1.0",
+    "charset-normalizer>=3.4",
     "fastapi>=0.143.3",
     "numpy>=2.5.2",
     "pyannote-audio>=4.0",

@@ -69,6 +69,10 @@ const saved = new URLSearchParams(location.hash.slice(1));
    edits the address or opens a link to another spot; reloading reads the new position. */
 addEventListener("hashchange", () => location.reload());
 const confidence = (clip) => clip.guess[0]?.p ?? 0;
+/* Shortcuts stay off while the keys go into a text box or a menu. A tick box is not typed into, so they still
+   work after ticking a line. */
+const typing = (el) => el.tagName === "SELECT" || el.tagName === "TEXTAREA"
+  || el.tagName === "INPUT" && !["checkbox", "radio", "button", "range"].includes(el.type);
 /* "Other": not any of the target characters. It is a human judgment, labeled with Q. Unsure whether it is a
    target, several people talking with no target among them, cheering and sound effects: all get "other". */
 const OTHER = "__other__";
@@ -95,8 +99,9 @@ function whoOf(clip) {
 const warmed = new Set();
 function warm(clips, kind) {
   for (const clip of clips) {
+    if (!clip) continue;
     const url = media(kind, clip.id);
-    if (!clip || warmed.has(url)) continue;
+    if (warmed.has(url)) continue;
     warmed.add(url);
     fetch(url, { priority: "low" }).catch(() => warmed.delete(url));
   }
@@ -530,6 +535,8 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
           e.preventDefault();
           if (!keep.length) return;
           if (chosen) onName(ids, chosen); else onNew(ids);
+          /* The name was for these lines; the lines left in the group may be someone else. */
+          setNames({ ...names, [g.key]: "" });
         };
         const known = Object.values(roles).filter((r) => r.target && r.name !== g.hint?.name).slice(0, 8);
         return html`<div class="group ${g.clips.some((c) => c.id === focus) ? "sel" : ""} ${done ? "done" : ""}">
@@ -541,6 +548,7 @@ function GroupsView({ groups, loading, roles, labelText, onName, onNew, focus, s
             ${g.clips.map((c) => html`<div class="member ${ticked.has(c.id) && !c.label ? "picked" : ""} ${c.label ? "labeled" : ""} ${c.id === focus ? "playing" : ""}"
                 onClick=${() => setFocus(c.id)}>
               ${c.label ? html`<span></span>` : html`<input type="checkbox" checked=${ticked.has(c.id)} onClick=${(e) => tick(c, e)}
+                onMouseDown=${(e) => e.preventDefault()}
                 title=${tr("勾上，下面的按钮就标这一句；按住 Shift 点，勾上中间的几句", "Tick it for the buttons below to label it; Shift+click ticks the lines in between")} />`}
               <span>${c.text || tr("（没有字幕文字）", "(no subtitle text)")}</span>
               ${c.label ? html`<span class="pill done" title=${tr("已经标了；按 Z 撤销，或在左边改", "Already labeled. Press Z to undo, or change it on the left")}>
@@ -612,7 +620,9 @@ function TextSubtitles({ state, setState, toast }) {
 
 function ExportView({ state, setState, toast }) {
   const trainable = state.roles.filter((r) => r.confirmed > 0);
-  const [picked, setPicked] = useState(() => new Set());
+  const [ticked, setPicked] = useState(() => new Set());
+  /* Only names still on the list: a character ticked here may have been renamed or merged since. */
+  const picked = new Set(trainable.map((r) => r.name).filter((n) => ticked.has(n)));
   const [form, setForm] = useState("gpt-sovits");
   const [language, setLanguage] = useState("ja");
   const [textSubtitles, setTextSubtitles] = useState(() => state.episodes.some((e) => e.text_subtitles));
@@ -980,11 +990,20 @@ function App() {
   const [view, setView] = useState("scene");
   const [episode, setEpisode] = useState(null);
   const [clips, setClips] = useState([]);
-  const [focus, setFocus] = useState(() => saved.get("clip"));
+  const [focus, setFocusState] = useState(() => saved.get("clip"));
+  /* The newest focus, set at once. Keys pressed faster than the page draws read it, so each press acts on the
+     line the press before moved to, not on the one still on screen. */
+  const focusNow = useRef(focus);
+  const setFocus = useCallback((next) => {
+    focusNow.current = typeof next === "function" ? next(focusNow.current) : next;
+    setFocusState(focusNow.current);
+  }, []);
   const [onlyWork, setOnlyWork] = useState(() => saved.get("only") === "1");
   /* Whether Whole episode lists the short lines skipped by default (status "skipped"); labeled ones always show. */
   const [showShort, setShowShort] = useState(() => localStorage.getItem("show-short") === "1");
   const [role, setRole] = useState(null);
+  const roleNow = useRef(role);
+  roleNow.current = role;
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -1127,6 +1146,9 @@ function App() {
       const list = await get(`/api/clips?role=${encodeURIComponent(role)}`);
       setClips(list);
       setFocus((f) => (list.some((c) => c.id === f) ? f : (pendingOf(list)[0] || maybeListOf(list)[0] || list[0])?.id));
+    } else if (view === "roles") {
+      /* No character open, for example after the open one was undone: no list, and no line on the stage. */
+      setClips([]);
     } else if (view === "groups" && episode) {
       setGroupsLoading(true);
       let found;
@@ -1141,12 +1163,16 @@ function App() {
     }
   }, [view, episode, role, !!state]);
   const reload = () => load().catch((e) => e !== STALE && showToast(e.message, true));
-  /* Clear the old list when the view changes: its lines don't always fit the new view (for example lines
-     without a guess in the Characters view). */
-  useEffect(() => { setClips([]); setGroups([]); }, [view]);
+  /* Clear the old list when the view, episode or character changes: its lines don't always fit the new view (for
+     example lines without a guess in the Characters view), and until the new list comes, keys and "Confirm the
+     rest" must not act on the old one under the new name. */
+  useEffect(() => { setClips([]); setGroups([]); }, [view, episode, role]);
   useEffect(() => { reload(); }, [load]);
   useEffect(() => {
-    if (view === "roles" && !role && state?.roles.length) setRole(state.roles[0].name);
+    /* Also when the open character is gone, for example after undoing the step that made or renamed it. */
+    const gone = role && role !== OTHER && state && !state.roles.some((r) => r.name === role);
+    if (view === "roles" && (!role || gone) && state?.roles.length) setRole(state.roles[0].name);
+    else if (gone) setRole(null);
   }, [view, state]);
 
   /* The order "next / previous line" follows in the current view */
@@ -1170,7 +1196,10 @@ function App() {
   const byId = useMemo(() => Object.fromEntries(clips.map((c) => [c.id, c])), [clips]);
   /* When the Scenes view filters out the focused line, the stage stays empty, so shortcuts can't change a line
      you can't see in the list. */
-  const current = focus && (view !== "scene" || order.includes(focus)) ? byId[focus] : null;
+  const shownClip = (id) => (id && (view !== "scene" || order.includes(id)) ? byId[id] : null);
+  const current = shownClip(focus);
+  /* What the shortcuts and buttons act on; see focusNow. */
+  const now = () => shownClip(focusNow.current);
 
   useEffect(() => {
     const at = order.indexOf(focus);
@@ -1193,17 +1222,16 @@ function App() {
     const at = groupIds.indexOf(id);
     return { after: order.filter((o) => groupIds.indexOf(o) > at), before: order.filter((o) => groupIds.indexOf(o) < at) };
   };
-  const move = (step) => {
-    const at = order.indexOf(focus);
-    if (at < 0 && view === "groups" && groupIds.includes(focus)) {
-      const { after, before } = besides(focus);
-      const next = step > 0 ? after[0] ?? before.at(-1) : before.at(-1) ?? after[0];
-      if (next) setFocus(next);
-      return;
+  /* Step from the newest focus, not the one this render saw: two quick presses of J come before the page has
+     drawn again, and each must move one line. */
+  const move = (step) => setFocus((f) => {
+    const at = order.indexOf(f);
+    if (at < 0 && view === "groups" && groupIds.includes(f)) {
+      const { after, before } = besides(f);
+      return (step > 0 ? after[0] ?? before.at(-1) : before.at(-1) ?? after[0]) ?? f;
     }
-    const next = order[Math.min(Math.max(at + step, 0), order.length - 1)];
-    if (next) setFocus(next);
-  };
+    return order[Math.min(Math.max(at + step, 0), order.length - 1)] ?? f;
+  });
 
   /* Move on after labeling a line. The Scenes view jumps to the next line that still needs work, instead of
      going through confirmed lines one by one. */
@@ -1228,16 +1256,16 @@ function App() {
     const updated = Object.fromEntries(result.updated.map((c) => [c.id, c]));
     /* "Maybe missed" is decided when the Characters view fetches its list, and updated lines don't carry it, so
        keep it; a line labeled as this character is no longer missed. */
+    /* The answer may come after you switched view or character, so read the ones open now. */
     setClips((list) => list.map((c) => {
       const next = updated[c.id];
       if (!next) return c;
-      return c.maybe && next.label !== role ? { ...next, maybe: true } : next;
+      return c.maybe && next.label !== roleNow.current ? { ...next, maybe: true } : next;
     }));
     /* In Groups, labeled lines stay where they are, marked as labeled, instead of leaving the group: the
-       unlabeled line next to it doesn't vanish with it, and undo puts things back exactly. */
-    if (view === "groups") {
-      setGroups((gs) => gs.map((g) => ({ ...g, clips: g.clips.map((c) => updated[c.id] ?? c) })));
-    }
+       unlabeled line next to it doesn't vanish with it, and undo puts things back exactly. Done in every view:
+       with no groups loaded it changes nothing. */
+    setGroups((gs) => gs.map((g) => ({ ...g, clips: g.clips.map((c) => updated[c.id] ?? c) })));
     const flashing = new Set(result.updated.map((c) => c.id));
     setFlashes(flashing);
     setTimeout(() => setFlashes(new Set()), 900);
@@ -1252,9 +1280,13 @@ function App() {
      focus back to that line. */
   const queue = useRef(Promise.resolve());
   const pendingCount = useRef(0);
+  /* Lines with a label change still on its way, and how many changes each has queued. */
+  const saving = useRef(new Map());
   const send = (url, body, label, onFail) => {
     setBusy(true);
     pendingCount.current += 1;
+    const ids = body.clips || [];
+    for (const id of ids) saving.current.set(id, (saving.current.get(id) || 0) + 1);
     const run = queue.current.then(async () => {
       try {
         const result = await call(url, body);
@@ -1265,6 +1297,10 @@ function App() {
         onFail?.();
         return null;
       } finally {
+        for (const id of ids) {
+          const left = saving.current.get(id) - 1;
+          if (left > 0) saving.current.set(id, left); else saving.current.delete(id);
+        }
         pendingCount.current -= 1;
         if (pendingCount.current === 0) setBusy(false);
       }
@@ -1275,9 +1311,9 @@ function App() {
 
   /* One choice sets both who it is and whether it is low quality: low means "them, low quality"; otherwise it is
      clean, and an earlier low quality mark is turned off. */
-  const assign = (name, ids = current ? [current.id] : [], low = false) => {
+  const assign = (name, ids = now() ? [now().id] : [], low = false) => {
     if (!ids.length || !name) return;
-    const from = focus;
+    const from = focusNow.current;
     const who = labelText[name] ? tr(`「${labelText[name]}」`, `"${labelText[name]}"`) : name;
     const what = low ? tr(`${who}·质量低，导出时跳过`, `${who}, low quality, skipped on export`) : who;
     const label = ids.length > 1 ? tr(`${ids.length} 句已标为 ${what}`, `${lines(ids.length)} labeled ${what}`) : tr(`已标为 ${what}`, `Labeled ${what}`);
@@ -1286,16 +1322,30 @@ function App() {
     else if (ids.length === 1) advance(from);
   };
   const accept = () => {
-    if (!current) return;
-    if (current.label) { move(1); return; }
-    if (current.guess.length) assign(current.guess[0].name);
+    const clip = now();
+    if (!clip) return;
+    if (clip.label) { move(1); return; }
+    if (clip.guess.length) assign(clip.guess[0].name);
   };
-  const clear = () => current?.label && send("/api/label", { clips: [current.id], label: null }, tr("已清掉这句的标签", "Label cleared"));
-  const undo = () => state?.can_undo ? send("/api/undo", {}, tr("已撤销", "Undone")) : showToast(tr("没有可以撤销的操作", "Nothing to undo"));
+  const clear = () => {
+    const clip = now();
+    if (clip?.label) send("/api/label", { clips: [clip.id], label: null }, tr("已清掉这句的标签", "Label cleared"));
+  };
+  /* A save still on its way can be undone too, though the overview doesn't know of it yet. Afterwards go back to
+     the line that was undone, if it is in this list. */
+  const undo = async () => {
+    if (!state?.can_undo && pendingCount.current === 0) { showToast(tr("没有可以撤销的操作", "Nothing to undo")); return; }
+    const result = await send("/api/undo", {}, tr("已撤销", "Undone"));
+    /* `updated` lists the lines undone first, then the ones whose guess changed along with them. */
+    const back = result?.updated.slice(0, result.updated.length - result.ripple).map((c) => c.id).filter((id) => order.includes(id) || groupIds.includes(id));
+    if (back?.length) setFocus(back.sort((a, b) => order.indexOf(a) - order.indexOf(b))[0]);
+  };
 
   const playRef = async (name) => {
+    const asked = focusNow.current;
     try {
       const refs = await call(`/api/references?name=${encodeURIComponent(name)}`);
+      if (focusNow.current !== asked) return;  // Moved on while waiting.
       if (!refs.length) { showToast(tr(`${name} 还没有确认过的台词可以当参考`, `${name} has no confirmed lines to use as a reference yet`)); return; }
       const pick = refs[Math.floor(Math.random() * refs.length)];
       if (playerRef.current) playerRef.current.pause();
@@ -1308,7 +1358,10 @@ function App() {
   };
 
   const confirmRest = async () => {
-    const pending = pendingOf(clips);
+    /* Leave out lines you just labeled whose answer hasn't come back: confirming them here would undo your fix. */
+    /* And only lines the machine gave to the character open now: right after switching character, for a moment
+       the list on hand can still be the last one's. */
+    const pending = pendingOf(clips).filter((c) => !saving.current.has(c.id) && c.guess[0]?.name === role);
     if (!pending.length) return;
     const changes = pending.map((c) => ({ clip: c.id, label: role }));
     const result = await send("/api/changes", { changes },
@@ -1362,17 +1415,26 @@ function App() {
   };
   /* Label as a new character without a name. If the current line is in the batch and there is a picture, go on to
      crop an avatar from this frame. */
-  const newRole = async (ids = current ? [current.id] : []) => {
-    if (!ids.length) return;
-    const from = focus;
+  /* Each request makes a fresh character, so a second press before the answer would make an empty second one. */
+  const makingRole = useRef(false);
+  const newRole = async (ids = now() ? [now().id] : []) => {
+    if (!ids.length || makingRole.current) return;
+    makingRole.current = true;
+    const from = focusNow.current;
+    let result;
+    try {
+      result = await send("/api/label", { clips: ids, new_role: true },
+        ids.length > 1 ? tr(`${ids.length} 句标成了一个新角色`, `${lines(ids.length)} labeled as a new character`)
+          : tr("已标成一个新角色", "Labeled as a new character"));
+    } finally {
+      makingRole.current = false;
+    }
+    /* If you moved to another line while waiting, stay there: no cropping from that line's frame. */
+    if (!result || focusNow.current !== from) return;
     const onward = () => {
       if (view === "groups") setFocus(nextUnlabeled(ids));
       else if (ids.length === 1) advance(from);
     };
-    const result = await send("/api/label", { clips: ids, new_role: true },
-      ids.length > 1 ? tr(`${ids.length} 句标成了一个新角色`, `${lines(ids.length)} labeled as a new character`)
-        : tr("已标成一个新角色", "Labeled as a new character"));
-    if (!result) return;
     if (ids.includes(from) && hasFrame()) openCrop(result.role, onward);
     else onward();
   };
@@ -1386,22 +1448,46 @@ function App() {
   const pick = (id) => (id === focus ? replay() : setFocus(id));
 
   /* Continuous play in the Characters view: when a line ends, jump to the next one to check */
+  /* L and the sound buttons make a new player, so listen again then too. Playing stops after the last line still
+     to check; the lines below it are already settled. */
   useEffect(() => {
     if (!playing || view !== "roles") return;
     const player = playerRef.current;
     if (!player) return;
-    const onEnd = () => setTimeout(() => move(1), 250);
+    let timer = null;
+    const onEnd = () => {
+      timer = setTimeout(() => {
+        const toCheck = pendingOf(clips).map((c) => c.id);
+        const at = toCheck.indexOf(focusNow.current);
+        if (at >= 0 && at + 1 < toCheck.length) setFocus(toCheck[at + 1]);
+        else setPlaying(false);
+      }, 250);
+    };
     player.addEventListener("ended", onEnd);
-    return () => player.removeEventListener("ended", onEnd);
-  }, [playing, focus, view, order]);
+    return () => { player.removeEventListener("ended", onEnd); clearTimeout(timer); };
+  }, [playing, focus, view, clips, sound, context]);
+  useEffect(() => { setPlaying(false); }, [view, role]);
+  /* Playing starts from the first line to check, or replays the open one if it is one of them: it may have
+     finished already, and then no end would come to move on from. */
+  useEffect(() => {
+    if (!playing) return;
+    const toCheck = pendingOf(clips);
+    if (toCheck.some((c) => c.id === focusNow.current)) replay();
+    else if (toCheck.length) setFocus(toCheck[0].id);
+  }, [playing]);
+  /* A reference clip belongs to the line it was asked on. */
+  useEffect(() => { refAudio.current?.pause(); }, [focus]);
 
   /* All shortcuts */
   useEffect(() => {
     const onKey = (e) => {
       if (crop) return;
       if (palette || help || addOpen) { if (e.key === "Escape") { setPalette(false); setHelp(false); setAddOpen(false); } return; }
-      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.ctrlKey && e.key !== "z" || e.metaKey || e.altKey) return;
+      if (typing(e.target) || e.ctrlKey && e.key !== "z" || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      /* Holding a key down repeats only moving between lines; a held Enter, digit or Z would label or undo a
+         whole run of lines. */
+      if (e.repeat && !["j", "k", "arrowdown", "arrowup"].includes(k)) { e.preventDefault(); return; }
       const handled = () => e.preventDefault();
       if (k === "j" || e.key === "ArrowDown") { handled(); move(1); }
       else if (k === "k" || e.key === "ArrowUp") { handled(); move(-1); }
@@ -1416,11 +1502,11 @@ function App() {
       }
       else if (k === "q") { handled(); assign(OTHER); }
       else if (e.key === "/") { handled(); setPalette(true); }
-      else if (k === "n" && current && view !== "export") { handled(); newRole(); }
+      else if (k === "n" && now() && view !== "export") { handled(); newRole(); }
       else if (e.key === "?") { handled(); setHelp(true); }
       else if (k === "z") { handled(); undo(); }
       else if (e.key === "Backspace" || e.key === "Delete") { handled(); clear(); }
-      else if (k === "r" && current?.guess.length && current.guess[0].name !== OTHER) { handled(); playRef(current.guess[0].name); }
+      else if (k === "r" && now()?.guess.length && now().guess[0].name !== OTHER) { handled(); playRef(now().guess[0].name); }
       else if (k === "l" && current) { handled(); nextContext(); }
       else if (k === "f" && view === "scene") { handled(); toggleOnlyWork(!onlyWork); }
       else if (k === "p" && view === "roles") { handled(); setPlaying(!playing); }
@@ -1463,7 +1549,11 @@ function App() {
       <nav class="tabs ${perEpisode ? "" : "away"}">
         <select value=${episode} title=${perEpisode ? tr("换一集", "Switch episode")
             : tr("「角色」和「导出」看的是全部集数，换集只影响「起步分组」和「场景」", "Characters and Export cover all episodes; switching only changes Groups and Scenes")}
-          onChange=${(e) => { if (e.target.value === "+") { e.target.value = episode; setAddOpen(true); } else setEpisode(e.target.value); }}>
+          onChange=${(e) => {
+            /* Let go of the menu, or the arrow keys meant for the next line would switch the episode again. */
+            e.target.blur();
+            if (e.target.value === "+") { e.target.value = episode; setAddOpen(true); } else setEpisode(e.target.value);
+          }}>
           ${state.episodes.map((e) => html`<option value=${e.name}>${e.name}</option>`)}
           <option value="+">${tr("＋ 加一集…", "+ Add an episode…")}${Object.keys(state.skipped || {}).length
             ? tr(`（${Object.keys(state.skipped).length} 集没做完）`, ` (${Object.keys(state.skipped).length} unfinished)`) : ""}</option>
@@ -1510,7 +1600,7 @@ function App() {
           onAvatar=${() => openCrop(role)} canCrop=${!!current && !!episodeInfo?.video}
           playing=${playing} setPlaying=${setPlaying} />`}
         ${view === "groups" && html`<${GroupsView} key=${episode} groups=${groups} loading=${groupsLoading} roles=${roles} labelText=${labelText}
-          focus=${focus} setFocus=${setFocus} firstRun=${firstRun}
+          focus=${focus} setFocus=${pick} firstRun=${firstRun}
           onName=${(ids, name) => assign(name, ids)} onNew=${(ids) => newRole(ids)} />`}
         ${view === "export" && html`<${ExportView} state=${state} setState=${setState} toast=${showToast} />`}
       </main>

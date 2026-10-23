@@ -216,8 +216,9 @@ class LabelStore:
                         self._ensure_role(label)
             # An undo is recorded even when nothing actually changes (for example, when it takes
             # back the batch that cleared retired old labels). Otherwise that batch would look
-            # never undone, and repeated undo would get stuck on it.
-            if not effective and undo_of is None:
+            # never undone, and repeated undo would get stuck on it. A rename or merge is recorded
+            # too, even for a character with no clips.
+            if not effective and undo_of is None and not cast:
                 return None
             batch: dict[str, Any] = {
                 "batch": (self.batches[-1]["batch"] + 1) if self.batches else 1,
@@ -342,7 +343,8 @@ class LabelStore:
                 if old in names and self.labels.get(clip) == OTHER:
                     renamed = (names - {old}) | {new}
                     moved.append({"clip": clip, "label": OTHER, "against": sorted(renamed)})
-            return self.apply(moved, cast=cast) if moved else None
+            # Recorded even when no clip moves, so the rename can still be undone.
+            return self.apply(moved, cast=cast)
 
     # Internal
 

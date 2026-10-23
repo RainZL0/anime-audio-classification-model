@@ -46,6 +46,16 @@ def test_rename_into_an_existing_role_merges_them(tmp_path: Path) -> None:
         store.rename_role("Nice Nature", "__unclear__")
 
 
+def test_renaming_a_role_with_no_clips_can_be_undone(tmp_path: Path) -> None:
+    store = LabelStore(tmp_path / "labels")
+    store.apply([{"clip": "a", "label": "A"}])
+    store.apply([{"clip": "a", "label": "B"}])
+    assert store.rename_role("A", "C") is not None
+    store.undo()
+    assert {r["name"] for r in store.roles} == {"A", "B"}
+    assert store.labels == {"a": "B"}
+
+
 def test_retired_labels_count_as_unlabeled(tmp_path: Path) -> None:
     """A retired old label (such as an unsure one) counts as no label when replayed, imported, or
     undone. Undo also does not get stuck."""
