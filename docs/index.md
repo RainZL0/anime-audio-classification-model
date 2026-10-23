@@ -12,18 +12,15 @@
 
 | What you want to know | Read | Main sections |
 | --- | --- | --- |
-| How to type the commands | [USAGE.md](USAGE.md) | [Processing a new episode](USAGE.md#processing-a-new-episode), [Labeling and correction interface](USAGE.md#labeling-and-correction-interface), [Grouping, scoring, export](USAGE.md#grouping-scoring-export), [Comparison experiments](USAGE.md#comparison-experiments) |
-| How things work, and what the terms mean | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [Glossary](HOW_IT_WORKS.md#glossary), [Five-step flow](HOW_IT_WORKS.md#five-step-flow), [Labeling and correction interface](HOW_IT_WORKS.md#labeling-and-correction-interface), [How scoring works](HOW_IT_WORKS.md#how-scoring-works), [Data files](HOW_IT_WORKS.md#data-files) |
+| How to type the commands | [USAGE.md](USAGE.md) | [Processing a new episode](USAGE.md#processing-a-new-episode), [Labeling and correction interface](USAGE.md#labeling-and-correction-interface) |
+| How things work, and what the terms mean | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | [Glossary](HOW_IT_WORKS.md#glossary), [Flow](HOW_IT_WORKS.md#flow), [Labeling and correction interface](HOW_IT_WORKS.md#labeling-and-correction-interface), [Data files](HOW_IT_WORKS.md#data-files) |
 | Dependencies, models, runtime environment | [TOOLS.md](TOOLS.md) | |
-| Manual label files | [annotations/README.md](../annotations/README.md) | |
 
-## Conclusions and evidence
+## Conclusions
 
 | What you want to know | Read | Main sections |
 | --- | --- | --- |
 | Which approaches are settled, and which paths were ruled out | [DECISIONS.md](DECISIONS.md) | [Settled](DECISIONS.md#settled), [Ruled out](DECISIONS.md#ruled-out) |
-| Working rules, and the mistake behind each one | [HISTORY.md](HISTORY.md) | [Scoring](HISTORY.md#scoring), [Tuning parameters](HISTORY.md#tuning-parameters), [Labeling](HISTORY.md#labeling), [Keeping and deleting](HISTORY.md#keeping-and-deleting) |
-| What experiments were done, and the numbers | [EXPERIMENTS.md](EXPERIMENTS.md) | Starts with a table of contents sorted by conclusion |
 
 ## What each doc covers
 
@@ -35,13 +32,11 @@ One fact is written in one place only. Elsewhere, only a link.
 | ROADMAP | Goals, users, direction, interface design, release standards and how to release, all for the first release | Next steps for now, experiment numbers |
 | COMPETITORS | Similar tools, training-side formats, survey date, and what was not verified | Our own plans |
 | USAGE | Commands and options | Why these were chosen |
-| HOW_IT_WORKS | Terms, flow, data formats, the scoring method | Rules, experiment numbers |
-| DECISIONS | Settled and ruled-out technical choices, each with one reason and a link | Numeric details, approaches not fully tested yet |
-| HISTORY | Working rules and the lesson behind each one; cleanup records | Which model or cutting method was picked |
-| EXPERIMENTS | Finished experiments and their numbers | Plans, rules |
+| HOW_IT_WORKS | Terms, flow, data formats | Rules, experiment numbers |
+| DECISIONS | Settled and ruled-out technical choices, each with one reason | Numeric details, approaches not fully tested yet |
 | TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
 
-When maintaining: if the plan for now changes, change STATUS. If the route changes, change ROADMAP. When an experiment is done, its numbers go into EXPERIMENTS, and any approach it settles goes into DECISIONS. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
+When maintaining: if the plan for now changes, change STATUS. If the route changes, change ROADMAP. While a question is being tested, its numbers stay in STATUS. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
 
 ## How to write
 

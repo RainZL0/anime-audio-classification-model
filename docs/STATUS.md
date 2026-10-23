@@ -1,6 +1,6 @@
 # Current status and next steps
 
-Updated: 2026-10-23, evening. Current plans are written only here. The route up to the first release is in [ROADMAP.md](ROADMAP.md). Settled approaches are in [DECISIONS.md](DECISIONS.md), and experiment numbers are in [EXPERIMENTS.md](EXPERIMENTS.md).
+Updated: 2026-10-23, evening. Current plans are written only here. The route up to the first release is in [ROADMAP.md](ROADMAP.md). Settled approaches are in [DECISIONS.md](DECISIONS.md).
 
 ## Where things stand
 
@@ -11,7 +11,7 @@ Updated: 2026-10-23, evening. Current plans are written only here. The route up 
 | Video and subtitles | All seven episodes have their video and subtitles recorded. Each also has Netflix Japanese subtitles attached (offsets -0.92 to -0.94 seconds) |
 | Interface | The four views, Groups, Scenes, Characters and Export, all work and are still being polished. Done so far: playback speed, listening to vocals only, More context, returning to the same spot after a refresh, background pre-cutting, and so on |
 | Labels | In `runs/labels/`. The only target character is Tokai Teio (label name `teo`). See the table below |
-| Export | The GPT-SoVITS format has been tested for real. Of Teio's 171 clips from episodes 1 to 3, 118 passed the filter (4.0 minutes). Fine-tuning GPT-SoVITS on them sounds closer to her ([numbers](EXPERIMENTS.md#japanese-dialogue)). Of the 503 clips from all seven episodes, 302 pass the same rule (10.7 minutes). The new version trained on them sounds somewhat closer. See "Questions being tested" below |
+| Export | The GPT-SoVITS format has been tested for real. Of Teio's 171 clips from episodes 1 to 3, 118 passed the filter (4.0 minutes). Fine-tuning GPT-SoVITS on them sounds closer to her. Of the 503 clips from all seven episodes, 302 pass the same rule (10.7 minutes). The new version trained on them sounds somewhat closer. See "Questions being tested" below |
 
 Labels per episode (2026-10-23 evening, status shown in the interface):
 
@@ -26,25 +26,21 @@ Labels per episode (2026-10-23 evening, status shown in the interface):
 | Episode 7 | 389 | 71 | 60 | 11 | 294 | 2 | 22 |
 
 - `teo` has 503 confirmed clips, 16 minutes 1 second in total. Of these, 2 minutes 50 seconds are "low quality". Every clip the machine is confident belongs to `teo` has already been listened to by a person. The remaining confident clips are all "Other", and they are not confirmed one by one.
-- The 102 clips carried over from before the migration that were labeled "multiple people" or "unclear" have been cleared. They are back to the machine's guesses and are being listened to again.
 - 85 clips are labeled "low quality" (episodes 1 to 7: 26, 12, 4, 6, 8, 11 and 18). They are not used for training and are skipped on export.
 - When the subtitles show two lines at the same time, each line is cut into its own clip. The two clips nearly share the same time range, and both contain two people's voices. About 50 clips in the first four episodes overlap another clip by more than 0.3 seconds. For now a person listens and labels them "low quality". The program does not handle them separately.
-- Clips were added for the 324 lines in episodes 1 and 2 that were still waiting to be labeled. 230 of them have been labeled in the interface.
 - "Needs review" includes clips that are shorter than 0.5 seconds and have no voiceprint.
 
 ## Questions being tested
 
-Classifying by name is settled and is no longer being tested ([DECISIONS.md](DECISIONS.md#settled); numbers in [EXPERIMENTS.md](EXPERIMENTS.md#classify-by-name)).
+Classifying by name is settled and is no longer being tested ([DECISIONS.md](DECISIONS.md#settled)).
 
-**Can a model reading the same line help identify people?** Take an unlabeled clip, use its Japanese line, and have Teio's GPT-SoVITS model read it aloud. Then compare the synthesized voice with the real clip, to see how alike they sound. The words are the same, so the remaining difference is only the voice itself. For short lines this might work better than comparing voiceprints directly. Expectations are low. The character information in the synthesized voice all comes from the labeled clips, the synthesis carries its own error (the similarity between the synthesized voice and Teio's average voiceprint is 0.52 to 0.70, while the real recordings score 0.767; [numbers](EXPERIMENTS.md#japanese-dialogue)), and the tone also follows the reference audio. This has not started yet. The rules are in next step 2.
+**Can a model reading the same line help identify people?** Take an unlabeled clip, use its Japanese line, and have Teio's GPT-SoVITS model read it aloud. Then compare the synthesized voice with the real clip, to see how alike they sound. The words are the same, so the remaining difference is only the voice itself. For short lines this might work better than comparing voiceprints directly. Expectations are low. The character information in the synthesized voice all comes from the labeled clips, the synthesis carries its own error (the similarity between the synthesized voice and Teio's average voiceprint is 0.52 to 0.70, while the real recordings score 0.767), and the tone also follows the reference audio. This has not started yet. The rules are in next step 2.
 
-**Does more data make GPT-SoVITS better?** Last time, after fine-tuning on 118 clips (4.0 minutes, episodes 1 to 3), the voice sounded closer. Now another version is trained with the same settings on 302 clips (10.7 minutes, episodes 1 to 7, `out/sovits-teio/dataset3/`). Its weights are named `teio7`. The old `teio` is kept untouched. The comparison: synthesize 8 lines that are not in the training data (last time's 4 lines, plus one each for excited, down, smug and determined) using the same reference audio. Do this for the base model, the old version and the new version. Compute the similarity of each to Teio's average voiceprint, then have a person listen for tone and pronunciation. If a person cannot hear an improvement, stop labeling more for GPT-SoVITS. Voiceprint similarity has been measured: without fine-tuning 0.538, old version 0.615, new version 0.646. It is still rising, but by less. GPT-SoVITS V5 without fine-tuning, averaged over 5 reference clips, scores 0.580. The new version scores 0.593, which is a tie. V5 follows the reference audio, and the new version's results go up and down. Training more rounds changes the score by only about 0.01. The similarity of the synthesized voice is already close to that of real recordings of the same length, so this measure has reached its limit ([numbers](EXPERIMENTS.md#japanese-dialogue)). Listening by a person is still needed.
-
-**Set aside for now:** the threshold drifts as the clip pool changes. A fixed 0.70 slips as the pool grows. The fix is `avs group --relative`. Classification is settled. Grouping is used only at the start, so that a person can name each whole group. Numbers are in [EXPERIMENTS.md](EXPERIMENTS.md#threshold-drift).
+**Does more data make GPT-SoVITS better?** Last time, after fine-tuning on 118 clips (4.0 minutes, episodes 1 to 3), the voice sounded closer. Now another version is trained with the same settings on 302 clips (10.7 minutes, episodes 1 to 7, `out/sovits-teio/dataset3/`). Its weights are named `teio7`. The old `teio` is kept untouched. The comparison: synthesize 8 lines that are not in the training data (last time's 4 lines, plus one each for excited, down, smug and determined) using the same reference audio. Do this for the base model, the old version and the new version. Compute the similarity of each to Teio's average voiceprint, then have a person listen for tone and pronunciation. If a person cannot hear an improvement, stop labeling more for GPT-SoVITS. Voiceprint similarity has been measured: without fine-tuning 0.538, old version 0.615, new version 0.646. It is still rising, but by less. GPT-SoVITS V5 without fine-tuning, averaged over 5 reference clips, scores 0.580. The new version scores 0.593, which is a tie. V5 follows the reference audio, and the new version's results go up and down. Training more rounds changes the score by only about 0.01. The similarity of the synthesized voice is already close to that of real recordings of the same length, so this measure has reached its limit. Listening by a person is still needed.
 
 ## Next steps
 
-No more held-out tests. From now on, each episode is labeled in the correction interface, with only two labels: `teo` and "Other".
+Each episode is labeled in the correction interface, with only two labels: `teo` and "Other".
 
 1. **Polish the interface (current focus).** A first use from scratch and the error messages must both be smooth. After that, record the demo GIF for the README. Done: `avs add` adds an episode with one command. `--device` is chosen automatically by default. `doctor` checks the token, the models and the disk space. An empty workspace gives the command to run. Episodes whose voiceprints are not all computed are skipped. The README, docs, code comments and command-line output are now in English, and the web app has Chinese and English versions with a switch. Not done yet: adding an episode from inside the interface, and actually installing and running it on Linux.
 2. **Finish labeling episode 4, and run the read-aloud comparison along the way.** 292 clips that the machine is confident are "Other" are still waiting. The Japanese subtitles are attached. The rules are fixed before labeling:
@@ -53,7 +49,7 @@ No more held-out tests. From now on, each episode is labeled in the correction i
    - For each clip, have Teio's model read its own line, and compute three scores. The new method is the `anime-va` voiceprint similarity between the real clip and the synthesized voice. Control 1 is the similarity between the real clip and the average voiceprint of Teio's manual labels from episodes 1 to 3. Control 2 is the probability the small classifier gives to Teio.
    - Report, for each of the three scores, the ranking accuracy at separating Teio from non-Teio clips (the share of times that a random Teio clip scores higher than a random non-Teio clip). Report it for all clips, and split by length: 0.5 to 1 second, 1 to 1.5, 1.5 to 3, and over 3 seconds.
    - Verdict: the new method must beat both controls by at least 0.02 in some length band before it is considered as a second opinion for that band. If no band reaches that, drop the idea.
-3. **Finish the remaining 60 clips of episodes 1 and 2.** Then check whether the 0.5 to 1 second band is equally weak on more data (see [limits of the evidence](EXPERIMENTS.md#limits-of-the-evidence)).
+3. **Finish the remaining 60 clips of episodes 1 and 2.** Then check whether clips of 0.5 to 1 second are still usable on more data.
 4. **After the GPT-SoVITS comparison, decide whether to handle episodes 8 onward.** Each episode takes one `avs add`, with `--text-subs` to attach the Japanese subtitles ([command](USAGE.md#processing-a-new-episode)). Label each episode as it is processed.
 
 ## Where the files are
@@ -61,15 +57,7 @@ No more held-out tests. From now on, each episode is labeled in the correction i
 | Content | Location |
 | --- | --- |
 | Each episode's clips, audio tracks, voiceprint cache, and pictures cut by the interface | `runs/episodes/ep01/` to `ep07/` |
-| The interface's labels and cast table | `runs/labels/` (format in [data files](HOW_IT_WORKS.md#data-files)). The original archive from before the migration is in `runs/labels/archive-20261023-170304/` |
-| Manual archives of the blind labels for episodes 1 to 3 | `annotations/`, see the [README](../annotations/README.md) there |
+| The interface's labels and cast table | `runs/labels/` (format in [data files](HOW_IT_WORKS.md#data-files)). |
 | Teio's GPT-SoVITS dataset and scripts | `out/sovits-teio/` |
-| Current groups and scores | `runs/groups/uma3.json`, `uma3-evaluation.json`, `uma3-ep03-evaluation.json` |
-| Classify by name, episode 3 | `runs/classify/ep03-*.json` |
-| Held-out test, episode 3 | `runs/groups/blind-redimnet*.json`, `blind-animeva*.json`, `runs/comparison-ep03.json`, `runs/score-ep03.json` |
-| Threshold drift as the pool grows | `runs/drift-ep01.json`, `drift-ep02.json`, `drift-ep03.json` |
-| Model comparison | `runs/score-models.json`, `runs/comparison-anime.json` |
-| Dialogue coverage check | `runs/coverage/ep01/` to `ep07/` |
-| Superseded old reports | `runs/superseded/`, see the `README.txt` there |
 
 `runs/` and `out/` are not committed to git.

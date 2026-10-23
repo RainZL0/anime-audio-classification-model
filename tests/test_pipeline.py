@@ -1,7 +1,6 @@
 """Regression tests.
 
-Covers: all clips included, cache consistency, exact matching of identity
-labels, and export at the original sample rate.
+Covers: the voiceprint cache, preparing and adding episodes, and the command list.
 """
 
 from __future__ import annotations
@@ -16,8 +15,6 @@ from typer.testing import CliRunner
 
 from avs import pipeline
 from avs.cli import app
-from avs.evaluation.identity import evaluate, identity_metrics
-from avs.labeling import apply_names, build_sample
 from avs.project import cache_signature, read_json, segment_rows, write_json
 
 
@@ -51,20 +48,7 @@ def episode(root: Path, name: str) -> Path:
     return directory
 
 
-def test_group_export_includes_every_clip_and_small_groups(tmp_path: Path) -> None:
-    episodes = [episode(tmp_path, name) for name in ("ep1", "ep2")]
-    out = tmp_path / "groups.json"
-    result = pipeline.group(episodes, out, model="redimnet2-b6")
-    assert result["summary"] == {"clips": 6, "groups": 2, "singleton_groups": 0, "unassigned": 2}
-    exported = pipeline.export_groups(out, tmp_path / "export")
-    assert exported["files"] == 6
-    assert len(list((tmp_path / "export/_unassigned").glob("*.wav"))) == 2
-    assert all(sf.info(p).samplerate == 44100 for p in (tmp_path / "export").rglob("*.wav"))
-    with pytest.raises(ValueError, match="already exists"):
-        pipeline.export_groups(out, tmp_path / "export")
-
-
-def test_grouping_and_cached_embed_do_not_load_models(tmp_path: Path, monkeypatch: Any) -> None:
+def test_cached_embed_does_not_load_models(tmp_path: Path, monkeypatch: Any) -> None:
     directory = episode(tmp_path, "ep1")
 
     def fail(*args: Any, **kwargs: Any) -> Any:
@@ -72,10 +56,6 @@ def test_grouping_and_cached_embed_do_not_load_models(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(pipeline, "embed_segments", fail)
     assert pipeline.embed(directory)["cached"]
-    a = pipeline.group([directory], tmp_path / "a.json", threshold=0.1, model="redimnet2-b6")
-    b = pipeline.group([directory], tmp_path / "b.json", threshold=1.5, model="redimnet2-b6")
-    assert a["summary"]["groups"] == 2
-    assert b["summary"]["groups"] == 1
 
 
 @pytest.mark.parametrize("changed", ["audio", "segments", "metadata"])
@@ -91,54 +71,7 @@ def test_cache_drift_is_detected(tmp_path: Path, changed: str) -> None:
         rows[0]["end"] = 1.9
         write_json(p, rows)
     with pytest.raises(ValueError):
-        pipeline.group([directory], tmp_path / "groups.json", model="redimnet2-b6")
-
-
-def test_exact_annotations_and_unassigned_are_not_hidden(tmp_path: Path) -> None:
-    directory = episode(tmp_path, "ep1")
-    groups = tmp_path / "groups.json"
-    pipeline.group([directory], groups, model="redimnet2-b6")
-    archive = tmp_path / "truth.json"
-    write_json(
-        archive,
-        {
-            "source": "old/ep1.wav",
-            "clips": [
-                {"start": 0, "end": 2, "name": "A"},
-                {"start": 5, "end": 5.5, "name": "A"},
-                {"start": 0, "end": 4, "name": "B"},
-            ],
-        },
-    )
-    report = evaluate(groups, [archive])
-    assert report["unmatched_labels"] == 1
-    assert report["labeled_unassigned"] == 1
-    assert report["metrics"]["labeled_clips"] == 2
-    assert report["metrics"]["pair_recall"] == 0
-    assert report["metrics"]["pair_precision"] is None
-    assert evaluate(groups, [archive, archive])["metrics"]["labeled_clips"] == 2
-    write_json(archive, {"source": "wrong.wav", "clips": []})
-    with pytest.raises(ValueError, match="audio track"):
-        evaluate(groups, [archive])
-
-
-def test_identity_metric_does_not_reward_singletons_as_perfect() -> None:
-    assert identity_metrics(["A", "A"], [0, 1])["pair_precision"] is None
-    result = identity_metrics(["A", "A", "B"], [0, 1, 0])
-    assert result["false_merged_pairs"] == 1
-    assert result["missed_same_person_pairs"] == 1
-
-
-def test_label_sample_uses_all_clips_and_preserves_archive(tmp_path: Path) -> None:
-    directory = episode(tmp_path, "ep1")
-    archive = tmp_path / "annotations.json"
-    data = build_sample(directory, archive, 99)
-    assert len(data["clips"]) == 3
-    names = {data["clips"][0]["clip_id"]: "角色 A"}
-    write_json(archive, apply_names(data, names))
-    assert build_sample(directory, archive, 1)["clips"][0]["name"] == "角色 A"
-    with pytest.raises(ValueError):
-        apply_names(data, {"not-a-clip": "A"})
+        pipeline.load_embeddings(directory, "redimnet2-b6")
 
 
 def test_prepare_uses_subtitle_boundaries_keeps_short_lines(
@@ -254,7 +187,7 @@ def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -
 def test_cli_has_one_route() -> None:
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
-    for command in ("add", "prepare", "embed", "group", "evaluate", "export", "label"):
+    for command in ("doctor", "add", "prepare", "embed", "set-text-subtitles", "app"):
         assert command in result.stdout
-    for old in ("probe", "propose", "audit", "multi"):
+    for old in ("group", "evaluate", "drift", "extend", "label-plan", "import-labels"):
         assert old not in result.stdout

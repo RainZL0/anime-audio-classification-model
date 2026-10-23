@@ -1,13 +1,13 @@
 # Dependencies, models and runtime environment
 
-The actual versions are in `pyproject.toml` and `uv.lock`. Which model does well or badly in practice is in [EXPERIMENTS.md](EXPERIMENTS.md). This page only says what each tool is and how it is connected.
+The actual versions are in `pyproject.toml` and `uv.lock`. Which model was chosen, and why, is in [DECISIONS.md](DECISIONS.md). This page only says what each tool is and how it is connected.
 
 ## Audio processing
 
-- **FFmpeg**: makes the 16 kHz analysis copy. The labeling page cuts video pictures on demand and converts them to 360p H.264. The vocals at the original sample rate are kept for export.
+- **FFmpeg**: makes the 16 kHz analysis copy. The interface cuts video pictures on demand and converts them to 360p H.264. The vocals at the original sample rate are kept for export.
 - **audio-separator / Mel-Band RoFormer**: separates the vocals. Model file `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`. The default is fp16. Measured on the same 3-minute clip on an RTX 4060 Laptop, fp16 is about 1.6 times faster than fp32. Its output differs from fp32's by a signal-to-noise ratio of 73.5 dB, which means the difference is far below what you can hear. bf16 is slower, and its output differs from fp32 by only 15.6 dB, so it is not chosen. Measure again when the GPU architecture changes. If you suspect separation artifacts, use `--precision fp32` to compare. `audioread` is a dependency that the package does not declare but that is actually needed. It is kept.
 - **pyannote community-1**: used only to measure the subtitle offset when `--offset` is not given. The WeSpeaker adapter also depends on it. It reads from the waveform tensor, which avoids a problem with the FFmpeg DLL used by torchcodec on Windows.
-- soundfile, pyloudnorm, pandas/pyarrow: read the tracks at the original sample rate, handle loudness, and save the source table. pysubs2, Typer: subtitles and the command line. scikit-learn: grouping, the scoring metrics, and the small classifier in the interface.
+- soundfile, pyloudnorm: read the tracks at the original sample rate and handle loudness. pysubs2, Typer: subtitles and the command line. scikit-learn: the starting groups and the small classifier in the interface.
 
 ## Voiceprint models
 

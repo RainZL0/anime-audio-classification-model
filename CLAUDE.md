@@ -6,7 +6,6 @@ Collects an anime character's lines, one character at a time. For the project ov
 
 1. `docs/STATUS.md`: where things stand now, what is being tested, and the next steps.
 2. `docs/DECISIONS.md`: approaches that are settled and approaches that were ruled out. **Do not reopen a ruled-out path.** To overturn one, bring new data first.
-3. `docs/HISTORY.md`: working rules, especially the two sections on scoring and labeling.
 
 Other docs are found through `docs/index.md`. That page also says what each doc covers and what it does not, and how to maintain them. **One fact is written in one place only. Elsewhere, only a link.**
 

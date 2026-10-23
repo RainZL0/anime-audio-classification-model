@@ -21,8 +21,8 @@ from pydantic import BaseModel
 
 from avs.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
 from avs.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
+from avs.app.video import VIDEO_PAD, cut_video
 from avs.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
-from avs.labeling import VIDEO_PAD, cut_video
 from avs.language import LANGUAGE, Words, say
 
 STATIC = Path(__file__).parent / "static"

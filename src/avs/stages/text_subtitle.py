@@ -5,8 +5,7 @@ The use case: Chinese subtitles are used to cut the clips, and Japanese subtitle
 because training a Japanese model needs the original Japanese. The two subtitle files have
 different line breaks and times. So first measure how many seconds the separate subtitles must be
 shifted to line up with the audio. Then find the dialogue for each clip, one clip at a time. A clip
-whose dialogue cannot be found in full is not exported, and the reason is recorded. Measurements
-are in docs/EXPERIMENTS.md, section "Japanese dialogue".
+whose dialogue cannot be found in full is not exported, and the reason is recorded.
 
 Common patterns in Japanese subtitles are handled here:
 - Several lines in one subtitle entry are often two people each saying one sentence. So the entry

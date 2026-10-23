@@ -27,8 +27,7 @@ SCENE_GAP = 3.0
 This is only used to split the dialogue for display. It does not affect identifying anyone."""
 
 DEFAULT_MODELS = ("anime-va", "anime-char", "redimnet2-b6")
-"""The three voiceprints work best together. See docs/EXPERIMENTS.md, section "Classifying by
-name"."""
+"""The three voiceprints work best together."""
 
 GROUPING_MODEL = "anime-va"
 """The Groups view uses only this one model. Its threshold of 0.70 was measured. The joined

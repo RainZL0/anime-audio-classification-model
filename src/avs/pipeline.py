@@ -1,5 +1,5 @@
-"""Subtitle clips, the voiceprint cache, identity grouping and export are independent of each other.
-Changing the grouping does not run the audio models."""
+"""Add an episode: cut clips by subtitles, attach the video and text subtitles, and compute and
+cache the voiceprints."""
 
 from __future__ import annotations
 
@@ -9,14 +9,12 @@ import shutil
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
-from avs.embeddings.extract import ANIME_VA, FRONTIER, MIN_SECONDS, embed_segments
+from avs.embeddings.extract import FRONTIER, MIN_SECONDS, embed_segments
 from avs.project import (
     cache_dir,
     cache_signature,
-    digest,
     load_episode,
     read_json,
     resolve_device,
@@ -67,8 +65,7 @@ def prepare(
     the subtitles, and then cut. That threw away 40% of the dialogue lines, so it has been
     abandoned. When `--offset` is given, detection is not run at all. The offset is stable for the
     same source and subtitle group (measured on episodes 1 to 3: -0.95, -0.96, -0.96), so simply
-    give the value measured for the previous episode, then check coverage with `avs coverage` to
-    make sure it is complete.
+    give the value measured for the previous episode.
     """
     from avs.audio import audio_info, diarize, extract_audio, make_analysis_copy, separate_vocals
     from avs.stages.subtitle import MIN_OVERLAP_RATIO, find_offset, load_lines
@@ -397,82 +394,22 @@ def add_episode(
     return {"episode": name, "directory": str(out), "segments": len(rows), "models": models}
 
 
-def extend_segments(directory: Path, subtitle: Path, floor: float = MIN_SECONDS) -> dict[str, Any]:
-    """Add the dialogue lines that have no matching clip in the subtitles to this episode's clip
-    table. Existing clips are not touched at all.
-
-    Clip IDs are a hash of the episode name and time range, independent of neighbouring clips. So if
-    the change only adds clips, existing labels and archives still line up, and nothing needs
-    relabeling.
-    The cost is that the voiceprint cache becomes stale, so `embed` has to be run again.
-
-    The added lines will certainly include narration, crowd cheers and other sounds that do not
-    belong to any character. Do not guess here. Add them all and let the human ear decide. Label
-    them "other" during labeling.
-    """
-    from avs.audio import audio_info
-    from avs.evaluation.coverage import align_to_segments, uncovered_lines
-    from avs.stages.subtitle import load_dialogue
-
-    episode, rows = load_episode(directory)
-    lines = load_dialogue(subtitle)
-    if not lines:
-        raise ValueError(f"{subtitle} has no dialogue lines. Check the subtitle style names")
-    offset, inside = align_to_segments(lines, rows)
-    if inside < len(rows) * 0.9:
-        raise ValueError(
-            f"Only {inside}/{len(rows)} clips fall inside subtitle lines, "
-            "so this subtitle is probably not for this episode"
-        )
-
-    duration = audio_info(Path(episode["vocals"])).duration
-    missing = uncovered_lines(lines, rows, offset)
-    added, too_short = [], 0
-    for entry in missing:
-        start, end = max(0.0, entry["start"]), min(duration, entry["end"])
-        if end - start < floor:
-            too_short += 1
-            continue
-        added.append({"start": start, "end": end})
-    if not added:
-        raise ValueError("No dialogue lines can be added. The clip table was not changed")
-
-    spans = [{"start": r["start"], "end": r["end"]} for r in rows] + added
-    combined = segment_rows(episode["name"], spans)
-    kept = {r["id"] for r in rows}
-    if not kept <= {r["id"] for r in combined}:
-        raise ValueError("Adding clips changed existing clips, so the operation was stopped")
-    write_json(directory / "segments.json", combined)
-    return {
-        "episode": episode["name"],
-        "before": len(rows),
-        "after": len(combined),
-        "added": len(added),
-        "too_short": too_short,
-        "floor_seconds": floor,
-        "offset_seconds": offset,
-        "shortest_added": round(min(a["end"] - a["start"] for a in added), 3),
-    }
-
-
-def embed(
-    directory: Path, model: str = FRONTIER, device: str = "auto", window: float = 0.0
-) -> dict[str, Any]:
+def embed(directory: Path, model: str = FRONTIER, device: str = "auto") -> dict[str, Any]:
     """Voiceprints are bound to their input. If a complete cache already exists, it is reused
     directly. Short clips stay in the clip table."""
     import numpy as np
 
     validate_name(model)
     episode, rows = load_episode(directory)
-    signature = cache_signature(directory, model, window)
-    cache = cache_dir(directory, model, window)
+    signature = cache_signature(directory, model)
+    cache = cache_dir(directory, model)
     if (cache / "cache.json").exists() and read_json(cache / "cache.json") == signature:
-        cached_records, _ = load_embeddings(directory, model, window)
+        cached_records, _ = load_embeddings(directory, model)
         return {"episode": episode["name"], "embedded": len(cached_records), "cached": True}
     eligible = [dict(r, speaker="") for r in rows if r["end"] - r["start"] >= MIN_SECONDS]
     if eligible:
         metadata, vectors = embed_segments(
-            Path(episode["analysis"]), eligible, model, resolve_device(device), window
+            Path(episode["analysis"]), eligible, model, resolve_device(device)
         )
         by_time = {time_key(r): r for r in rows}
         records = [by_time[(round(m.start, 3), round(m.end, 3))] for m in metadata]
@@ -485,14 +422,12 @@ def embed(
     return {"episode": episode["name"], "embedded": len(records), "cached": False}
 
 
-def load_embeddings(
-    directory: Path, model: str, window: float = 0.0
-) -> tuple[list[dict[str, Any]], Any]:
+def load_embeddings(directory: Path, model: str) -> tuple[list[dict[str, Any]], Any]:
     import numpy as np
 
     validate_name(model)
-    cache = cache_dir(directory, model, window)
-    if read_json(cache / "cache.json") != cache_signature(directory, model, window):
+    cache = cache_dir(directory, model)
+    if read_json(cache / "cache.json") != cache_signature(directory, model):
         raise ValueError(f"{directory} voiceprint cache is out of date. Run embed again")
     records = read_json(cache / "metadata.json")
     vectors = np.load(cache / "vectors.npy", allow_pickle=False)
@@ -509,111 +444,3 @@ def load_embeddings(
     if len(vectors) and not np.allclose(np.linalg.norm(vectors, axis=1), 1, atol=1e-4):
         raise ValueError("The voiceprints are not unit-length vectors")
     return records, vectors
-
-
-def relative_threshold(directories: list[Path], model: str = ANIME_VA) -> float:
-    """Compute the threshold from the pool made of these episodes, using the pool's own distances.
-    See pool_threshold in stages/cluster.py."""
-    import numpy as np
-
-    from avs.stages.cluster import POOL_MULTIPLIERS, pool_threshold
-
-    if model not in POOL_MULTIPLIERS:
-        raise ValueError(
-            f"{model} has no multiplier for setting the threshold from the pool yet. "
-            "First measure one with avs drift"
-        )
-    matrices = [load_embeddings(directory, model)[1] for directory in directories]
-    vectors = np.concatenate([m for m in matrices if len(m)]) if matrices else np.empty((0, 0))
-    return pool_threshold(vectors, POOL_MULTIPLIERS[model])
-
-
-def group(
-    directories: list[Path],
-    out: Path,
-    threshold: float = 0.5,
-    model: str = ANIME_VA,
-    method: str = "average",
-) -> dict[str, Any]:
-    import numpy as np
-
-    from avs.stages.cluster import METHODS, cluster
-
-    if method not in METHODS:
-        raise ValueError(f"Linking rule must be one of {', '.join(METHODS)}, got {method}")
-
-    if out.exists():
-        raise ValueError(
-            f"Output already exists. Use a new file to keep the previous grouping: {out}"
-        )
-    if not directories or len({p.resolve() for p in directories}) != len(directories):
-        raise ValueError("At least one episode folder is required, and no folder may be repeated")
-    if not math.isfinite(threshold) or not 0 < threshold <= 2:
-        raise ValueError("The distance threshold must be between 0 and 2")
-    episodes = {}
-    all_rows = []
-    records = []
-    matrices = []
-    for directory in directories:
-        episode, rows = load_episode(directory)
-        if episode["name"] in episodes:
-            raise ValueError("Episode names are duplicated. Give each episode a different name")
-        own_records, vectors = load_embeddings(directory, model)
-        episodes[episode["name"]] = {
-            **episode,
-            "directory": str(directory.resolve()),
-            "segments_sha256": digest(directory / "segments.json"),
-        }
-        all_rows.extend(rows)
-        records.extend(own_records)
-        if len(vectors):
-            matrices.append(vectors)
-    vectors = np.concatenate(matrices) if matrices else np.empty((0, 0))
-    labels = cluster(vectors, threshold, method, [r["end"] - r["start"] for r in records])
-    # Number groups in the order their clips first appear. Small groups are kept; they are not
-    # merged into a miscellaneous bucket.
-    numbers: dict[int, str] = {}
-    by_id = {}
-    for row, label in zip(records, labels, strict=True):
-        number = numbers.setdefault(int(label), f"speaker_{len(numbers) + 1:03d}")
-        by_id[row["id"]] = number
-    assignments = [dict(r, speaker=by_id.get(r["id"])) for r in all_rows]
-    counts = Counter(r["speaker"] for r in assignments if r["speaker"] is not None)
-    result = {
-        "schema": "avs.groups.v1",
-        "model": model,
-        "threshold": threshold,
-        "strategy": f"global_{method}",
-        "audio_assumption": "single_speaker",
-        "episodes": episodes,
-        "assignments": assignments,
-        "summary": {
-            "clips": len(assignments),
-            "groups": len(counts),
-            "singleton_groups": sum(n == 1 for n in counts.values()),
-            "unassigned": sum(r["speaker"] is None for r in assignments),
-        },
-    }
-    write_json(out, result)
-    return result
-
-
-def export_groups(groups_file: Path, out: Path) -> dict[str, Any]:
-    from avs.stages.export import export, summarize, write_manifest
-
-    data = read_json(groups_file)
-    if data.get("schema") != "avs.groups.v1":
-        raise ValueError("Please provide a grouping file produced by the current group command")
-    if out.exists():
-        raise ValueError(f"Export folder already exists. Please use a new folder: {out}")
-    assigned: dict[str, list[Any]] = {}
-    for row in data["assignments"]:
-        name = row["speaker"] or "_unassigned"
-        validate_name(name) if row["speaker"] else None
-        validate_name(row["episode"])
-        assigned.setdefault(name, []).append(SimpleNamespace(**row))
-    vocals = {name: Path(e["vocals"]) for name, e in data["episodes"].items()}
-    written = export(assigned, vocals, out)
-    write_manifest(written, out)
-    write_json(out / "groups.json", data)
-    return summarize(written)

@@ -5,12 +5,8 @@ All the commands are listed only here. For how each step works inside, see [HOW_
 | Section | What it does |
 | --- | --- |
 | [Set up](#set-up) | Before the first run |
-| [Processing a new episode](#processing-a-new-episode) | Separate voices, cut clips, compute voiceprints, check coverage |
-| [Extending clips](#extending-clips) | Add the dialogue lines that were missed into an old clip table |
+| [Processing a new episode](#processing-a-new-episode) | Separate voices, cut clips, compute voiceprints |
 | [Labeling and correction interface](#labeling-and-correction-interface) | The daily main workflow: label a few lines, let the machine guess, fix its wrong guesses, export |
-| [Labeling](#labeling) | The old page used for blind labeling of the held-out test set |
-| [Grouping, scoring, export](#grouping-scoring-export) | Group, score and export by machine, without the interface. Kept for comparison |
-| [Comparison experiments](#comparison-experiments) | Sweep thresholds, measure drift, check whether pairs can be told apart, nearest-neighbor diagnosis |
 | [Checks](#checks) | Checks to run before committing |
 
 ## Set up
@@ -45,23 +41,6 @@ uv run avs embed runs/episodes/ep08 --model anime-char
 uv run avs embed runs/episodes/ep08 --model redimnet2-b6
 ```
 
-After cutting, check the coverage:
-
-```powershell
-uv run avs coverage runs/episodes/ep08 --subtitle "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --out runs/coverage/ep08
-```
-
-`coverage` checks whether the cutting is right. The number of dialogue lines that have a clip should equal the total number of dialogue lines (episode 3: 375 of 375). It also cuts the dialogue that has no clip into audio files. These go into two folders, `below_floor` (the line itself is too short) and `no_speech_found` (the line is long enough, but no clip was cut from it). It also writes `lines.txt` and `report.json`.
-
-## Extending clips
-
-```powershell
-uv run avs extend runs/episodes/ep02 --subtitle "data/ass/uma/[FLsnow][UmamusumeS2][02][HEVC_FLAC][BDRIP].chs.ass"
-uv run avs embed runs/episodes/ep02
-```
-
-Adds the dialogue lines in the subtitles that have no matching clip into the clip table. It only adds and never changes, so existing labels stay valid. The voiceprint cache is invalid once the clip table changes, so `embed` must be run again. Narration and cheers that get added are not filtered here. A person labels them while labeling.
-
 ## Labeling and correction interface
 
 The workspace is a folder. Its `episodes/` subfolder holds the episodes (the output of `add` or `prepare`), and labels are saved automatically in `labels/`. This repo uses `runs/` as the workspace.
@@ -93,100 +72,11 @@ Commands for filling in information for older episodes:
 uv run avs set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
 uv run avs set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
 uv run avs set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
-uv run avs import-labels runs --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --target teo
-uv run avs migrate-targets runs --target teo
 ```
 
 - `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.
 - `set-subtitles`: adds subtitles to an episode that has none recorded. The offset is worked out from the existing clips, and the dialogue text is found by matching the times that overlap.
 - `set-text-subtitles`: attaches a second subtitle file (ASS or SRT) to an episode. On export, the dialogue text is taken from it. The offset is measured automatically. If it does not match the subtitles used for cutting, it is refused. Subtitles from Netflix or Amazon are preferred. Subtitles recorded from TV carry symbols such as 🎤, and these are not removed.
-- `import-labels`: imports the old manual archives into the label records in one go. It can only be used while the label records are still empty. Imports cannot be undone. If you give `--target`, follow it with `migrate-targets` below.
-- `migrate-targets`: keeps only the given target characters (the option can be repeated), and changes the labels of all other characters to "Other". Before changing anything, it copies the label records and the cast table in `labels/` as they are into `labels/archive-date-time/`. A migration cannot be undone with Z. To recover the old names, use the archive.
-
-## Labeling
-
-Episodes 1 to 3 were blind-labeled with this old page, which does not show the machine's guesses. Now that the held-out test has been cancelled, new episodes are labeled in the correction interface. This page is kept as a backup. The labeling rules (why only the picture counts, and why the page gives no machine answers) are in [HISTORY.md](HISTORY.md#labeling). The archive files are described in [annotations/README.md](../annotations/README.md).
-
-```powershell
-uv run avs label runs/episodes/ep04 --archive annotations/ep04-full.json --all --known annotations/ep03-full.json --known annotations/names.json --video "D:/_search/ani/uma/[DHR][Uma Musume S2][04][BIG5][1080P][HEVC_AAC].mp4"
-```
-
-Check each name against the picture. Each press is saved to the manual archive right away.
-
-- `--all`: labels all the clips of this episode, going through them in time order. Without it, `--count` clips are picked at random. If new clips are added to the clip table later, running `--all` again appends them to the existing archive with empty labels. Clips that are already labeled are not touched.
-- `--known`: where the clickable character names on the page come from. It can be repeated. If you give a manual archive, the clips in it can be played back on the page. If you give `annotations/names.json`, a list of names only, you get names only. Names are sorted by how many lines they appear in. The number keys 1 to 9 select the first nine.
-- `--video`: plays the picture for the current clip, with 0.5 seconds of extra time on each side. ffmpeg cuts each clip only when you reach it (measured: a 2 to 3 second clip takes less than half a second), and it also pre-cuts the next one. The output is converted to 360p H.264, about 46 MB per episode.
-
-  **The video and the audio track must be on the same timeline.** `data/raw/*.flac` is extracted from these mp4 files. Their lengths match exactly, and the waveform alignment shift is 0 ms. Check this before switching sources, or the picture will show the wrong person.
-
-Page operations:
-
-- Character names are shown as small blocks. Click one to label the current clip. Special labels are also shown as blocks. Otherwise, clips labeled "multiple people" could never be found again for review.
-- Clicking the number to the right of a name opens a panel that lists all the clips under that name, by episode and time. In the current round, clicking one jumps to it. In an old archive, clicking one plays it in place, using a separate player so that the clip being labeled is not interrupted. In the panel you can rename a name, remove labels in bulk, or drag a single clip onto another name to change its owner.
-- Type a new name in the filter box and click "+ Create this name" to create it first, then drag clips onto it. Unused names, and names removed from the list, only affect the current page. They are not saved to disk.
-
-## Grouping, scoring, export
-
-```powershell
-uv run avs group runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --out runs/groups/uma-next.json
-uv run avs evaluate runs/groups/uma-next.json --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --out runs/groups/uma-next-evaluation.json
-uv run avs export runs/groups/uma-next.json --out out/uma-next
-```
-
-Options of `group`:
-
-- `--threshold`: if not given, the model's own default threshold is used, and it is printed.
-- `--relative`: sets the threshold from the pool's own distances (see the [glossary](HOW_IT_WORKS.md#glossary)). It has not been checked on a held-out test, so it is off by default. For the current status, see [STATUS.md](STATUS.md).
-- `--model`: `anime-va` (default), `redimnet2-b6`, `anime-char` or `wespeaker-resnet293`. Changing the model means sweeping the threshold again.
-- `--method`: default `average`. The others are `single`, `complete`, `mutual_knn` and `two_stage`. All are ruled out, and kept only for recomputing.
-
-Group files and export folders always get new names, so that old audio does not get mixed into new results.
-
-## Comparison experiments
-
-Numbers picked out using manual labels only count as exploration. They must be checked on a separate set of data that took no part in choosing them.
-
-**Sweep thresholds; compare models and merge rules:**
-
-```powershell
-uv run avs compare runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --model redimnet2-b6 --method average --low 0.25 --high 1.15 --out runs/comparison-next.json
-```
-
-It first checks that each model covers the same clips. `--low` and `--high` must be given on each model's own similarity scale. The default 0.20 to 0.90 was set for `redimnet2-b6`, and it is almost meaningless for `anime-va`.
-
-**Measure how scores change as the clip pool grows:**
-
-```powershell
-uv run avs drift runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --scored ep03 --annotation annotations/ep03-full.json --out runs/drift-next.json --steps 9 --seeds 8
-```
-
-The scored episode always stays in the pool in full. Only clips from other episodes are added to the pool. `--steps` sets how many stages there are, and `--seeds` sets how many random draws are made at each stage. The report puts two lines side by side: a fixed threshold, and a threshold set from the pool. `--multiplier` can try other levels of strictness.
-
-**Hold out by episode, and assign clips directly to character names:**
-
-```powershell
-uv run avs classify-check runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --test ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --model anime-va --model anime-char --model redimnet2-b6 --out runs/classify/next.json
-```
-
-Labels from the `--test` episode are not used for training. They are only used for scoring. Labels from all the other episodes are used for training. `--model` can be repeated. With several models, their voiceprints are joined together. The cache for each model must be computed beforehand with `avs embed`. The report puts three methods side by side: "closest single clip", "character average" and "small classifier". Each one comes with its per-clip predictions.
-
-**Compare only how well same-character and different-character pairs separate, without grouping:**
-
-```powershell
-uv run avs scores runs/episodes/ep03 --annotation annotations/ep03-full.json --model anime-va --norm none --out runs/score-next.json
-```
-
-The report gives ranking accuracy and equal error rate, split by clip length and by whether a pair crosses episodes. `--norm` can be repeated (`none`, `snorm` or `asnorm`). The last two are score normalization, which is ruled out. `--window` reads voiceprints computed with a different minimum clip length.
-
-**Nearest-neighbor search and distance distribution:**
-
-```powershell
-uv run avs diagnose runs/episodes/ep01 runs/episodes/ep02 runs/episodes/ep03 --annotation annotations/ep01-full.json --annotation annotations/ep02-full.json --annotation annotations/ep03-full.json --groups runs/groups/uma3.json --out runs/diagnosis-next
-```
-
-The output is a report, the distances for all label pairs, and error examples under `examples/` that you can listen to.
-
-**Commands left over from ruled-out routes**, kept only for recomputing: `avs embed --window` (pads short clips with the neighboring audio, stored in `embeddings/<model>@w<seconds>`), `avs references` (a few identity references), and `avs label-plan` (labels only the clips whose candidate changed).
 
 ## Checks
 

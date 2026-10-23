@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from avs.stages.export import PEAK_CEILING, TARGET_LUFS, export, summarize, write_manifest
+from avs.stages.export import PEAK_CEILING, export, summarize
 
 
 @dataclass(frozen=True)
@@ -96,24 +96,6 @@ def test_very_short_clips_are_left_alone(tmp_path: Path) -> None:
     )
     assert written[0].lufs_before is None
     assert written[0].gain_db == 0.0
-
-
-def test_manifest_records_where_each_file_came_from(tmp_path: Path) -> None:
-    """When something goes wrong, the table must let you trace back to the source:
-    which episode, which second, and how much the loudness was changed."""
-    import pandas as pd
-
-    vocals = tmp_path / "vocals.flac"
-    _tone(vocals, 44_100)
-    out = tmp_path / "out"
-    written = export({"speaker_01": [Clip("ep01", "A", 1.0, 4.0)]}, {"ep01": vocals}, out)
-    frame = pd.read_parquet(write_manifest(written, out))
-    row = frame.iloc[0]
-    assert row["speaker"] == "speaker_01"
-    assert row["episode"] == "ep01"
-    assert row["start"] == 1.0
-    assert row["duration"] == 3.0
-    assert TARGET_LUFS - 30 < row["lufs_before"] < 0
 
 
 def test_summary_puts_unassigned_last(tmp_path: Path) -> None:

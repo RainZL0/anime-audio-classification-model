@@ -2,8 +2,7 @@
 
 Input is a 16 kHz analysis copy. Output is unit-length vectors (each vector is scaled to length 1).
 
-ReDimNet2 and WeSpeaker are both kept for comparing identity grouping. Differences between
-models cannot replace human identity evaluation.
+The interface uses the models in DEFAULT_MODELS of app/workspace.py.
 WeSpeaker uses the CPU on the current Windows setup.
 """
 
@@ -18,27 +17,6 @@ BASELINE = "wespeaker-resnet293"
 ANIME_CHAR = "anime-char"
 ANIME_VA = "anime-va"
 MODELS = (FRONTIER, BASELINE, ANIME_CHAR, ANIME_VA)
-
-DEFAULT_THRESHOLDS = {FRONTIER: 0.50, BASELINE: 0.60, ANIME_CHAR: 0.53, ANIME_VA: 0.70}
-"""Each model's own starting distance threshold.
-
-The similarity scale differs between models, so using another model's threshold would scan over
-a meaningless range.
-
-These values were chosen on the labels of the first two episodes, **and they drift as the clip
-pool grows**. At the same threshold, a bigger pool makes merging more conservative. This is
-because average linkage (merging two groups by the average distance between all their clips)
-requires the average distance across the whole cluster to reach the threshold. For anime-va at
-0.70, episode ep03 had 2613 same-person pairs linked with 76 wrong merges in a 372-clip pool.
-In a 1176-clip pool, it has 2095 pairs linked with 21 wrong merges.
-
-**Note that these two numbers move together. So the grouping has not gotten worse. The fixed
-number has slid to the conservative end of the trade-off curve.** Holding wrong merges fixed and
-moving the threshold again, a bigger pool can link even more pairs (at the 76-wrong-merges level,
-2613 pairs become 3278 pairs). The approach that does not change with pool size is pool_threshold
-in stages/cluster.py. The command line option is `avs group --relative`. It has no independent
-test yet, so the default here is still the fixed one. As more episodes are added, re-check with
-`avs drift`, and do not treat the number as a constant."""
 
 ANIME_VARIANTS = {ANIME_CHAR: "char", ANIME_VA: "va"}
 """The two variants of litagin02/anime_speaker_embedding.
@@ -66,19 +44,6 @@ different characters was almost impossible to tell apart. When the "same charact
 pair scores higher than a different-character pair) for clips under 0.5 seconds was only 0.61.
 Pure random guessing gives 0.50. So these clips mostly bring in noise. Clips from 0.5 to 1 second
 get 0.81, which is marginally useful, so they are kept for now."""
-
-MIN_WINDOW = 0.0
-"""Smallest audio window fed to the model.
-
-When a clip is shorter than this, neighboring audio is taken from the original track symmetrically
-from both sides to fill it up. The clip's own time range does not change. The model just hears a
-little more context. 0 means it only hears the clip itself.
-
-**Why it may help or hurt.** Short clips have poor voiceprints. One explanation is that the model
-hears too little audio, and adding neighboring audio gives it more material. But the neighboring
-audio may not still be the same person speaking. Padding too much mixes in the voices of the
-neighbors. Whether the benefit outweighs the harm, or the reverse, can only be measured on human
-labels. Do not decide it by intuition."""
 
 REDIMNET2_REPO = "PalabraAI/redimnet2"
 REDIMNET2_SIZE = "b6"
@@ -195,13 +160,8 @@ def embed_segments(
     segments: list[Any],
     model: str = FRONTIER,
     device: str = "cuda",
-    window: float = MIN_WINDOW,
 ) -> tuple[list[Embedded], Any]:
     """Compute a voiceprint for each clip. wav must be 16 kHz mono, which is the analysis copy.
-
-    `window` is the smallest listening window. Short clips borrow neighboring audio from both sides
-    to fill this length. The recorded metadata still holds the clip's own time range. The borrowed
-    part only affects what the model hears, not what the clip is.
 
     Returns (list of metadata, voiceprint matrix). The matrix has one row per clip, and row numbers
     line up with the list. The rows are already length-normalized, so the dot product of two rows
@@ -225,8 +185,7 @@ def embed_segments(
         start, end = float(seg["start"]), float(seg["end"])
         if end - start < MIN_SECONDS:
             continue
-        heard = _window(start, end, window, len(mono) / sample_rate)
-        chunk = mono[int(heard[0] * sample_rate) : int(heard[1] * sample_rate)]
+        chunk = mono[int(start * sample_rate) : int(end * sample_rate)]
         vector = np.asarray(extract(chunk), dtype=np.float32).reshape(-1)
         norm = float(np.linalg.norm(vector))
         if norm == 0.0:
@@ -239,19 +198,3 @@ def embed_segments(
             "No voiceprint was computed at all. Check clip durations and the analysis copy"
         )
     return meta, np.stack(vectors)
-
-
-def _window(start: float, end: float, window: float, duration: float) -> tuple[float, float]:
-    """Symmetrically widen a clip shorter than `window` to `window`.
-
-    If it hits either end of the track, take the extra from the other side.
-    """
-    if window <= 0 or end - start >= window:
-        return start, end
-    room = (window - (end - start)) / 2
-    low, high = start - room, end + room
-    if low < 0:
-        low, high = 0.0, min(duration, high - low)
-    if high > duration:
-        low, high = max(0.0, low - (high - duration)), duration
-    return low, high

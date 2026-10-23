@@ -10,7 +10,6 @@
 *.ckpt binary
 *.pth binary
 *.onnx binary
-*.parquet binary
 
 # Lock file: do not expand it in diffs
 uv.lock -diff linguist-generated

@@ -9,11 +9,11 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from avs.app.labels import OTHER, LabelStore, migrate_to_targets
+from avs.app.labels import OTHER, LabelStore
 from avs.app.model import train_and_predict
 from avs.app.server import AppState, create_app
 from avs.app.workspace import Clip, neighbor_gap, text_for
-from tests.test_drift import episode
+from tests.fixtures import episode
 
 
 def test_store_keeps_every_step_and_undoes_whole_batches(tmp_path: Path) -> None:
@@ -157,29 +157,6 @@ def test_other_remembers_the_targets_it_was_judged_against(tmp_path: Path) -> No
     store.update_role("A", target=True)
     store.rename_role("A", "teo")
     assert store.against["o"] == {"teo"}
-
-
-def test_migration_keeps_targets_and_archives_the_rest(tmp_path: Path) -> None:
-    store = LabelStore(tmp_path / "labels")
-    store.apply(
-        [
-            {"clip": "a", "label": "teo"},
-            {"clip": "b", "label": "麦昆"},
-            {"clip": "c", "label": "__unclear__"},
-        ],
-        source="import:x",
-    )
-    archive = tmp_path / "labels" / "archive"
-    assert migrate_to_targets(store, ["teo"], archive) == 1
-    assert store.labels == {"a": "teo", "b": OTHER}
-    assert store.against["b"] == {"teo"}
-    assert store.targets() == ["teo"]
-    assert not store.can_undo()
-    assert "麦昆" in (archive / "events.jsonl").read_text(encoding="utf-8")
-    with pytest.raises(ValueError, match="already exists"):
-        migrate_to_targets(store, ["teo"], archive)
-    with pytest.raises(ValueError, match="no such characters"):
-        migrate_to_targets(store, ["nobody"], tmp_path / "other")
 
 
 def test_text_is_found_by_overlap_not_exact_time() -> None:

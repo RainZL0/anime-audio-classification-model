@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from avs.app.server import AppState, create_app
 from avs.project import read_json, write_json
 from avs.stages.text_subtitle import TextLine, load_text_lines, match, measure_offset, own_tag
-from tests.test_drift import episode
+from tests.fixtures import episode
 
 
 def _srt(path: Path, events: list[tuple[float, float, str]]) -> Path:

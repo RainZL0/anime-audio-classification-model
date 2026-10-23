@@ -71,7 +71,7 @@ const confidence = (clip) => clip.guess[0]?.p ?? 0;
 const OTHER = "__other__";
 /* Each target character has two choices: clean, and "low quality" (Shift + number). Only targets have it;
    "other" is never exported anyway. There used to be a separate "several people", now merged into low quality. */
-/* Seconds the video clip extends past each end of the line. Matches avs.labeling.VIDEO_PAD on the server. */
+/* Seconds the video clip extends past each end of the line. Matches avs.app.video.VIDEO_PAD on the server. */
 const VIDEO_PAD = 0.5;
 const lowTip = () => tr("背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人，导出时跳过",
   "Too much background sound, someone talking at the same time and so on: not fit for a clean dataset. "

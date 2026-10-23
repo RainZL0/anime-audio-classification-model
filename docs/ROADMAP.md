@@ -1,6 +1,6 @@
 # Roadmap to the first release
 
-Updated: 2026-10-23, evening. This page covers the goals, the direction and the standards up to the first release. The next steps for now are in [STATUS.md](STATUS.md). The direction has been settled ([DECISIONS.md](DECISIONS.md#settled)). It has not been checked on a held-out test, and the held-out test has been cancelled ([DECISIONS.md](DECISIONS.md#ruled-out)). The labeling interface has a first version. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
+Updated: 2026-10-23, evening. This page covers the goals, the direction and the standards up to the first release. The next steps for now are in [STATUS.md](STATUS.md). The direction has been settled ([DECISIONS.md](DECISIONS.md#settled)). The labeling interface has a first version. [HOW_IT_WORKS.md](HOW_IT_WORKS.md#labeling-and-correction-interface) explains how it works.
 
 ## Goal
 
@@ -11,14 +11,13 @@ Updated: 2026-10-23, evening. This page covers the goals, the direction and the 
 ## Repo
 
 - The first release is developed locally in this repo. Nothing is pushed before release.
-- Before pushing, decide what to do with `annotations/`: the blind labels of episodes 1 to 3 are tracked in git, with Chinese character names and the subtitle text. Subtitle text should not be distributed publicly. Either move the folder out of the repo, or keep it and accept that.
 - At release, replace the `main` branch of the old GitHub repo `RainbowZL0/anime-audio-classification-model`. First tag the old `main` to keep it, then push this repo's history onto it. The old repo is kept so that its existing stars and links are kept. Whether to rename it is decided before release.
 
 ## Direction
 
 - **Input**: each episode must have both video and subtitles. If either is missing, processing is refused. The subtitles decide how to cut the clips, and the video lets the labeler identify people.
 - **Identifying people**: the voiceprint models stay as they are. A small classifier is trained on the manual labels, and it assigns clips directly to character names. The small classifier trains in a few seconds, so it can be retrained right away after every label change. Each prediction comes with a confidence. Confident predictions are accepted directly. Low-confidence ones go to "needs review". Clips that resemble nobody are marked as unknown or as a new character.
-- **Why it may beat grouping**: grouping compares one clip with another clip, and both are noisy. It also relies on one global threshold, which drifts as the pool grows ([basis](EXPERIMENTS.md#threshold-drift)). Classification compares one clip with dozens of clips of one character, and each character has its own boundary.
+- **Why it beats grouping**: grouping compares one clip with another clip, and both are noisy. It also relies on one global threshold, which drifts as more episodes are added. Classification compares one clip with dozens of clips of one character, and each character has its own boundary.
 - **Start**: use the existing groups (few wrong merges, but split into many small pieces) so that a person can name each whole group. A batch of clips is labeled in one go.
 - **Later**: use the order of neighboring lines, the subtitle text, and the lip movement in the picture. Once labels reach several thousand, consider fine-tuning the voiceprint model. At that point, the "do not fine-tune the models" item in [DECISIONS.md](DECISIONS.md#settled) must be changed first.
 
@@ -43,7 +42,7 @@ Not done yet:
 The first item used to be "prove with numbers that classification is clearly better than grouping". It was removed on 2026-10-23. In real labeling, classification feels much better, so no separate comparison is made for the release ([DECISIONS.md](DECISIONS.md#settled)).
 
 1. **Labeling interface**: naming whole groups, two views of the same clips (Scenes and Characters), keyboard use, undo, and immediate retraining after each edit. The first version is done and is still being polished.
-2. **Export**: at least the GPT-SoVITS list format, with the dialogue text. GPT-SoVITS, Style-Bert-VITS2 and one folder per character are already supported, with the text taken from the subtitles (format in [COMPETITORS.md](COMPETITORS.md#2-dataset-format-expected-by-training)). When the subtitles used for cutting are translations, each episode can have a separate Japanese subtitle file for the text. No speech-to-text is needed ([basis](EXPERIMENTS.md#japanese-dialogue)).
+2. **Export**: at least the GPT-SoVITS list format, with the dialogue text. GPT-SoVITS, Style-Bert-VITS2 and one folder per character are already supported, with the text taken from the subtitles (format in [COMPETITORS.md](COMPETITORS.md#2-dataset-format-expected-by-training)). When the subtitles used for cutting are translations, each episode can have a separate Japanese subtitle file for the text. No speech-to-text is needed.
 3. **Install**: `uv sync` installs everything in one command, and adding an episode takes one `avs add`. Windows and Linux both install the CUDA build of torch, and the CPU is used automatically when there is no graphics card. Linux and macOS have not been run in practice yet. A one-click Windows package can come after the first release.
 4. **README**: a demo GIF at the top, and one sentence saying what the tool is for. The README is English only, so the pushed repo has no Chinese README. The English version is written. The GIF is still missing. The license is settled: MIT for the code. The scope of use for the extracted material is written in the "Usage rules" section of the README. The MIT license itself allows commercial use, so the "no commercial use" rule applies to the extracted material, not to the code.
 

@@ -86,7 +86,7 @@ def load_episode(directory: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
     return episode, rows
 
 
-def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[str, str]:
+def cache_signature(directory: Path, model: str) -> dict[str, str]:
     """Fingerprint of the voiceprint cache. If any of these items changes, the old cache must be
     thrown away and recomputed.
 
@@ -103,14 +103,9 @@ def cache_signature(directory: Path, model: str, window: float = 0.0) -> dict[st
         "analysis_sha256": digest(Path(episode["analysis"])),
         "min_seconds": f"{MIN_SECONDS:.3f}",
     }
-    if window:
-        signature["window_seconds"] = f"{window:.3f}"
     return signature
 
 
-def cache_dir(directory: Path, model: str, window: float = 0.0) -> Path:
-    """Different listening windows give different voiceprints, so store them in separate folders to
-    keep them from overwriting each other."""
+def cache_dir(directory: Path, model: str) -> Path:
     validate_name(model)
-    name = model if not window else f"{model}@w{window:g}"
-    return directory / "embeddings" / name
+    return directory / "embeddings" / model

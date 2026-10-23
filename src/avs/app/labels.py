@@ -17,17 +17,11 @@ old "other" labels do not count against it, and a person must check them again. 
 character is removed, its labels stay as they are: a clip that belongs to one character is
 certainly not any other target character, so it can still be used as a negative example. Adding
 the character back loses nothing.
-
-The blind labels (labels made without knowing the target characters) for episodes 1 to 3 are
-archived in `annotations/`. Their labels were imported from there and migrated into target
-characters and "other". The labels as they were before migration are archived next to them. See
-`migrate_to_targets`.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -425,63 +419,3 @@ class LabelStore:
 
     def _save_cast(self) -> None:
         write_json(self.cast_path, {"schema": "avs.cast.v1", "roles": self.roles})
-
-
-def import_archives(
-    store: LabelStore, archives: list[Path], by_time: dict[tuple[str, tuple[float, float]], str],
-    sources: dict[str, str],
-) -> int:  # fmt: skip
-    """Import the names from the manual archives into the label records in one go. The whole
-    import is recorded as one batch, and imported batches cannot be undone.
-
-    `by_time` maps (episode name, time in milliseconds) to a clip ID. `sources` maps a vocals file
-    name to an episode name.
-    The imported names are first treated as target characters. Then `migrate_to_targets` turns
-    them into target characters and "other".
-    """
-    from avs.project import time_key
-
-    changes = []
-    for path in archives:
-        data = read_json(path)
-        source = str(data["source"]).replace("\\", "/").rsplit("/", 1)[-1]
-        if source not in sources:
-            raise ValueError(f"the audio of {path} is not in this workspace")
-        episode = sources[source]
-        for clip in data["clips"]:
-            name = clip.get("name")
-            clip_id = by_time.get((episode, time_key(clip)))
-            if name and clip_id is not None:
-                changes.append({"clip": clip_id, "label": name})
-    batch = store.apply(changes, source="import:" + ",".join(p.name for p in archives))
-    return len(batch["changes"]) if batch else 0
-
-
-def migrate_to_targets(store: LabelStore, targets: list[str], archive: Path) -> int:
-    """Keep only `targets` as target characters, and change the labels of every other character to
-    "other". Returns how many labels changed.
-
-    Before changing anything, copy the label records and the character list into `archive` as they
-    are. The migration is recorded as one import batch, which undo cannot take back. To get the
-    original names back, look at the archive, or at the event log's history from before this batch.
-    """
-    with store._lock:
-        unknown = [t for t in targets if store.role(t) is None]
-        if unknown:
-            raise ValueError(f"no such characters: {', '.join(unknown)}")
-        if archive.exists():
-            raise ValueError(f"{archive} already exists; pick another archive folder")
-        archive.mkdir(parents=True)
-        for path in (store.events_path, store.cast_path):
-            if path.exists():
-                shutil.copy2(path, archive / path.name)
-        for role in store.roles:
-            role["target"] = role["name"] in targets
-        store._save_cast()
-        changes = [
-            {"clip": clip, "label": OTHER, "against": sorted(targets)}
-            for clip, name in store.labels.items()
-            if name not in targets and name != OTHER
-        ]
-        batch = store.apply(changes, source="import:migrate-to-targets")
-        return len(batch["changes"]) if batch else 0

@@ -1,4 +1,4 @@
-"""Export the sorted groups as finished wav files, one folder per group.
+"""Export the labeled clips as finished wav files, one folder per character.
 
 **This step has one mistake that must never be made.** Clips must be cut from the
 **original-sample-rate vocal track**, not from the 16 kHz analysis copy. Most voice models are
@@ -146,35 +146,6 @@ def export(
                 )
             )
     return written
-
-
-def write_manifest(written: list[Written], out_dir: Path) -> Path:
-    """Write a table recording where each exported file came from.
-
-    If something goes wrong, it can be traced back: which episode, which second, and how much the
-    loudness was adjusted. Parquet is used because it stores the column types itself, unlike csv,
-    which turns everything into strings.
-    """
-    import pandas as pd
-
-    frame = pd.DataFrame(
-        [
-            {
-                "speaker": w.name,
-                "file": w.path.name,
-                "episode": w.episode,
-                "start": w.start,
-                "end": w.end,
-                "duration": round(w.duration, 3),
-                "lufs_before": w.lufs_before,
-                "gain_db": w.gain_db,
-            }
-            for w in written
-        ]
-    )
-    path = out_dir / "manifest.parquet"
-    frame.to_parquet(path, index=False)
-    return path
 
 
 def summarize(written: list[Written]) -> dict[str, Any]:
