@@ -1,6 +1,6 @@
 # Settled approaches and ruled-out paths
 
-This page lists only the conclusions. Each one has a one-sentence reason. To overturn one of these, bring new data first, then change it here. Approaches that are not settled yet are not listed here. The questions still being tested are in [STATUS.md](STATUS.md).
+This page lists only the conclusions. Each one has a one-sentence reason. To overturn one of these, bring new data first, then change it here. Approaches that are not settled yet are not listed here.
 
 ## Settled
 

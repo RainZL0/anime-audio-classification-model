@@ -43,3 +43,6 @@ htmlcov/
 .vscode/
 .DS_Store
 desktop.ini
+
+# Personal notes: plans, labeling progress, local paths. Never committed
+private/

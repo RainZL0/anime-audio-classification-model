@@ -4,9 +4,7 @@
 
 | What you want to know | Read | Main sections |
 | --- | --- | --- |
-| Where things stand now, and what comes next | [STATUS.md](STATUS.md) | [Questions being tested](STATUS.md#questions-being-tested), [Next steps](STATUS.md#next-steps), [Where the files are](STATUS.md#where-the-files-are) |
-| Goals, direction and standards up to the first release | [ROADMAP.md](ROADMAP.md) | [Direction](ROADMAP.md#direction), [Labeling interface](ROADMAP.md#labeling-interface), [First release standard](ROADMAP.md#first-release-standard) |
-| Similar tools, and what they lack | [COMPETITORS.md](COMPETITORS.md) | [Bottom line first](COMPETITORS.md#0-bottom-line-first), [Dataset format expected by training](COMPETITORS.md#2-dataset-format-expected-by-training) |
+| Who it is for, the direction, and what is planned | [ROADMAP.md](ROADMAP.md) | [Direction](ROADMAP.md#direction), [Labeling interface](ROADMAP.md#labeling-interface), [Platforms](ROADMAP.md#platforms) |
 
 ## Usage and how it works
 
@@ -30,9 +28,7 @@ One fact is written in one place only. Elsewhere, only a link.
 
 | Doc | Only covers | Does not cover |
 | --- | --- | --- |
-| STATUS | Current numbers, questions being tested, next steps, files in use now | Settled approaches, experiment process, long-term route |
-| ROADMAP | Goals, users, direction, interface plans, release standards and how to release, all for the first release | Next steps for now, experiment numbers, interface design rules |
-| COMPETITORS | Similar tools, training-side formats, survey date, and what was not verified | Our own plans |
+| ROADMAP | Users, direction, planned features, platforms | Next steps for now, experiment numbers, interface design rules |
 | USAGE | Commands and options | Why these were chosen |
 | HOW_IT_WORKS | Terms, flow, data formats | Rules, experiment numbers |
 | DECISIONS | Settled and ruled-out technical choices, each with one reason | Numeric details, approaches not fully tested yet |
@@ -40,7 +36,9 @@ One fact is written in one place only. Elsewhere, only a link.
 | TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
 | UI_DESIGN | Design rules of the web app: what looks the same, colors, when to type, layout | How to use each view (USAGE), how it works inside (HOW_IT_WORKS) |
 
-When maintaining: if the plan for now changes, change STATUS. If the route changes, change ROADMAP. While a question is being tested, its numbers stay in STATUS. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
+These pages are public: they hold only what every user and contributor should know. The maintainer's own progress, experiments, local paths and release plans are kept outside git.
+
+When maintaining: if the direction changes, change ROADMAP. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
 
 ## How to write
 

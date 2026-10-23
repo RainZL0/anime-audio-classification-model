@@ -23,7 +23,7 @@ uv run avoc doctor
 ## Processing a new episode
 
 ```powershell
-uv run avoc add workspace "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
+uv run avoc add workspace "Episode 08.mkv" --subs "Episode 08.zh.ass" --offset -0.95
 ```
 
 The interface can also add an episode, with the same steps ([how](#labeling-and-correction-interface)). `add` does everything in one command: it extracts the audio track, separates the voices, cuts clips along the subtitle lines, and then computes the three voiceprints that the interface needs. If the episode name is left out, it uses the next unused `epNN` in the workspace. You can also name it with `--name`. If you give `--text-subs <subtitle file in the language spoken>`, the dialogue text used for export is attached in the same step (the same as `set-text-subtitles` below). If the run stops halfway (for example, because there is not enough GPU memory), fix the problem and run the same command again. It picks up where it stopped: clips that are already cut and voiceprints that are already computed are not recomputed. Text subtitles given with `--text-subs` are noted in the episode before the voiceprints start, so they are still attached if you leave `--text-subs` out the second time. If the clip-cutting step itself fails, the half-built folder is deleted.
@@ -73,9 +73,9 @@ Each label is saved to disk and the model is retrained right away. Backspace (or
 Commands for filling in information for older episodes:
 
 ```powershell
-uv run avoc set-video workspace/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
-uv run avoc set-subtitles workspace/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
-uv run avoc set-text-subtitles workspace/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
+uv run avoc set-video workspace/episodes/ep01 "Episode 01.mkv"
+uv run avoc set-subtitles workspace/episodes/ep01 "Episode 01.zh.ass"
+uv run avoc set-text-subtitles workspace/episodes/ep01 "Episode 01.ja.srt"
 ```
 
 - `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.
