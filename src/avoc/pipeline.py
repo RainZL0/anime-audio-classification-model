@@ -544,12 +544,15 @@ def missing_text_note(episode: dict[str, Any]) -> str | None:
         f"注意：字幕是{languages_note(languages)}，这一集说的是{name_of(spoken)}。"
         f"导出 GPT-SoVITS 或 Style-Bert-VITS2 要有{name_of(spoken)}台词：用 --text-subs 配上"
         f"{name_of(spoken)}字幕，或者以后用 avoc set-text-subtitles、在界面的导出页配。"
-        "只导出音频（RVC）不需要",
+        f"只导出音频（RVC）不需要。有{name_of(spoken)}字幕的话，更好的做法是用它当 --subs，"
+        "这份当 --display-subs：按译文切的片段和原文对不齐，不少句子会导不出文字",
         f"Note: the subtitles are in {languages_note(languages)}, but this episode speaks "
         f"{name_of(spoken)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the "
         f"{name_of(spoken)} text: attach {name_of(spoken)} subtitles with --text-subs, or later "
         "with avoc set-text-subtitles or on the Export page. Audio-only export (RVC) does not "
-        "need it",
+        f"need it. If you have {name_of(spoken)} subtitles, it is better to give them as --subs "
+        "and these as --display-subs: clips cut from a translation often don't line up with "
+        "the original lines, and many get no text",
     )
 
 
