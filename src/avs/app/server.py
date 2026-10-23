@@ -594,6 +594,15 @@ def create_app(state: AppState) -> Any:
 
     app = FastAPI(title="avs", docs_url=None, redoc_url=None)
 
+    @app.middleware("http")
+    async def always_check_page_files(request: Any, call_next: Any) -> Any:
+        """网页和样式、脚本每次都向服务端核对一下（没改过只回 304）。不加这个头，浏览器会凭
+        修改时间自己缓存一阵，改了界面以后刷新，可能还在用旧的样式或脚本。"""
+        response = await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     def clips_where(keep: Any) -> list[dict[str, Any]]:
         return [state.view(c) for c in state.workspace.clips if keep(c)]
 

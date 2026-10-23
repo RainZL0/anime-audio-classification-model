@@ -426,6 +426,13 @@ def test_changes_api_rejects_unknown_entries_and_reads_old_flag_names(tmp_path: 
     assert state.store.labels[clip] == "A"
 
 
+def test_page_files_are_checked_on_every_load(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    client = TestClient(create_app(AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")))
+    for path in ("/", "/static/app.js", "/static/style.css"):
+        assert client.get(path).headers["cache-control"] == "no-cache"
+
+
 def test_prefetch_cuts_nearby_and_later_clips_in_the_background(tmp_path: Path) -> None:
     import time
 
