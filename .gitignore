@@ -15,7 +15,7 @@ npm-debug.log*
 
 # Data and outputs: never committed to git
 data/
-runs/
+workspace/
 out/
 models/
 *.wav

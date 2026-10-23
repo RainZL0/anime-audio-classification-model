@@ -10,7 +10,7 @@ Updated: 2026-10-24. Current plans are written only here. The route up to the fi
 | Clips and voiceprints | 2689 clips across the seven episodes. Clips shorter than 0.5 seconds have no voiceprint. Voiceprints for all seven episodes have been computed with `anime-va`, `anime-char` and `redimnet2-b6`. Episodes 5 to 7 have a clip for every dialogue line. Their subtitle offset is -0.95 seconds, the same as episode 3 |
 | Video and subtitles | All seven episodes have their video and subtitles recorded. Each also has Netflix Japanese subtitles attached (offsets -0.92 to -0.94 seconds) |
 | Interface | The four views, Groups, Scenes, Characters and Export, all work and are still being polished. Done so far: playback speed, listening to vocals only, More context, returning to the same spot after a refresh, background pre-cutting, and so on |
-| Labels | In `runs/labels/`. The only target character is Tokai Teio (label name `teo`). See the table below |
+| Labels | In `workspace/labels/`. The only target character is Tokai Teio (label name `teo`). See the table below |
 | Export | The GPT-SoVITS format has been tested for real. Of Teio's 171 clips from episodes 1 to 3, 118 passed the filter (4.0 minutes). Fine-tuning GPT-SoVITS on them sounds closer to her. Of the 503 clips from all seven episodes, 302 pass the same rule (10.7 minutes). The new version trained on them sounds somewhat closer. See "Questions being tested" below |
 
 Labels per episode (2026-10-23 evening, status shown in the interface):
@@ -59,9 +59,9 @@ Each episode is labeled in the correction interface, with only two labels: `teo`
 
 | Content | Location |
 | --- | --- |
-| Each episode's clips, audio tracks, voiceprint cache, and pictures cut by the interface | `runs/episodes/ep01/` to `ep07/` |
-| The interface's labels and cast table | `runs/labels/` (format in [data files](HOW_IT_WORKS.md#data-files)). |
+| Each episode's clips, audio tracks, voiceprint cache, and pictures cut by the interface | `workspace/episodes/ep01/` to `ep07/` |
+| The interface's labels and cast table | `workspace/labels/` (format in [data files](HOW_IT_WORKS.md#data-files)). |
 | Teio's GPT-SoVITS dataset and scripts | `out/sovits-teio/`. `speak.py` there is a page for typing text and hearing `teio7` read it (http://127.0.0.1:9873) |
 | Teio's RVC model | `C:\_projects\py\2026\Applio\logs\teio7\` (`teio7_200e_8800s.pth` and `teio7.index`) |
 
-`runs/` and `out/` are not committed to git.
+`workspace/` and `out/` are not committed to git.

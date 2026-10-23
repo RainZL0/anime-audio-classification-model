@@ -23,7 +23,7 @@ uv run avoc doctor
 ## Processing a new episode
 
 ```powershell
-uv run avoc add runs "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
+uv run avoc add workspace "D:/_search/ani/uma/[DHR][Uma Musume S2][08][BIG5][1080P][HEVC_AAC].mp4" --subs "data/ass/uma/[FLsnow][umamusumeS2][08][AVC_AAC][WEBRIP][1080p].chs.ass" --audio data/raw/uma_s2_08.flac --offset -0.95
 ```
 
 The interface can also add an episode, with the same steps ([how](#labeling-and-correction-interface)). `add` does everything in one command: it extracts the audio track, separates the voices, cuts clips along the subtitle lines, and then computes the three voiceprints that the interface needs. If the episode name is left out, it uses the next unused `epNN` in the workspace. You can also name it with `--name`. If you give `--text-subs <subtitle file in the language spoken>`, the dialogue text used for export is attached in the same step (the same as `set-text-subtitles` below). If the run stops halfway (for example, because there is not enough GPU memory), fix the problem and run the same command again. It picks up where it stopped: clips that are already cut and voiceprints that are already computed are not recomputed. Text subtitles given with `--text-subs` are noted in the episode before the voiceprints start, so they are still attached if you leave `--text-subs` out the second time. If the clip-cutting step itself fails, the half-built folder is deleted.
@@ -35,18 +35,18 @@ Both the video and the subtitles are required. The subtitles can be in any commo
 If you prefer to run the steps one at a time, `add` is equal to the following:
 
 ```powershell
-uv run avoc prepare "video" --subs "subtitles" --name ep08 --out runs/episodes/ep08 --offset -0.95
-uv run avoc embed runs/episodes/ep08 --model anime-va
-uv run avoc embed runs/episodes/ep08 --model anime-char
-uv run avoc embed runs/episodes/ep08 --model redimnet2-b6
+uv run avoc prepare "video" --subs "subtitles" --name ep08 --out workspace/episodes/ep08 --offset -0.95
+uv run avoc embed workspace/episodes/ep08 --model anime-va
+uv run avoc embed workspace/episodes/ep08 --model anime-char
+uv run avoc embed workspace/episodes/ep08 --model redimnet2-b6
 ```
 
 ## Labeling and correction interface
 
-The workspace is a folder. Its `episodes/` subfolder holds the episodes (the output of `add` or `prepare`), and labels are saved automatically in `labels/`. This repo uses `runs/` as the workspace.
+The workspace is a folder. Its `episodes/` subfolder holds the episodes (the output of `add` or `prepare`), and labels are saved automatically in `labels/`. This repo uses the folder `workspace/`, which git ignores.
 
 ```powershell
-uv run avoc app runs
+uv run avoc app workspace
 ```
 
 Open `http://127.0.0.1:8765` in your browser. `--port` changes the port. `--no-open` stops the browser from opening by itself. `--model` can be repeated, to use only the named voiceprint models. The part of the address after `#` records the current view, episode, character and selected line, so after a refresh you return to the same spot. Episodes whose voiceprints are not all computed (usually because `add` was interrupted) are not loaded. They are listed on the command line at startup, and the other episodes work as usual. When the workspace has no episodes at all, the page opens on a welcome page: what the tool does in four steps, the same machine checks as `doctor`, and a form to add the first episode.
@@ -73,9 +73,9 @@ Each label is saved to disk and the model is retrained right away. Backspace (or
 Commands for filling in information for older episodes:
 
 ```powershell
-uv run avoc set-video runs/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
-uv run avoc set-subtitles runs/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
-uv run avoc set-text-subtitles runs/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
+uv run avoc set-video workspace/episodes/ep01 "D:/_search/ani/uma/[DHR][Uma Musume S2][01][BIG5][1080P][HEVC_AAC].mp4"
+uv run avoc set-subtitles workspace/episodes/ep01 "data/ass/uma/[FLsnow][UmamusumeS2][01][HEVC_FLAC][BDRIP].chs.ass"
+uv run avoc set-text-subtitles workspace/episodes/ep01 "data/subtitles/uma_s2/ja/Netflix/ウマ娘.プリティーダービー.S02E01.トウカイテイオー.WEBRip.Netflix.ja[cc].srt"
 ```
 
 - `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.

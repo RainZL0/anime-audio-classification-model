@@ -86,7 +86,7 @@ The small classifier only picks among the characters it already knows, so the se
 
 ## Data files
 
-Each episode has a folder `runs/episodes/<episode>/`:
+Each episode has a folder `workspace/episodes/<episode>/`:
 
 - `episode.json` records the paths of the source and the audio tracks, and `subtitle_styles`, the styles the clips were cut from (episodes cut before this was recorded pick them again, which gives the same lines). `segments.json` records the clip IDs, the episode name, and the start and end times. For an episode with attached text subtitles, `episode.json` also has `text_subtitles` (the path), `text_subtitle_offset` (the offset in seconds), `text_subtitle_agreement` (the overlap) and `text_subtitle_marked` (how many lines still carry marks the cleaning does not know, with a few examples, or null).
 - Voiceprints are stored in `embeddings/<model name>/`. The matrix and its metadata line up row by row. The cache is tied to the content of the clip files, the content of the analysis audio, the model name and the minimum length. If any of these changes, the cache must be recomputed. An old cache raises an error. It is never used silently.
