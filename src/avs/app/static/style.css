@@ -150,7 +150,8 @@ kbd {
 .cand > :first-child { grid-row: span 2; }
 .cand .meter { grid-column: 2 / -1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .cand .meter i { display: block; height: 100%; background: var(--accent); }
-.cand .pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; min-width: 34px; text-align: right; }
+/* 百分比固定在最后一列，没有按钮的「其他」也靠右，几行上下对齐。 */
+.cand .pct { grid-column: -2; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; min-width: 34px; text-align: right; }
 .cand .ref { padding: 3px 8px; font-size: 12px; }
 .confirmed-box { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius);
   background: var(--ok-soft); color: var(--ok); }
