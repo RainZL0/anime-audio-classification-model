@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from avoc.app.adding import Adding, clean_path
 from avoc.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
-from avoc.app.model import AUTO_CONFIDENCE, Guess, train_and_predict
+from avoc.app.model import AUTO_CONFIDENCE, MIN_GUESS_LABELS, Guess, train_and_predict
 from avoc.app.video import VIDEO_PAD, cut_video
 from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avoc.language import LANGUAGE, Words, say
@@ -125,13 +125,20 @@ class AppState:
                     examples[target][1].append(clip.row)
                     used.add(clip.row)
         began = time.perf_counter()
-        trained = train_and_predict(self.workspace.features, examples, rejects)
+        trained = train_and_predict(self.workspace.features, examples, rejects, MIN_GUESS_LABELS)
         self.guesses = trained.guesses
         self.trained = {
             "labels": len(used),
             "roles": len(targets),
             "seconds": round(time.perf_counter() - began, 2),
             "familiar_threshold": trained.threshold,
+            "min_labels": MIN_GUESS_LABELS,
+            # Targets the machine does not guess yet, with what it has of them so far.
+            "waiting": {
+                t: {"lines": len(pos), "others": len(neg)}
+                for t, (pos, neg) in examples.items()
+                if len(pos) < MIN_GUESS_LABELS or not neg
+            },
         }
         self._find_tags(set(targets))
 

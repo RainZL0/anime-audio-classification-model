@@ -59,7 +59,7 @@ def main() -> None:
         done = order[:n]
         pos = [c.row for c in done if c.row is not None and truth(c)]
         neg = [c.row for c in done if c.row is not None and not truth(c)]
-        trained = train_and_predict(ws.features, {args.target: (pos, neg)}, {})
+        trained = train_and_predict(ws.features, {args.target: (pos, neg)}, {}, min_labels=1)
         found: dict[str, Any] = {"n": n, "target": len(pos), "guessing": bool(trained.guesses)}
         if not trained.guesses:
             return found

@@ -46,6 +46,13 @@ FAMILIAR_QUANTILE = 0.05
 """The percentile of each character's nearest-clip similarity used as the "similar enough" bar.
 95% of confirmed clips pass this bar."""
 
+MIN_GUESS_LABELS = 10
+"""The machine starts guessing a target character only once a person has confirmed this many of
+their lines (and labeled at least one other line as not them). Replaying the Teio labels of episodes
+1 and 2 and scoring on episode 3: with 10 of her lines the guesses were 94% right and found three
+quarters of her lines; with fewer they were barely better than calling everyone "Other". See
+docs/HOW_IT_WORKS.md#how-many-labels-before-the-guesses-are-good."""
+
 MIN_FAMILIAR_LABELS = 20
 """If there are fewer confirmed clips than this, no reliable bar can be measured. In that case the
 machine never counts as confident."""
@@ -106,12 +113,14 @@ def train_and_predict(
     features: Any,
     examples: dict[str, tuple[list[int], list[int]]],
     rejects: dict[int, set[str]],
+    min_labels: int = MIN_GUESS_LABELS,
 ) -> Trained:
     """Give a prediction for each row of the voiceprint table.
 
     `examples` maps each target character to (positive row numbers, negative row numbers).
     `rejects` lists the rows and characters where the person said "not this character". On those
-    rows, that character's probability is recorded as 0.
+    rows, that character's probability is recorded as 0. A target with fewer than `min_labels`
+    positive examples, or no negative example, gets no guess.
     """
     import numpy as np
 
@@ -129,10 +138,10 @@ def train_and_predict(
             continue
         positive_rows += positives
         positive_names += [target] * len(positives)
-        if not negatives:
-            # No one is known not to be them yet, so there is nothing to compare against: it
-            # makes no guess for them rather than calling every line theirs. The page asks for a
-            # few "Other" labels.
+        if len(positives) < min_labels or not negatives:
+            # Too few of their lines to guess well yet, or no one known not to be them, so nothing
+            # to compare against (every line would come out as theirs). No guess for them yet; the
+            # page says what is still needed.
             continue
         from sklearn.linear_model import LogisticRegression
 

@@ -65,7 +65,7 @@ Labeling and export then happen in the [interface](#labeling-and-correction-inte
 - Negative examples are clips labeled with another name, plus clips labeled "Other" while that target already existed. A wrong guess is simply corrected to the right person or to "Other". No separate "not the target" label is recorded.
 - Clips labeled "low quality" are not used for training. We have not measured whether noisy clips help the machine find the target inside the noise, or whether they teach it the wrong thing. For now they are kept out.
 
-The probability of "Other" is recorded as 1 minus the probability of the top target character. So the numbers do not always add up to 1. A training set has a few hundred to a few thousand clips. All target characters together take one or two seconds to train. So every label change retrains everything. A target character with no negative example yet (only them labeled, no "Other") gets no guess at all: with no one to compare against, every line would come out as theirs. The page asks for a few "Other" labels instead.
+The probability of "Other" is recorded as 1 minus the probability of the top target character. So the numbers do not always add up to 1. A training set has a few hundred to a few thousand clips. All target characters together take one or two seconds to train. So every label change retrains everything. A target character gets no guess at all until 10 of their lines are confirmed and at least one line is labeled as someone else: with fewer, the guesses are barely better than calling everyone "Other" ([measured](#how-many-labels-before-the-guesses-are-good)), and with no one to compare against, every line would come out as theirs. Until then the page says how many lines each target has, and asks for a few "Other" labels if there are none.
 
 **When a clip counts as confident.** A clip skips the line-by-line check by a person only when both of these hold:
 
@@ -93,7 +93,7 @@ The chance gap measures whether the probabilities can be taken at their word: li
 - The guesses become useful at about 10 Teio lines and 50 "Other": 94% right, and three quarters of her lines found.
 - The probabilities can be trusted, to within about 3 points, from about 25 Teio lines (150 labeled).
 - What counts is the number of Teio lines, not the total. Labeled in random order, Teio turns up sooner: 20 lines (about 6 Teio) give 94% right, and the chance gap drops under 0.03 by about 80 lines.
-- The interface is more careful than this table: no line counts as confident before 20 confirmed lines of the target (see above).
+- So the interface starts guessing a target at 10 confirmed lines of them (see above), and counts no line as confident before 20.
 
 Not measured: other characters, episodes from another season, and labeling in Groups. To repeat it on a workspace: `uv run python scripts/replay_labels.py workspace teo --train ep01,ep02 --test ep03` ([script](../scripts/replay_labels.py)).
 

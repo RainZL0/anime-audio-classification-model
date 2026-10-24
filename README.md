@@ -87,7 +87,7 @@ You only name the characters you want (the target characters). Everyone else is 
 | **Characters** | `O` | Everything the machine gave one character, least sure first. Fix the wrong ones, then confirm the rest with `Shift+Enter`. Below are lines it may have missed. |
 | **Export** | `E` | Write the dataset. |
 
-After 20 to 30 lines of a character, the machine starts guessing. `Z` undoes the last step, `?` lists every key, and the Guide button explains the four views. The full guide is in [docs/USAGE.md](docs/USAGE.md).
+Once 10 lines of a character are confirmed and a few others are labeled "Other", the machine starts guessing. `Z` undoes the last step, `?` lists every key, and the Guide button explains the four views. The full guide is in [docs/USAGE.md](docs/USAGE.md).
 
 ## What you get
 

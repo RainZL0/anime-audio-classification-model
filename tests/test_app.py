@@ -16,6 +16,12 @@ from avoc.app.workspace import Clip, neighbor_gap, text_for
 from tests.fixtures import episode
 
 
+@pytest.fixture(autouse=True)
+def guess_from_one_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The workspaces here have a handful of lines, so the app guesses a target from one of them."""
+    monkeypatch.setattr("avoc.app.server.MIN_GUESS_LABELS", 1)
+
+
 def test_store_keeps_every_step_and_undoes_whole_batches(tmp_path: Path) -> None:
     store = LabelStore(tmp_path / "labels")
     store.apply([{"clip": "a", "label": "A"}, {"clip": "b", "label": "A"}], source="import:x")
@@ -211,7 +217,7 @@ def test_a_voice_unlike_any_known_role_is_not_trusted() -> None:
         even, odd = list(range(0, n, 2)), list(range(1, n, 2))
         return {"A": (even, odd), "B": (odd, even)}
 
-    few = train_and_predict(features, examples(4), {})
+    few = train_and_predict(features, examples(4), {}, min_labels=1)
     assert few.threshold is None
     assert few.guesses[40].familiar is None
 
@@ -226,8 +232,21 @@ def test_no_guess_before_anyone_is_known_not_to_be_the_target() -> None:
     # Only one character labeled and no "other" yet: nothing to compare against, so no line is
     # called theirs at 100%.
     features = np.eye(3)[[0, 0, 1, 2]]
-    assert train_and_predict(features, {"A": ([0, 1], [])}, {}).guesses == {}
-    assert train_and_predict(features, {"A": ([0, 1], [2])}, {}).guesses
+    assert train_and_predict(features, {"A": ([0, 1], [])}, {}, min_labels=1).guesses == {}
+    assert train_and_predict(features, {"A": ([0, 1], [2])}, {}, min_labels=1).guesses
+
+
+def test_no_guess_before_enough_of_the_targets_lines_are_confirmed() -> None:
+    features = np.eye(2)[[0] * 12 + [1] * 3]
+    few = {"A": (list(range(9)), [12, 13, 14])}
+    assert train_and_predict(features, few, {}).guesses == {}
+    enough = {"A": (list(range(10)), [12, 13, 14])}
+    assert train_and_predict(features, enough, {}).guesses[11].names[0] == "A"
+    # A target still waiting does not stop another from being guessed.
+    both = {**enough, "B": ([12], list(range(10)))}
+    guesses = train_and_predict(features, both, {}).guesses
+    assert guesses[11].names[0] == "A"
+    assert guesses[11].p("B") == 0.0
 
 
 def test_other_only_counts_against_the_targets_of_its_time() -> None:
@@ -240,7 +259,7 @@ def test_other_only_counts_against_the_targets_of_its_time() -> None:
     a, b, c = list(range(10)), list(range(10, 20)), list(range(20, 30))
     only_a = train_and_predict(features, {"A": (a, b + c)}, {})
     assert only_a.guesses[25].names[0] == "__other__"
-    with_c = train_and_predict(features, {"A": (a, b + c), "C": (c[:2], a + b)}, {})
+    with_c = train_and_predict(features, {"A": (a, b + c), "C": (c[:2], a + b)}, {}, min_labels=1)
     assert with_c.guesses[25].names[0] == "C"
 
 
@@ -346,6 +365,26 @@ def test_messages_follow_the_page_language(tmp_path: Path) -> None:
     first = client.get("/api/clips").json()[0]["id"]
     named = client.post("/api/label", json={"clips": [first], "new_role": True}, headers=english)
     assert named.json()["role"] == "Character 1"
+
+
+def test_api_says_which_targets_wait_for_more_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("avoc.app.server.MIN_GUESS_LABELS", 2)
+    state = AppState(_workspace(tmp_path), ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clips = client.get("/api/clips", params={"episode": "ep1"}).json()
+    client.post("/api/label", json={"clips": [clips[0]["id"]], "label": "A"})
+    client.post("/api/label", json={"clips": [clips[3]["id"]], "label": OTHER})
+    model = client.get("/api/state").json()["model"]
+    assert model["min_labels"] == 2
+    assert model["waiting"] == {"A": {"lines": 1, "others": 1}}
+    assert all(not c["guess"] for c in client.get("/api/clips", params={"episode": "ep1"}).json())
+
+    client.post("/api/label", json={"clips": [clips[1]["id"]], "label": "A"})
+    assert client.get("/api/state").json()["model"]["waiting"] == {}
+    after = client.get("/api/clips", params={"episode": "ep1"}).json()
+    assert after[2]["guess"][0]["name"] == "A"
 
 
 def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:

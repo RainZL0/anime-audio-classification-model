@@ -105,6 +105,10 @@ export interface Model {
   roles?: number;
   seconds?: number;
   familiar_threshold?: number | null;
+  /* A target is guessed once this many of their lines are confirmed and someone is labeled not them. */
+  min_labels?: number;
+  /* Targets not guessed yet: their confirmed lines, and lines known not to be them. */
+  waiting?: Record<string, { lines: number; others: number }>;
   auto_confidence: number;
 }
 

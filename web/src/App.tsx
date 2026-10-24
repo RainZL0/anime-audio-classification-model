@@ -1081,6 +1081,8 @@ export function App() {
             context={context}
             setContext={setContext}
             dock={dock}
+            waiting={state.model.waiting ?? {}}
+            minLabels={state.model.min_labels ?? 0}
           />
         )}
         {showStage && <Divider width={fitStage(stageWidth)} setWidth={setStageWidth} />}

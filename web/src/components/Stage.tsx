@@ -75,6 +75,9 @@ interface StageProps {
   context: number;
   setContext: (context: number) => void;
   dock: string[];
+  /* Targets the machine does not guess yet, and how many confirmed lines it waits for. */
+  waiting: Record<string, { lines: number; others: number }>;
+  minLabels: number;
 }
 
 /* ───────────── Stage: picture, line, who is it ───────────── */
@@ -98,10 +101,16 @@ export function Stage({
   context,
   setContext,
   dock,
+  waiting,
+  minLabels,
 }: StageProps) {
   /* Which player can play, named by what it plays. "Loading" is worked out from it while drawing. It used to be
      switched on when the line changed, but a clip already cut could be ready before that ran, and then the
      spinner covered the picture for good. */
+  /* Targets not guessed yet, in dock order; those short of lines; and whether any has no "Other" to compare with. */
+  const waits = dock.filter((n) => waiting[n]);
+  const few = waits.filter((n) => waiting[n].lines < minLabels);
+  const lonely = waits.some((n) => !waiting[n].others);
   const line = `${clip?.id}-${sound}-${context}`;
   /* How many times "Cut again" was pressed on this line. Only this line asks for a fresh cut. */
   const [retry, setRetry] = useState<{ for: string; times: number } | null>(null);
@@ -432,18 +441,30 @@ export function Stage({
               )}
             </div>
           )}
-          {/* A character but no "Other" yet: the machine has no one to compare them with, so it waits. */}
-          {!clip.guess.length && clip.voiced && !clip.label && dock.length > 0 && (
+          {/* Targets the machine does not guess yet: too few of their lines confirmed, or no "Other" to compare with. */}
+          {clip.voiced && !clip.label && waits.length > 0 && (
             <div className={cn(STRANGER, "border bg-muted text-muted-foreground")}>
               {tr(
                 <>
-                  机器还没开始猜：它得先听过别人的声音，才分得出谁是 {dock.join("、")}
-                  。不是你要收集的人，就按 <Kbd>Q</Kbd> 标「其他」，标几句后它就开始猜。
+                  机器还没开始猜 {waits.join("、")}。
+                  {few.length > 0 &&
+                    `一个角色确认满 ${minLabels} 句后才开始猜，现在${few.map((n) => `${n} 已确认 ${waiting[n].lines} 句`).join("，")}。`}
+                  {lonely && (
+                    <>
+                      它还得先听过别人的声音：不是你要收集的人，按 <Kbd>Q</Kbd> 标「其他」。
+                    </>
+                  )}
                 </>,
                 <>
-                  The machine has not started guessing: it needs to hear other people first to tell{" "}
-                  {dock.join(", ")} apart. Label people you don't want to collect "Other" with{" "}
-                  <Kbd>Q</Kbd>; after a few it starts guessing.
+                  The machine is not guessing {waits.join(", ")} yet.{" "}
+                  {few.length > 0 &&
+                    `It starts once ${minLabels} lines of a character are confirmed; so far ${few.map((n) => `${n} has ${waiting[n].lines}`).join(", ")}. `}
+                  {lonely && (
+                    <>
+                      It also needs to hear other people first: label people you don't want to
+                      collect "Other" with <Kbd>Q</Kbd>.
+                    </>
+                  )}
                 </>,
               )}
             </div>

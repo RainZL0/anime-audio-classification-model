@@ -47,8 +47,8 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
           {tr("）；别人的按 ", "); label other people's with ")}
           <Kbd>Q</Kbd>
           {tr(
-            " 标「其他」。一组混着几个人时，分几次勾、几次标。这个角色标了二三十句、别人也标了一些以后，机器就开始猜了。",
-            ' ("Other"). When a group mixes several people, tick and label them in turns. Once the character has twenty or thirty lines and others have some, the machine starts guessing.',
+            " 标「其他」。一组混着几个人时，分几次勾、几次标。这个角色确认满 10 句、别人也标了几句以后，机器就开始猜了。",
+            ' ("Other"). When a group mixes several people, tick and label them in turns. Once 10 lines of the character are confirmed and a few others are labeled, the machine starts guessing.',
           )}
         </>
       ),
