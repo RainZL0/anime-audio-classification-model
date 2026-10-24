@@ -1018,6 +1018,7 @@ export function App() {
   const total =
     Object.values(counts).reduce((a: number, b) => a + (b ?? 0), 0) - (counts.skipped || 0) || 1;
   const progress = { done: (counts.confirmed || 0) / total, auto: (counts.auto || 0) / total };
+  const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
   const showStage = view !== "export";
   const cropRole = crop ? roles[crop.name] : undefined;
 
@@ -1033,7 +1034,7 @@ export function App() {
         unfinished={Object.keys(state.skipped || {}).length}
         view={view}
         setView={setView}
-        work={(counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0)}
+        work={work}
         adding={addingState === "running" && !addOpen ? (adding?.episode ?? "") : null}
         onShowAdding={() => setAddOpen(true)}
         busy={busy}
@@ -1142,6 +1143,7 @@ export function App() {
               onNew={(ids) => newRole(ids)}
               episode={episode}
               progress={progress}
+              work={work}
             />
           )}
           {view === "export" && (

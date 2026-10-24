@@ -41,6 +41,8 @@ interface GroupsViewProps {
   setPicked: (next: Picked | ((p: Picked) => Picked)) => void;
   episode: string | null;
   progress: Progress;
+  /* Lines still to do in this episode, as counted on the Scenes tab. */
+  work: number;
 }
 
 const GUESSED_MOST = () =>
@@ -64,6 +66,7 @@ export function GroupsView({
   setPicked,
   episode,
   progress,
+  work,
 }: GroupsViewProps) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState<Record<number, string>>({});
@@ -134,14 +137,40 @@ export function GroupsView({
           </ol>
         </Welcome>
       )}
+      {/* Says why there is nothing to do here, then where the work goes on. */}
       {groups.length === 0 && (
-        <Empty title={tr("没有可分的组了", "No groups left")}>
+        <Empty title={tr("这一集不用再分组了", "Nothing to group here")}>
           <p>
-            {tr(
-              "这一集要处理的台词，要么彼此都不太像，要么已经没有了。机器有把握的不分组，去「角色」视图核对；剩下的去「场景」视图逐句确认。",
-              "The lines still to do in this episode are either not much alike, or none are left. Lines the machine is confident about are not grouped: check them in the Characters view, and confirm the rest line by line in Scenes.",
-            )}
+            {progress.auto > 0
+              ? tr(
+                  "机器已经替你做了大部分判断，这里没有要你做的了。下一步：",
+                  "The machine has made most of the calls, so there is no work left here. Next:",
+                )
+              : tr("这里没有要你做的了。下一步：", "There is no work left here. Next:")}
           </p>
+          <ol className="mx-auto mt-1.5 w-fit list-decimal pl-[18px] text-left">
+            {work > 0 && (
+              <li>
+                {withKeys(
+                  tr(
+                    `去「场景」，按 [F] 只看要处理的，确认剩下的 ${work} 句`,
+                    `In Scenes, press [F] for Only to do and confirm the ${lines(work)} left`,
+                  ),
+                )}
+              </li>
+            )}
+            {progress.auto > 0 && (
+              <li>
+                {withKeys(
+                  tr(
+                    "去「角色」，逐个角色核对机器的判断：改掉错的，其余按 [Shift]+[Enter] 一起确认",
+                    "In Characters, check what the machine gave each character: fix the wrong ones, then confirm the rest with [Shift]+[Enter]",
+                  ),
+                )}
+              </li>
+            )}
+            <li>{tr("够用了就去「导出」", "When you have enough, go to Export")}</li>
+          </ol>
         </Empty>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3.5 pt-3">
