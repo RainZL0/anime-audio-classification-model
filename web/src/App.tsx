@@ -27,7 +27,7 @@ import { withKeys } from "./components/Keys";
 import { Empty } from "./components/Notes";
 import { Stage } from "./components/Stage";
 import { TopBar, type View } from "./components/TopBar";
-import { currentLanguage, lines, setLanguage, tr } from "./language";
+import { currentLanguage, lines, setLanguage, tr, type Language } from "./language";
 import { CONTEXTS, SPEEDS, type Sound } from "./playback";
 import { currentPurpose, setPurpose, type Purpose } from "./purpose";
 import { fitStage, savedStageWidth } from "./stageWidth";
@@ -219,9 +219,10 @@ export function App() {
 
   /* Switch the page language. The overview is fetched again because it holds a few messages from the server,
      such as why an episode was not loaded. */
-  const switchLanguage = () => {
-    setLanguage(currentLanguage() === "en" ? "zh" : "en");
-    setLanguageState(currentLanguage());
+  const switchLanguage = () => pickLanguage(currentLanguage() === "en" ? "zh" : "en");
+  const pickLanguage = (next: Language) => {
+    setLanguage(next);
+    setLanguageState(next);
     call<Summary>("/api/state")
       .then(setState)
       .catch(() => {});
@@ -1001,7 +1002,7 @@ export function App() {
     return (
       <>
         {corner}
-        <Welcome {...addProps} />
+        <Welcome {...addProps} onLanguage={pickLanguage} />
         {toaster}
       </>
     );

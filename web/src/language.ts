@@ -33,6 +33,9 @@ export function startLanguage() {
   showLanguage();
 }
 
+/* Whether the person has picked a language on this machine, rather than it following the browser. */
+export const languageChosen = () => ["zh", "en"].includes(localStorage.getItem("lang") ?? "");
+
 /* Change the language and keep the choice. The caller re-renders the page. */
 export function setLanguage(next: Language) {
   lang = next;
