@@ -139,14 +139,14 @@ export function GroupsView({
       )}
       {/* Says why there is nothing to do here, then where the work goes on. */}
       {groups.length === 0 && (
-        <Empty title={tr("这一集不用再分组了", "Nothing to group here")}>
+        <Empty title={tr("「起步分组」里没有要做的了", "No more work to do in Groups")}>
           <p>
             {progress.auto > 0
               ? tr(
-                  "你标的已经够机器学了，它替你做了大部分判断，这里没有要你做的了。下一步：",
-                  "You have labeled enough for the machine to learn from, and it has made most of the calls, so there is no work left here. Next:",
+                  "你标的已经够机器学了，它替你做了大部分判断。下一步：",
+                  "You have labeled enough for the machine to learn from, and it has made most of the calls. Next:",
                 )
-              : tr("这里没有要你做的了。下一步：", "There is no work left here. Next:")}
+              : tr("下一步：", "Next:")}
           </p>
           <ol className="mx-auto mt-1.5 w-fit list-decimal pl-[18px] text-left">
             {work > 0 && (
