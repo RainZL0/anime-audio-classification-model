@@ -684,10 +684,14 @@ export function AddEpisode({
           </Button>
         </div>
         <Note>
-          {tr("也可以在命令行里加：", "You can also add one in a terminal: ")}
-          <code className="font-mono break-all">
-            uv run avoc add "{state.workspace}" {tr("视频 --subs 字幕", "VIDEO --subs SUBTITLES")}
-          </code>
+          {tr("也可以在命令行里加：", "You can also add one in a terminal:")}
+          {/* The parts in <> are to be filled in, and look it. */}
+          <pre className="mt-1 rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap text-foreground">
+            uv run avoc add "{state.workspace}"{" "}
+            <span className="text-muted-foreground">{"<video>"}</span>
+            {" --subs "}
+            <span className="text-muted-foreground">{"<subtitles>"}</span>
+          </pre>
         </Note>
       </form>
     </div>
