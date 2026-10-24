@@ -13,7 +13,7 @@
 
 [Install](#install) · [Your first episode](#your-first-episode) · [Labeling](#labeling) · [What you get](#what-you-get) · [Questions](#questions) · [Docs](docs/index.md)
 
-<!-- Demo GIF: upload it to the media issue, then put its address here. No pictures are kept in git. -->
+<img src="https://github.com/user-attachments/assets/6de411ae-34b0-4d17-b90a-2ac3ba3c170d" width="800" alt="Demo: name a group of lines as a character, the machine starts guessing the rest, fix a wrong guess, check the character's list, and export">
 
 </div>
 
