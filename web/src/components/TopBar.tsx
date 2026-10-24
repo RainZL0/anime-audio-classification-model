@@ -18,6 +18,10 @@ import { withKeys } from "./Keys";
 import { LanguageButton } from "./LanguageButton";
 import { Tip } from "./Tip";
 
+/* The orange count of lines still to do. */
+const TODO_COUNT =
+  "min-w-4 rounded-full bg-warning/15 px-1.5 text-center text-[11px] leading-4 font-semibold text-warning tabular-nums";
+
 export type View = "groups" | "scene" | "roles" | "export";
 
 /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
@@ -32,6 +36,8 @@ const ALL_VIEWS = (): [View, string, string][] => [
 
 interface TopBarProps {
   episodes: string[];
+  /* Lines still to do in each episode, shown beside it in the episode menu. */
+  todo: Record<string, number>;
   episode: string | null;
   setEpisode: (name: string) => void;
   onAdd: () => void;
@@ -93,9 +99,7 @@ export function TopBar(p: TopBarProps) {
         >
           {label}
           {v === "scene" && p.work > 0 && (
-            <span className="ml-1.5 min-w-4 rounded-full bg-warning/15 px-1.5 text-center text-[11px] leading-4 font-semibold text-warning tabular-nums">
-              {p.work}
-            </span>
+            <span className={cn("ml-1.5", TODO_COUNT)}>{p.work}</span>
           )}
         </button>
       </Tip>
@@ -137,6 +141,10 @@ export function TopBar(p: TopBarProps) {
               {p.episodes.map((name) => (
                 <DropdownMenuRadioItem key={name} value={name} closeOnClick>
                   {name}
+                  {/* The same orange count as on the Scenes tab, so the person sees which episodes need work. */}
+                  {p.todo[name] > 0 && (
+                    <span className={cn("ml-auto", TODO_COUNT)}>{p.todo[name]}</span>
+                  )}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>

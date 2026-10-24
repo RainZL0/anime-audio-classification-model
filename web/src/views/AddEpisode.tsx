@@ -32,15 +32,9 @@ const LOG =
   "m-0 max-h-[180px] overflow-y-auto rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap";
 
 /* What `avoc doctor` finds wrong on this machine, if anything; nothing is shown while checking or when all is
-   well. Fetched once; torch is loaded for the GPU check, so it can take a few seconds. */
-function MachineProblems() {
-  const [list, setList] = useState<Check[] | null>(null);
-  useEffect(() => {
-    call<Check[]>("/api/doctor")
-      .then(setList)
-      .catch(() => setList([]));
-  }, []);
-  const problems = (list ?? []).filter((c) => !c.ok);
+   well. The token is left out: its steps are shown by the offset box, the one place it is needed. */
+function MachineProblems({ list }: { list: Check[] | null }) {
+  const problems = (list ?? []).filter((c) => !c.ok && c.topic !== "token");
   if (!problems.length) return null;
   return (
     <Section title={tr("这台机器", "This machine")}>
@@ -71,6 +65,74 @@ function MachineProblems() {
         ))}
       </ul>
     </Section>
+  );
+}
+
+/* How to get the Hugging Face token that measuring the offset needs, step by step, with a button to check again
+   once it is done. */
+function TokenSteps({ onCheck, checking }: { onCheck: () => void; checking: boolean }) {
+  const link = (href: string, text: string) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-primary underline underline-offset-2"
+    >
+      {text}
+    </a>
+  );
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-[13px]">
+      <div className="font-semibold">
+        {tr(
+          "这台机器还没有 Hugging Face 令牌，自动测要先做一次这几步（免费，约 3 分钟）：",
+          "This machine has no Hugging Face token yet. To measure automatically, do these steps once (free, about 3 minutes):",
+        )}
+      </div>
+      <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
+        <li>
+          {tr("登录 ", "Log in to ")}
+          {link("https://huggingface.co/login", "Hugging Face")}
+          {tr("，没有账号就免费注册一个。", " (sign up for free if you have no account).")}
+        </li>
+        <li>
+          {tr("打开 ", "Open ")}
+          {link(
+            "https://huggingface.co/pyannote/speaker-diarization-community-1",
+            tr("测偏移用的模型页", "the page of the model that measures the offset"),
+          )}
+          {tr("，同意使用条款。", " and accept its terms of use.")}
+        </li>
+        <li>
+          {tr("在 ", "On ")}
+          {link("https://huggingface.co/settings/tokens", tr("令牌页", "the tokens page"))}
+          {tr(
+            " 新建一个令牌，类型选 Read，复制它。",
+            ", create a new token of type Read and copy it.",
+          )}
+        </li>
+        <li>
+          {tr(
+            "在启动 avoc 的文件夹里打开终端，运行下面这条命令，按提示粘贴令牌：",
+            "Open a terminal in the folder you started avoc in, run this command, and paste the token when asked:",
+          )}
+          <pre className="mt-1 mb-0 rounded-md bg-background px-2.5 py-1.5 font-mono text-xs">
+            uv run hf auth login
+          </pre>
+        </li>
+      </ol>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={checking} onClick={onCheck}>
+          {checking ? tr("正在检查…", "Checking…") : tr("做好了，再检查一次", "Done, check again")}
+        </Button>
+        <span className="text-muted-foreground">
+          {tr(
+            "不想弄的话，填上前面测过的同一片源、同一字幕组的偏移也行。",
+            "Or give the offset measured for an earlier episode from the same source and subtitle group.",
+          )}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -328,6 +390,19 @@ export function AddEpisode({
   const [subtitles, setSubtitles] = useState("");
   const [displaySubtitles, setDisplaySubtitles] = useState("");
   const [offset, setOffset] = useState(last ? String(last.offset) : "");
+  /* The machine checks of `avoc doctor`. Fetched when the form opens and again on "check again"; torch is loaded for
+     the GPU check, so the first time can take a few seconds. */
+  const [checks, setChecks] = useState<Check[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const check = () => {
+    setChecking(true);
+    call<Check[]>("/api/doctor")
+      .then(setChecks)
+      .catch(() => setChecks([]))
+      .finally(() => setChecking(false));
+  };
+  useEffect(check, []);
+  const noToken = !!checks?.some((c) => c.topic === "token" && !c.ok);
   /* "" lets the audio track's tag decide. */
   const [spoken, setSpoken] = useState("");
   const tracks = useAnswer<AudioTracks>("/api/audio-tracks", video);
@@ -560,7 +635,7 @@ export function AddEpisode({
           ))}
         </Section>
       )}
-      <MachineProblems />
+      <MachineProblems list={checks} />
       <form className="flex flex-col gap-6" onSubmit={start}>
         <Section title={tr("收集声音做什么用", "What the voices are for")}>
           <Choice<Purpose>
@@ -635,10 +710,10 @@ export function AddEpisode({
             <Note>
               {text
                 ? tr(
-                    "按它切台词。最好用这一集说的语言的字幕。",
-                    "The lines are cut along it. Best in the language spoken.",
+                    "每句台词按它的时间切出来。最好用这一集说的语言的字幕，导出时文字才对得上。",
+                    "Each line is cut out at its times. Best in the language spoken, so the text matches on export.",
                   )
-                : tr("按它切台词。", "The lines are cut along it.")}
+                : tr("每句台词按它的时间切出来。", "Each line is cut out at its times.")}
             </Note>
           )}
           {found && (
@@ -664,24 +739,27 @@ export function AddEpisode({
             !found.languages.includes(heard) && (
               <Note warn>
                 {tr(
-                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面的显示用字幕；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
-                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under display subtitles below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
+                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面「给你看的字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
+                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under "Subtitles for you to read" below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
                 )}
               </Note>
             )}
         </Section>
-        <Section title={tr("显示用字幕", "Display subtitles")} aside={tr("可以不填", "optional")}>
+        <Section
+          title={tr("给你看的字幕", "Subtitles for you to read")}
+          aside={tr("可以不填，比如一份译文", "optional, such as a translation")}
+        >
           <PathInput
             kind="subtitles"
             value={displaySubtitles}
             onChange={setDisplaySubtitles}
-            placeholder={tr("显示用字幕文件的路径", "Path to the display subtitles")}
+            placeholder={tr("字幕文件的路径", "Path to the subtitles")}
             toast={toast}
           />
           <Note>
             {tr(
-              "对白字幕是你看不懂的语言时，配一份译文，标注时显示在台词上面。导出不用它。",
-              "If you don't read the dialogue subtitles' language, add a translation here. It is shown above each line while labeling, and never exported.",
+              "标注时显示在每句台词上面，帮你看懂在说什么。只给你看，不影响切台词、认人和导出。",
+              "Shown above each line while labeling, so you know what is being said. Only for you: it changes nothing in how lines are cut, who the machine thinks is speaking, or what is exported.",
             )}
           </Note>
           <DisplayNote path={displaySubtitles} />
@@ -706,10 +784,11 @@ export function AddEpisode({
                   "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. For another source or subtitle group, empty it to measure again.",
                 )
               : tr(
-                  "字幕时间要加几秒才和声音对上。测出来的值，之后同一片源、同一字幕组的集会默认填上。没有令牌的话先填 0。",
-                  "How many seconds to add to the subtitle times so they line up with the sound. Later episodes from the same source and subtitle group get the measured value filled in. Without a token, try 0.",
+                  "字幕时间要加几秒才和声音对上。测出来的值，之后同一片源、同一字幕组的集会默认填上。",
+                  "How many seconds to add to the subtitle times so they line up with the sound. Later episodes from the same source and subtitle group get the measured value filled in.",
                 )}
           </Note>
+          {noToken && !offset.trim() && <TokenSteps onCheck={check} checking={checking} />}
         </Section>
         <Note>
           {withKeys(

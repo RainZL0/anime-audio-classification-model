@@ -12,7 +12,6 @@ import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
 import { Chip, LowButton } from "./Chip";
 import { Choice } from "./Choice";
-import { Note } from "./Notes";
 import { NoText, Tag } from "./Pills";
 import { RoleName } from "./RoleName";
 import { withKeys } from "./Keys";
@@ -544,12 +543,6 @@ export function Stage({
             >
               {tr("新角色", "New character")}
             </Chip>
-            <Note>
-              {tr(
-                "已有的人按数字键，或点底部的头像",
-                "Existing characters: number keys, or click an avatar at the bottom",
-              )}
-            </Note>
           </div>
         </>
       )}
@@ -557,13 +550,12 @@ export function Stage({
       <div className="mt-4 text-xs leading-[1.9] text-muted-foreground">
         {tr(
           <>
-            <Kbd>J</Kbd> <Kbd>K</Kbd> 上下一句 · <Kbd>空格</Kbd> 重播 · <Kbd>1</Kbd>–<Kbd>9</Kbd>{" "}
-            选下面的角色 ·<Kbd>N</Kbd> 新角色 · <Kbd>Z</Kbd> 撤销 · <Kbd>?</Kbd> 全部快捷键
+            <Kbd>J</Kbd> <Kbd>K</Kbd> 上下一句 · <Kbd>空格</Kbd> 重播 · 底部角色上标的键直接标 ·{" "}
+            <Kbd>?</Kbd> 全部快捷键
           </>,
           <>
-            <Kbd>J</Kbd> <Kbd>K</Kbd> next / previous · <Kbd>Space</Kbd> replay · <Kbd>1</Kbd>–
-            <Kbd>9</Kbd> pick a character below ·<Kbd>N</Kbd> new character · <Kbd>Z</Kbd> undo ·{" "}
-            <Kbd>?</Kbd> all shortcuts
+            <Kbd>J</Kbd> <Kbd>K</Kbd> next / previous · <Kbd>Space</Kbd> replay · the key on a
+            character at the bottom labels the line · <Kbd>?</Kbd> all shortcuts
           </>,
         )}
       </div>

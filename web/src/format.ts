@@ -7,7 +7,8 @@ export const stamp = (s: number) => {
   return `${String(Math.floor(tenths / 600)).padStart(2, "0")}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
 };
 
-export const pct = (p: number) => `${Math.round(p * 100)}%`;
+/* A guess is never certain, so 99.6% is written 99%, not 100%. */
+export const pct = (p: number) => `${Math.min(99, Math.round(p * 100))}%`;
 
 /* A total length: seconds under a minute, minutes and seconds under an hour, else hours and minutes. */
 export const howLong = (seconds: number) => {

@@ -13,6 +13,8 @@ interface DockProps {
   labelText: LabelText;
   /* Whether there is a line to label, which "New character" needs. */
   canNew: boolean;
+  /* Whether there is a line to label: one selected, or lines ticked in Groups. */
+  canLabel: boolean;
   onName: (name: string, low?: boolean) => void;
   onNew: () => void;
   canUndo: boolean;
@@ -26,6 +28,7 @@ export function Dock({
   roles,
   labelText,
   canNew,
+  canLabel,
   onName,
   onNew,
   canUndo,
@@ -36,11 +39,13 @@ export function Dock({
       {dock.map((name, i) => (
         <Chip
           key={name}
+          off={!canLabel}
           onPick={() => onName(name)}
           picture={<Avatar role={roles[name]} name={name} size="md" />}
           hotkey={i < 9 ? String(i + 1) : undefined}
           extra={
             <LowButton
+              disabled={!canLabel}
               tip={lowTip()}
               hotkey={i < 9 ? i + 1 : undefined}
               onClick={() => onName(name, true)}
@@ -51,6 +56,7 @@ export function Dock({
         </Chip>
       ))}
       <Chip
+        off={!canLabel}
         tip={tr("不是任何一个目标角色", "Not any of the target characters")}
         onPick={() => onName(OTHER)}
         picture={<Avatar blank size="md" />}

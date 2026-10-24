@@ -176,7 +176,10 @@ export function ExportView({
   onPurpose: (purpose: Purpose) => void;
 }) {
   const trainable = state.roles.filter((r) => r.confirmed > 0);
-  const [ticked, setPicked] = useState(() => new Set<string>());
+  /* The target characters start ticked: they are who the person is collecting. */
+  const [ticked, setPicked] = useState(
+    () => new Set(trainable.filter((r) => r.target).map((r) => r.name)),
+  );
   /* Only names still on the list: a character ticked here may have been renamed or merged since. */
   const picked = new Set(trainable.map((r) => r.name).filter((n) => ticked.has(n)));
   const [form, setFormState] = useState<Form>(needsText() ? "gpt-sovits" : "folder");
@@ -224,8 +227,8 @@ export function ExportView({
     setBusy(false);
   };
   const forms: [Form, string][] = [
-    ["gpt-sovits", "GPT-SoVITS"],
-    ["folder", tr("只要音频（RVC）", "Audio only (RVC)")],
+    ["folder", tr("只要声音（RVC 等）", "Sound only (RVC and such)")],
+    ["gpt-sovits", tr("带文字（GPT-SoVITS）", "With text (GPT-SoVITS)")],
   ];
   return (
     <div className="mx-auto flex max-w-[860px] flex-col gap-6 pt-3 pb-10">
@@ -233,8 +236,8 @@ export function ExportView({
         <h2 className="text-lg font-semibold">{tr("导出训练数据", "Export training data")}</h2>
         <span className="text-[13px] text-muted-foreground">
           {tr(
-            "从原采样率的人声轨上切，统一响度，一个角色一个文件夹",
-            "Cut from the vocals at the original sample rate, loudness evened out, one folder per character",
+            "每个角色一个文件夹：只有人声，音质和原片一样，音量统一",
+            "One folder per character: voice only, the same quality as the video, even loudness",
           )}
         </span>
       </div>
@@ -298,8 +301,8 @@ export function ExportView({
         <Section title={tr("台词文字", "Text of each line")}>
           <Note>
             {tr(
-              "训练要的是真正说出口的话，所以文字用每集说的语言：切片段用的字幕就是这种语言时直接用，不是的话（比如中文译文）就用下面另配的字幕。没有这种文字的片段不导出，原因写进导出目录的 rejected.tsv。",
-              "Training needs the words actually said, so the text is in the language each episode speaks: taken from the cutting subtitles when they are in that language, and otherwise (a translation, say) from the subtitles attached below. Clips without such text are not exported; the reasons go into rejected.tsv in the export folder.",
+              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。切台词的字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的句子不导出，原因写在导出目录的 rejected.tsv 里。",
+              "Each line needs the words the character actually said, in the language the episode speaks (usually Japanese). If the subtitles the lines were cut from are in that language, they are used; if they are a translation, attach subtitles in the original language below. Lines without their words are not exported; the reasons are in rejected.tsv in the export folder.",
             )}
           </Note>
           <SpokenTexts state={state} setState={setState} toast={toast} />

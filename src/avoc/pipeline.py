@@ -28,9 +28,14 @@ from avoc.stages.captions import marked_note
 from avoc.stages.text_language import name_of
 
 TOKEN_PAGE = "https://huggingface.co/pyannote/speaker-diarization-community-1"
+TOKEN_SETTINGS = "https://huggingface.co/settings/tokens"
 TOKEN_HOWTO = Words(
-    f"先在 {TOKEN_PAGE} 同意使用条款，再运行 uv run hf auth login 登录",
-    f"Accept the terms of use at {TOKEN_PAGE}, then log in by running uv run hf auth login",
+    f"登录 Hugging Face（没有账号就免费注册），在 {TOKEN_PAGE} 同意使用条款，"
+    f"在 {TOKEN_SETTINGS} 新建一个 Read 类型的令牌，再在 avoc 的文件夹里运行 uv run hf auth login，"
+    "粘贴这个令牌",
+    f"Log in to Hugging Face (sign up for free if you have no account), accept the terms of use at "
+    f"{TOKEN_PAGE}, create a Read token at {TOKEN_SETTINGS}, then run uv run hf auth login in the "
+    "avoc folder and paste the token",
 )
 NO_TOKEN_HINT = Words(
     "没给字幕偏移，要用 pyannote 自动测，但这台机器没有 Hugging Face 令牌。"

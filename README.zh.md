@@ -56,7 +56,7 @@ uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt" --offset 0
 | 选项 | 作用 |
 | --- | --- |
 | `--offset` | 字幕时间要加上的秒数，让字幕和音频对齐。同一个片源、同一个字幕组的各集，几乎总是同一个偏移：算一次，之后沿用。 |
-| *（不加 `--offset`）* | 用 [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1) 自动测量偏移。这个模型需要申请：先在 Hugging Face 上同意它的条款，再运行 `uv run hf auth login`。 |
+| *（不加 `--offset`）* | 用 [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1) 自动测量偏移。这个模型需要申请：先在 Hugging Face 上同意它的条款，在[令牌页](https://huggingface.co/settings/tokens)新建一个 Read 类型的令牌，再运行 `uv run hf auth login` 粘贴进去。 |
 | `--display-subs "Episode 01.zh.ass"` | 一份你看得懂的翻译，标注时显示在每句台词上方。不会从它导出任何内容。 |
 | `--text-subs "Episode 01.ja.ass"` | 只在 `--subs` 是翻译字幕时使用：附上原声语言的字幕，导出的文字从这里取。这样会有不少切片拿不到文字，所以更推荐 `--subs` 直接用原声语言的字幕。 |
 | `--spoken ja` | 原声语言（`ja`、`zh`、`en`、`ko`）。默认从音轨读取；双音轨的视频会选用对应的那条音轨。 |

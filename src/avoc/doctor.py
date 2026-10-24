@@ -22,6 +22,8 @@ class Check:
     """What to do when `ok` is false."""
     required: bool = True
     """False means the tool still works without it, only slower or with one feature less."""
+    topic: str = ""
+    """A fixed name for checks the interface shows in a place of their own: "token"."""
 
 
 def checks(where: Path) -> list[Check]:
@@ -88,6 +90,7 @@ def checks(where: Path) -> list[Check]:
             )
             + str(TOKEN_HOWTO),
             required=False,
+            topic="token",
         )
     )
     free = shutil.disk_usage(where).free / 2**30

@@ -56,7 +56,7 @@ uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt" --offset 0
 | Option | What it does |
 | --- | --- |
 | `--offset` | Seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and subtitle group almost always share one offset: find it once, then reuse it. |
-| *(no `--offset`)* | The offset is measured with [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1). That model is gated: accept its terms on Hugging Face, then run `uv run hf auth login`. |
+| *(no `--offset`)* | The offset is measured with [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1). That model is gated: accept its terms on Hugging Face, create a Read token on the [tokens page](https://huggingface.co/settings/tokens), then run `uv run hf auth login` and paste it. |
 | `--display-subs "Episode 01.zh.ass"` | A translation you can read, shown above each line while labeling. Nothing is exported from it. |
 | `--text-subs "Episode 01.ja.ass"` | Only when `--subs` is a translation: attach subtitles in the language spoken, and the exported text is taken from them. Many clips get no text this way, so prefer `--subs` in the spoken language. |
 | `--spoken ja` | The language spoken (`ja`, `zh`, `en`, `ko`). By default it is read from the audio track, and the matching track of a dual-audio video is used. |

@@ -53,7 +53,7 @@ export function Row({
     <div
       ref={ref}
       className={cn(
-        "relative isolate grid grid-cols-[36px_1fr_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
+        "relative isolate grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
         selected && SELECTED_ROW,
       )}
       onClick={onSelect}
@@ -68,7 +68,7 @@ export function Row({
         blank={isOther}
       />
       <div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
           <span
             className={cn(
               "font-semibold text-foreground",
@@ -86,7 +86,8 @@ export function Row({
             )}
           </span>
           <Pill clip={clip} />
-          {stranger && best && <Closest roles={roles} name={best.name} p={best.p} />}
+          {/* No chance here: it is among the known characters only, so it can be high for someone new. */}
+          {stranger && best && <Closest roles={roles} name={best.name} />}
           {clip.unusable && !(clip.label && labelText[clip.label]) && (
             <Tag look="unusable" tip={lowTip()}>
               {tr("质量低", "Low quality")}

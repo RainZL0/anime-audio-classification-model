@@ -3,6 +3,7 @@ import { useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import type { Clip, Group, Roles } from "../api";
 import { lowTip, newTip, OTHER, type LabelText } from "../clips";
@@ -15,6 +16,7 @@ import { SELECTED_ROW } from "../components/Row";
 import { RoleName } from "../components/RoleName";
 import { withKeys } from "../components/Keys";
 import { Tip } from "../components/Tip";
+import type { View } from "../components/TopBar";
 import { stamp } from "../format";
 import { lines, many, tr } from "../language";
 
@@ -42,6 +44,7 @@ interface GroupsViewProps {
   progress: Progress;
   /* Lines still to do in this episode, as counted on the Scenes tab. */
   work: number;
+  onGo: (view: View) => void;
 }
 
 const GUESSED_MOST = () =>
@@ -65,6 +68,7 @@ export function GroupsView({
   episode,
   progress,
   work,
+  onGo,
 }: GroupsViewProps) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState<Record<number, string>>({});
@@ -144,6 +148,18 @@ export function GroupsView({
             )}
             <li>{tr("够用了就去「导出」", "When you have enough, go to Export")}</li>
           </ol>
+          {/* A button for the first step, so the person need not find the tab. */}
+          <Button
+            className="mt-4"
+            onClick={() => onGo(work > 0 ? "scene" : progress.auto > 0 ? "roles" : "export")}
+          >
+            {work > 0
+              ? tr("去「场景」", "Go to Scenes")
+              : progress.auto > 0
+                ? tr("去「角色」", "Go to Characters")
+                : tr("去「导出」", "Go to Export")}
+            <Kbd className="ml-1">{work > 0 ? "S" : progress.auto > 0 ? "O" : "E"}</Kbd>
+          </Button>
         </Empty>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3.5 pt-3">

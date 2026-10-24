@@ -6,6 +6,7 @@ import {
   type Adding,
   type ChangeResult,
   type Clip,
+  type Episode,
   type Group,
   type Roles,
   type Summary,
@@ -1011,7 +1012,8 @@ export function App() {
   const total =
     Object.values(counts).reduce((a: number, b) => a + (b ?? 0), 0) - (counts.skipped || 0) || 1;
   const progress = { done: (counts.confirmed || 0) / total, auto: (counts.auto || 0) / total };
-  const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
+  const workOf = (c: Episode["counts"]) => (c.review || 0) + (c.novoice || 0) + (c.unlabeled || 0);
+  const work = workOf(counts);
   const showStage = view !== "export";
   const cropRole = crop ? roles[crop.name] : undefined;
 
@@ -1021,6 +1023,7 @@ export function App() {
     <div className="flex h-screen flex-col">
       <TopBar
         episodes={state.episodes.map((e) => e.name)}
+        todo={Object.fromEntries(state.episodes.map((e) => [e.name, workOf(e.counts)]))}
         episode={episode}
         setEpisode={setEpisode}
         onAdd={() => setAddOpen(true)}
@@ -1134,6 +1137,7 @@ export function App() {
               episode={episode}
               progress={progress}
               work={work}
+              onGo={setView}
             />
           )}
           {view === "export" && (
@@ -1153,6 +1157,11 @@ export function App() {
           roles={roles}
           labelText={labelText}
           canNew={!!current}
+          canLabel={
+            !!current ||
+            (view === "groups" &&
+              groups.some((g) => g.clips.some((c) => !c.label && picked[g.key]?.has(c.id))))
+          }
           onName={(name, low) => assign(name, keyTargets(), low)}
           onNew={() => current && newRole(keyTargets())}
           canUndo={!!state.can_undo}
