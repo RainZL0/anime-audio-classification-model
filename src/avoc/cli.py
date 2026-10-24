@@ -296,6 +296,47 @@ def set_spoken_language(
     typer.echo(f"{result['episode']}: spoken language {result['spoken_language']}")
 
 
+@app.command("borrow-labels")
+def borrow_labels(
+    workspace: Annotated[Path, typer.Argument(help="The workspace that borrows")],
+    other: Annotated[
+        Path | None, typer.Argument(help="The workspace whose labels are borrowed")
+    ] = None,
+    stop: Annotated[bool, typer.Option("--stop", help="Stop borrowing")] = False,
+) -> None:
+    """Let the machine learn from another workspace's labels too, such as the same show cut from
+    other subtitles. They only help it guess; nothing is copied into this workspace's labels. Stop
+    with --stop once enough lines are labeled here."""
+    from avoc.app import borrowing
+
+    if stop:
+        done = borrowing.stop(workspace)
+        typer.echo(
+            say("不再借用别处的标注", "No longer borrowing labels")
+            if done
+            else say("本来就没借用", "Nothing was borrowed")
+        )
+        return
+    if other is None:
+        typer.echo(say("出错：要给出被借用的工作区", "Error: give the workspace to borrow from"),
+                   err=True)  # fmt: skip
+        raise typer.Exit(1)
+    try:
+        added = borrowing.start(workspace, other)
+    except ValueError as exc:
+        typer.echo(say(f"出错：{exc}", f"Error: {exc}"), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(say(f"借用 {other} 的标注", f"Borrowing the labels of {other}"))
+    if added:
+        typer.echo(
+            say(
+                f"新加的目标角色：{'、'.join(added)}",
+                f"Target characters added: {', '.join(added)}",
+            )
+        )
+    typer.echo(say("重开 avoc app 后生效", "Restart avoc app for it to take effect"))
+
+
 def _serve_reloaded(port: int) -> None:
     """The server of `avoc app --reload`, run in a new process after each change."""
     import uvicorn

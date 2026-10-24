@@ -73,6 +73,8 @@ The probability of "Other" is recorded as 1 minus the probability of the top tar
 
 The small classifier only picks among the characters it already knows, so the second condition is required.
 
+**Borrowed labels.** A workspace can also learn from another workspace's labels (`avoc borrow-labels`), such as the same show cut again from other subtitles. The voices are the same but the clips are not, so the old labels cannot be moved over; instead, on every retrain, the other workspace's labeled clips are added as extra examples, with their voiceprints from the same models and by the same rules as this workspace's own labels ("low quality" left out). They count toward the 10 lines above, so guesses start at once. They are never shown, guessed or exported, and nothing in either workspace's labels changes. The top bar shows how many lines are borrowed, with "Stop borrowing", which drops them all at once. Measured once: the 13 Uma Musume episodes cut again from Japanese subtitles, borrowing the 1,283 labeled lines of the Chinese cut, with no label of their own yet. On the new clips that overlap an old labeled one, the machine named 538 of the 582 Teio lines, and 538 of its 539 Teio guesses were right. These clips are the same sound the borrowed examples came from, so this is easier than new episodes.
+
 ### How many labels before the guesses are good
 
 Measured once, for one character (Tokai Teio, `teo`). The confirmed labels of episodes 1 and 2 (636 lines, 159 of them Teio, the rest "Other"; "low quality" left out) were replayed one at a time, as a person labels them in Scenes from the start of episode 1. After each step the machine was retrained the way the interface does it, and its guesses were scored on episode 3, which it never trained on: 310 lines, 57 of them Teio. Saying "Other" for every line there is already right 82% of the time, so that is the number to beat.
@@ -129,6 +131,7 @@ The interface's labels are stored in the workspace folder `labels/`:
 
 - `events.jsonl` is append-only. Each line is one batch of changes, and it records each clip's value before and after the change. An undo is also a batch, and it records which batch it undoes. The cast table `cast.json` is stored separately. When a batch also creates, renames or merges characters, the batch's `cast` field records it, and an undo restores the cast table as well. A new character that has no clips left after an undo is deleted. Replaying all the lines gives the current labels.
 - `cast.json` is the cast table. It holds the name, whether a person gave the name (`named`), the color, the pattern number (`pattern`), the avatar file, and whether the character takes part in training. A character without a name is shown as "Character N". Giving it a name is a rename. Pattern numbers only grow and are never reused. When no avatar has been cropped, the default picture is drawn from the pattern number. Avatar images are stored in the `avatars/` folder next to it.
+- `borrowed.json`, only while [borrowing labels](#labeling-and-correction-interface) from another workspace: `{"from": "<that workspace's folder>"}`.
 
 **Clip IDs are a hash of the episode name plus the start and end times. They do not depend on neighboring clips.** Re-cutting an episode makes its labels invalid.
 
@@ -151,6 +154,7 @@ src/avoc/
   app/workspace.py         read the workspace: episodes, clips, text, scenes, assembled voiceprints
   app/labels.py            label records in the interface, undo, cast table
   app/model.py             small classifier and similarity check
+  app/borrowing.py         labels borrowed from another workspace
   app/video.py             cut the short video pieces shown next to each line
   app/adding.py            add an episode from the interface: runs `avoc add` in a separate process
   app/picker.py            the "Browse…" buttons: opens the system's file window

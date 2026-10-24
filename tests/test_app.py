@@ -387,6 +387,39 @@ def test_api_says_which_targets_wait_for_more_lines(
     assert after[2]["guess"][0]["name"] == "A"
 
 
+def test_labels_borrowed_from_another_workspace_teach_but_are_not_shown(tmp_path: Path) -> None:
+    """The same show cut again: the new clips have no labels yet, but the old workspace's labels
+    already let the machine guess. Stopping drops them in one go."""
+    from avoc.app import borrowing
+
+    old = _workspace(tmp_path)
+    ids = [row["id"] for row in json.loads((old / "episodes/ep1/segments.json").read_text())]
+    store = LabelStore(old / "labels")
+    store.apply([{"clip": ids[0], "label": "A"}, {"clip": ids[1], "label": "A"}])
+    store.apply([{"clip": ids[3], "label": OTHER}])
+    store.apply([{"clip": ids[4], "label": "A"}])
+    store.apply([{"clip": ids[4], "unusable": True}])
+
+    new = tmp_path / "new"
+    (new / "episodes").mkdir(parents=True)
+    a, b = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]
+    episode(new / "episodes", "ep9", np.array([a, b, a, b], dtype=float))
+    assert borrowing.start(new, old) == ["A"]
+    state = AppState(new, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    model = client.get("/api/state").json()["model"]
+    # Clips 0 and 1 count for A, clip 3 against; the low-quality clip 4 is left out.
+    assert model["labels"] == 0 and model["borrowed"]["lines"] == 3
+    clips = client.get("/api/clips").json()
+    assert len(clips) == 4 and all(c["label"] is None for c in clips)
+    assert [c["guess"][0]["name"] for c in clips] == ["A", OTHER, "A", OTHER]
+
+    stopped = client.post("/api/borrowed/stop").json()
+    assert stopped["model"]["borrowed"] is None
+    assert all(not c["guess"] for c in client.get("/api/clips").json())
+    assert not (new / "labels" / borrowing.FILE).exists()
+
+
 def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")

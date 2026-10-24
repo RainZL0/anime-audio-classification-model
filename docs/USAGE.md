@@ -82,9 +82,11 @@ uv run avoc set-video workspace/episodes/ep01 "Episode 01.mkv"
 uv run avoc set-subtitles workspace/episodes/ep01 "Episode 01.zh.ass"
 uv run avoc set-display-subtitles workspace/episodes/ep08 "Episode 08.zh.ass"
 uv run avoc set-spoken-language workspace/episodes/ep01 ja
+uv run avoc borrow-labels workspace-ja workspace
 ```
 
 - `set-video`: records the video for an episode that was processed before `prepare` required it. If the length does not match the audio track, it is refused.
 - `set-subtitles`: adds subtitles to an episode that has none recorded. The offset is worked out from the existing clips, and the dialogue text is found by matching the times that overlap.
 - `set-display-subtitles`: attaches subtitles in a language you read to an episode cut from subtitles you don't. They are only shown while labeling. The offset is measured automatically; if it does not line up with the main subtitles, it is refused.
+- `borrow-labels`: lets the machine also learn from another workspace's labels, such as the same show cut from other subtitles, so it guesses before anything is labeled here ([how](HOW_IT_WORKS.md#labeling-and-correction-interface)). Target characters of the other workspace missing here are added, with their color and avatar. The choice is kept in `labels/borrowed.json`; restart `avoc app` after it. `--stop`, or "Stop borrowing" in the top bar, drops the borrowed labels once enough is labeled here.
 - `set-spoken-language`: corrects the language an episode speaks when the audio track's tag was wrong or missing. The voices already cut stay as they are; to cut from another audio track, add the episode again with `--spoken`.
