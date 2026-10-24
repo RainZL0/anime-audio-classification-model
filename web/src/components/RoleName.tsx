@@ -24,9 +24,7 @@ export function RoleName({
         )
       }
     >
-      <span className={cn(unnamed && "font-medium text-muted-foreground italic", className)}>
-        {name}
-      </span>
+      <span className={cn(unnamed && "font-medium text-muted-foreground", className)}>{name}</span>
     </Tip>
   );
 }
