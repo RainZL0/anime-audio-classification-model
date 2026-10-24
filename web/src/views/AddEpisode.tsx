@@ -566,8 +566,8 @@ export function AddEpisode({
           <Choice<Purpose>
             value={text ? "tts" : "audio"}
             options={[
-              ["tts", tr("朗读文字（GPT-SoVITS 等）", "Read text aloud (GPT-SoVITS and such)")],
               ["audio", tr("只要声音（RVC 等）", "Sound only (RVC and such)")],
+              ["tts", tr("朗读文字（GPT-SoVITS 等）", "Read text aloud (GPT-SoVITS and such)")],
             ]}
             onPick={onPurpose}
           />
