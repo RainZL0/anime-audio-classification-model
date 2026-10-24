@@ -1035,8 +1035,6 @@ export function App() {
         busy={busy}
         trainedOn={state.model.labels || 0}
         targets={state.roles.filter((r) => r.target).length}
-        canUndo={!!state.can_undo}
-        onUndo={undo}
         dark={theme === "dark"}
         onTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         onLanguage={switchLanguage}
@@ -1160,6 +1158,8 @@ export function App() {
           canNew={!!current}
           onName={(name, low) => assign(name, keyTargets(), low)}
           onNew={() => current && newRole(keyTargets())}
+          canUndo={!!state.can_undo}
+          onUndo={undo}
         />
       )}
 

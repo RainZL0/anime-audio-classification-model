@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import type { Roles } from "../api";
 import { lowTip, newTip, OTHER, type LabelText } from "../clips";
 import { tr } from "../language";
@@ -13,11 +15,22 @@ interface DockProps {
   canNew: boolean;
   onName: (name: string, low?: boolean) => void;
   onNew: () => void;
+  canUndo: boolean;
+  onUndo: () => void;
 }
 
 /* The bar at the bottom: one chip per target character, in a fixed order so the number keys don't move, then
    "Other" and "New character". */
-export function Dock({ dock, roles, labelText, canNew, onName, onNew }: DockProps) {
+export function Dock({
+  dock,
+  roles,
+  labelText,
+  canNew,
+  onName,
+  onNew,
+  canUndo,
+  onUndo,
+}: DockProps) {
   return (
     <footer className="flex items-center gap-1.5 overflow-x-auto border-t bg-background px-3.5 py-2">
       {dock.map((name, i) => (
@@ -54,6 +67,11 @@ export function Dock({ dock, roles, labelText, canNew, onName, onNew }: DockProp
       >
         {tr("新角色", "New character")}
       </Chip>
+      {/* Undo goes back on the last label, so it sits with the choices that label. */}
+      <span className="flex-1"></span>
+      <Button variant="ghost" size="sm" className="flex-none" disabled={!canUndo} onClick={onUndo}>
+        {tr("撤销", "Undo")} <Kbd>Z</Kbd>
+      </Button>
     </footer>
   );
 }

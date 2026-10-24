@@ -53,6 +53,7 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 - **A list that covers all episodes shows which episode each line is from.**
 - **A form is split into parts, each with a title**, as in Export and Add an episode. The title is short, dark and bold, with at most a few gray words after it ("optional", "ASS / SRT"). Under it come the box or buttons, then any explanation in gray, one size smaller. Longer reasons go in that gray text, never in brackets in the title. The space between parts is clearly bigger than the space inside one.
 - Choices of the same kind sit together in one row.
+- **The top bar holds only where to go and settings**: the episode, the views, language, colors, the guide and the shortcuts. Actions on lines live where the lines are labeled; "Undo" sits at the right end of the bottom bar, next to the choices it takes back.
 - A button that cannot be used yet is shown grayed out, not hidden, so nothing jumps when it becomes usable. For example, the chips under a group stay gray until a line is ticked.
 - A count is shown once, next to what it counts, not repeated on every button.
 - Short messages show at the bottom, above the bottom bar; **while a dialog is open they show at the top of the window**, so they never cover its buttons.

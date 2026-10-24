@@ -47,8 +47,6 @@ interface TopBarProps {
   busy: boolean;
   trainedOn: number;
   targets: number;
-  canUndo: boolean;
-  onUndo: () => void;
   dark: boolean;
   onTheme: () => void;
   onLanguage: () => void;
@@ -186,15 +184,6 @@ export function TopBar(p: TopBarProps) {
               : tr("机器还没学过", "Not trained yet")}
         </span>
       </Tip>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="flex-none"
-        disabled={!p.canUndo}
-        onClick={p.onUndo}
-      >
-        {tr("撤销", "Undo")} <Kbd>Z</Kbd>
-      </Button>
       <LanguageButton onSwitch={p.onLanguage} />
       <Tip text={themeText}>
         <Button
