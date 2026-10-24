@@ -61,10 +61,12 @@ function MachineChecks({
             <span
               className={cn(
                 "w-3.5 flex-none font-semibold",
-                c.ok ? "text-success" : c.required ? "text-destructive" : "text-muted-foreground",
+                c.ok ? "text-success" : c.required ? "text-destructive" : "text-warning",
               )}
             >
-              {c.ok ? "✓" : c.required ? "✗" : "–"}
+              {/* A cross for every failed check; red when the tool cannot work without it, orange when only one
+                  feature needs it. */}
+              {c.ok ? "✓" : "✗"}
             </span>
             <span className="flex min-w-0 flex-col gap-1">
               {c.text}
