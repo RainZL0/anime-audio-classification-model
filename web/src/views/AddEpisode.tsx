@@ -8,6 +8,7 @@ import {
   type SubtitleStyles as Styles,
 } from "../api";
 import { cn } from "cn";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -70,6 +71,50 @@ function MachineProblems() {
         ))}
       </ul>
     </Section>
+  );
+}
+
+/* The command that adds an episode in a terminal, with a button that copies it. The parts in <> are to be
+   filled in, and look it. */
+function AddCommand({ workspace }: { workspace: string }) {
+  const [copied, setCopied] = useState(false);
+  const command = `uv run avoc add "${workspace}" <video> --subs <subtitles>`;
+  const box = useRef<HTMLPreElement>(null);
+  /* Browsers allow the clipboard only on a secure page, which a server opened from another machine over plain
+     http is not; there the command is selected instead, ready for Ctrl+C. */
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      if (box.current) getSelection()?.selectAllChildren(box.current);
+    }
+  };
+  const label = copied ? tr("已复制", "Copied") : tr("复制", "Copy");
+  return (
+    <div className="relative mt-1">
+      <pre
+        ref={box}
+        className="rounded-lg bg-muted py-2 pr-10 pl-2.5 font-mono text-xs break-all whitespace-pre-wrap text-foreground"
+      >
+        uv run avoc add "{workspace}" <span className="text-muted-foreground">{"<video>"}</span>
+        {" --subs "}
+        <span className="text-muted-foreground">{"<subtitles>"}</span>
+      </pre>
+      <Tip text={label}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-1 right-1"
+          aria-label={label}
+          onClick={copy}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </Button>
+      </Tip>
+    </div>
   );
 }
 
@@ -685,13 +730,7 @@ export function AddEpisode({
         </div>
         <Note>
           {tr("也可以在命令行里加：", "You can also add one in a terminal:")}
-          {/* The parts in <> are to be filled in, and look it. */}
-          <pre className="mt-1 rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap text-foreground">
-            uv run avoc add "{state.workspace}"{" "}
-            <span className="text-muted-foreground">{"<video>"}</span>
-            {" --subs "}
-            <span className="text-muted-foreground">{"<subtitles>"}</span>
-          </pre>
+          <AddCommand workspace={state.workspace} />
         </Note>
       </form>
     </div>
