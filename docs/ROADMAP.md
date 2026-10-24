@@ -20,6 +20,8 @@ The first version is done, with four views: Groups, Scenes, Characters and Expor
 
 Planned:
 
+- **Switch what the voices are for midway.** It is chosen once, before the first episode ([USAGE.md](USAGE.md#labeling-and-correction-interface)). Going from reading text aloud to sound only loses nothing, since Export can already write sound only. The other way needs every episode cut from subtitles in the spoken language; episodes cut from a translation would have to be added again.
+
 - **Show which lines are low quality.** Train another classifier, inside the clips of a target character, that separates "clean" from "low quality" (heavy background sound, several people speaking at once). It would hint that the person should choose "low quality". It only answers whether a clip can go into a clean dataset, not who is speaking. So low-quality clips count as negatives here, but they still do not count as negatives in the classifier that identifies people. As the number of lines grows, choosing this by hand is a large share of the labeling work, which is why it is worth doing. Its accuracy has been measured on Teio's labels, and it is good enough to build. The voiceprints separate clean clips from noisy ones only partly. A general speech model does clearly better, so the hint uses it ([DECISIONS.md](DECISIONS.md#settled)).
 
 ## Platforms

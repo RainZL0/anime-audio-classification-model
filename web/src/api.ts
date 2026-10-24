@@ -123,6 +123,8 @@ export interface Summary {
   can_undo: boolean;
   /* The program was updated after this server started. Missing when the server is older than this page. */
   outdated?: boolean;
+  /* What the voices are for, chosen once at the start; null until then (see purpose.ts). */
+  purpose: "tts" | "audio" | null;
 }
 
 /* The answer to a label change, an undo or a character change. */

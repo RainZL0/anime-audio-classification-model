@@ -1,12 +1,13 @@
 /* What the voices are collected for. Reading text aloud (GPT-SoVITS) needs the words
    actually said, in the language spoken; voice conversion (RVC) needs only the sound. With "audio", the page leaves
-   out everything about that text: "No text to export" and its reasons. The choice is kept on
-   this machine, like the page language; the caller re-renders the page after a change. Sound only is the default,
-   as it asks the least of the person. */
+   out everything about that text: "No text to export" and its reasons. It is chosen once, in the add form before
+   the first episode, and kept in the workspace (`purpose` in the state); switching midway is not supported yet.
+   Until it is chosen, the add form's pick is kept here, starting at reading text aloud, the choice that keeps both
+   ways open. The caller re-renders the page after a change. */
 
 export type Purpose = "tts" | "audio";
 
-let purpose: Purpose = localStorage.getItem("purpose") === "tts" ? "tts" : "audio";
+let purpose: Purpose = "tts";
 
 export const currentPurpose = (): Purpose => purpose;
 
@@ -15,5 +16,4 @@ export const needsText = () => purpose === "tts";
 
 export function setPurpose(next: Purpose) {
   purpose = next;
-  localStorage.setItem("purpose", next);
 }

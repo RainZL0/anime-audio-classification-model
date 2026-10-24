@@ -26,9 +26,12 @@ from avoc.app.model import AUTO_CONFIDENCE, MIN_GUESS_LABELS, Guess, train_and_p
 from avoc.app.video import VIDEO_PAD, cut_video
 from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL, Clip, load_workspace
 from avoc.language import LANGUAGE, Words, say
+from avoc.project import read_json, write_json
 from avoc.stages.captions import marked_note
 
 STATIC = Path(__file__).parent / "static"
+PURPOSES = ("tts", "audio")
+"""What the voices can be collected for; see `AppState.purpose`."""
 GROUP_THRESHOLD = 0.70
 """The Groups view uses anime-va's threshold. See docs/DECISIONS.md."""
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]+")
@@ -297,7 +300,35 @@ class AppState:
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
             "can_undo": self.store.can_undo(),
             "outdated": _code_stamp() > self.code_stamp,
+            "purpose": self.purpose(),
         }
+
+    # What the voices are for
+
+    @property
+    def _purpose_file(self) -> Path:
+        return self.workspace.labels_dir / "purpose.json"
+
+    def purpose(self) -> str | None:
+        """What the voices are collected for: "tts" (reading text aloud, so each line's text is
+        needed too) or "audio" (sound only). Chosen once, at the start; None until then."""
+        path = self._purpose_file
+        return read_json(path)["purpose"] if path.exists() else None
+
+    def set_purpose(self, purpose: str) -> None:
+        """Record the choice. It is made once: switching midway is not supported yet."""
+        if purpose not in PURPOSES:
+            raise ValueError(say(f"不认识的用途：{purpose}", f"unknown purpose: {purpose}"))
+        chosen = self.purpose()
+        if chosen is not None and chosen != purpose:
+            raise ValueError(
+                say(
+                    "收集声音做什么用，开始时已经选定，中途换还不支持",
+                    "what the voices are for was chosen at the start; switching midway is not "
+                    "supported yet",
+                )
+            )
+        write_json(self._purpose_file, {"purpose": purpose})
 
     def _blocked(self) -> Counter[str]:
         """Per episode, how many clips of target characters cannot be exported with text."""
@@ -724,6 +755,10 @@ class PickBody(BaseModel):
     """What the box holds now; the window opens in its folder."""
 
 
+class PurposeBody(BaseModel):
+    purpose: str
+
+
 class SpokenBody(BaseModel):
     episode: str
     language: str
@@ -902,6 +937,15 @@ def create_app(state: AppState) -> Any:
         try:
             with state.lock:
                 return state.export(body.roles, body.include_auto, body.form, Path(body.out))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/purpose")
+    def post_purpose(body: PurposeBody) -> dict[str, Any]:
+        try:
+            with state.lock:
+                state.set_purpose(body.purpose)
+                return state.summary()
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 

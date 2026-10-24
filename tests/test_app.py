@@ -387,6 +387,20 @@ def test_api_says_which_targets_wait_for_more_lines(
     assert after[2]["guess"][0]["name"] == "A"
 
 
+def test_what_the_voices_are_for_is_chosen_once(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    client = TestClient(create_app(AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")))
+    assert client.get("/api/state").json()["purpose"] is None
+    assert client.post("/api/purpose", json={"purpose": "tts"}).json()["purpose"] == "tts"
+    assert client.post("/api/purpose", json={"purpose": "tts"}).status_code == 200
+    switched = client.post("/api/purpose", json={"purpose": "audio"})
+    assert switched.status_code == 400 and "中途" in switched.json()["detail"]
+    assert client.post("/api/purpose", json={"purpose": "rvc"}).status_code == 400
+    # Kept in the workspace, so another browser or a restart sees the same choice.
+    reopened = TestClient(create_app(AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")))
+    assert reopened.get("/api/state").json()["purpose"] == "tts"
+
+
 def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")

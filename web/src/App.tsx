@@ -130,12 +130,15 @@ export function App() {
   const [stageWidth, setStageWidth] = useState(savedStageWidth);
   /* Only here to re-render everything when the language changes; the strings read the module's language. */
   const [language, setLanguageState] = useState(currentLanguage());
-  /* Also only here to re-render: the views read the module's purpose (see purpose.ts). */
+  /* Also only here to re-render: the views read the module's purpose (see purpose.ts). Only the add form changes it,
+     before the workspace has one. */
   const [, setPurposeState] = useState(currentPurpose());
   const choosePurpose = (next: Purpose) => {
     setPurpose(next);
     setPurposeState(next);
   };
+  /* The workspace's choice, once made, is what every view goes by. Set before the views below read it. */
+  if (state?.purpose && state.purpose !== currentPurpose()) setPurpose(state.purpose);
   const dockOrder = useRef<string[]>([]);
   const playerRef = useRef<HTMLMediaElement | null>(null);
   const refAudio = useRef<HTMLAudioElement>(null);
@@ -1144,14 +1147,7 @@ export function App() {
               onGo={setView}
             />
           )}
-          {view === "export" && (
-            <ExportView
-              state={state}
-              setState={setState}
-              toast={showToast}
-              onPurpose={choosePurpose}
-            />
-          )}
+          {view === "export" && <ExportView state={state} setState={setState} toast={showToast} />}
         </main>
       </div>
 

@@ -13,7 +13,7 @@ import { Section } from "../components/Section";
 import { Tip } from "../components/Tip";
 import { pct } from "../format";
 import { languageName, lines, many, SPOKEN, tr } from "../language";
-import { needsText, type Purpose } from "../purpose";
+import { needsText } from "../purpose";
 import type { Toast } from "../toast";
 
 /* ───────────── Export ───────────── */
@@ -112,12 +112,10 @@ export function ExportView({
   state,
   setState,
   toast,
-  onPurpose,
 }: {
   state: Summary;
   setState: (s: Summary) => void;
   toast: Toast;
-  onPurpose: (purpose: Purpose) => void;
 }) {
   const trainable = state.roles.filter((r) => r.confirmed > 0);
   /* The target characters start ticked: they are who the person is collecting. */
@@ -126,12 +124,10 @@ export function ExportView({
   );
   /* Only names still on the list: a character ticked here may have been renamed or merged since. */
   const picked = new Set(trainable.map((r) => r.name).filter((n) => ticked.has(n)));
-  const [form, setFormState] = useState<Form>(needsText() ? "gpt-sovits" : "folder");
-  /* The format also says what the voices are for, so the labeling views show or leave out the text parts. */
-  const setForm = (next: Form) => {
-    setFormState(next);
-    onPurpose(next === "folder" ? "audio" : "tts");
-  };
+  /* What the voices are for was chosen at the start and is only shown here. Voices collected with their text can
+     still be exported as sound only; voices collected as sound only have no text to export. */
+  const soundOnly = !needsText();
+  const [form, setForm] = useState<Form>(soundOnly ? "folder" : "gpt-sovits");
   const [includeAuto, setIncludeAuto] = useState(false);
   const [out, setOut] = useState(state.export_folder);
   /* The default folder now in the box. After an export it moves on to the next free one, unless the person typed
@@ -228,18 +224,32 @@ export function ExportView({
         </Note>
       </Section>
       <Section title={tr("格式", "Format")}>
-        <Choice value={form} options={forms} onPick={setForm} />
-        <Note>
-          {form === "folder"
-            ? tr(
-                "只要声音，不用文字。标注时也不再显示「导不出文字」之类的提示。这个选择会记住。",
-                'Sound only, no text. While labeling, notes such as "No text to export" are left out too. This choice is remembered.',
-              )
-            : tr(
-                "连同每句台词的原声语言文本一起导出。标注时会标出没有文本、导不出来的台词。这个选择会记住。",
-                "Exports each line with its text in the original language. While labeling, lines without that text, which cannot be exported, are marked. This choice is remembered.",
+        {soundOnly ? (
+          <>
+            <div className="text-sm font-medium">{forms[0][1]}</div>
+            <Note>
+              {tr(
+                "开始时选的用途是「只要声音」，没有收集台词文字，所以只能这样导出。中途换用途还不支持。",
+                'The purpose chosen at the start is "Sound only", so no text was collected and this is the only format. Switching midway is not supported yet.',
               )}
-        </Note>
+            </Note>
+          </>
+        ) : (
+          <>
+            <Choice value={form} options={forms} onPick={setForm} />
+            <Note>
+              {form === "folder"
+                ? tr(
+                    "只导出声音，不带文字，给 RVC 之类用。开始时选的用途「朗读文字」不变。",
+                    'Sound only, no text, for RVC and such. The purpose chosen at the start, "Read text aloud", stays as it is.',
+                  )
+                : tr(
+                    "连同每句台词的原声语言文本一起导出。没有文本的台词导不出来，标注时已经标出。",
+                    "Exports each line with its text in the original language. Lines without that text cannot be exported; they are marked while labeling.",
+                  )}
+            </Note>
+          </>
+        )}
       </Section>
       {form !== "folder" && (
         <Section title={tr("台词文字", "Text of each line")}>

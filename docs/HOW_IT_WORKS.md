@@ -129,6 +129,7 @@ The interface's labels are stored in the workspace folder `labels/`:
 
 - `events.jsonl` is append-only. Each line is one batch of changes, and it records each clip's value before and after the change. An undo is also a batch, and it records which batch it undoes. The cast table `cast.json` is stored separately. When a batch also creates, renames or merges characters, the batch's `cast` field records it, and an undo restores the cast table as well. A new character that has no clips left after an undo is deleted. Replaying all the lines gives the current labels.
 - `cast.json` is the cast table. It holds the name, whether a person gave the name (`named`), the color, the pattern number (`pattern`), the avatar file, and whether the character takes part in training. A character without a name is shown as "Character N". Giving it a name is a rename. Pattern numbers only grow and are never reused. When no avatar has been cropped, the default picture is drawn from the pattern number. Avatar images are stored in the `avatars/` folder next to it.
+- `purpose.json` records what the voices are for, `{"purpose": "tts"}` (reading text aloud) or `"audio"` (sound only). It is written once, when the add form starts the first episode, and never changed ([how](USAGE.md#labeling-and-correction-interface)).
 
 **Clip IDs are a hash of the episode name plus the start and end times. They do not depend on neighboring clips.** Re-cutting an episode makes its labels invalid.
 

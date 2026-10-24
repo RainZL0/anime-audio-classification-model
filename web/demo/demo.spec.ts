@@ -74,7 +74,8 @@ const press = async (
 };
 
 test("README demo", async ({ page, request }) => {
-  /* Start with no labels. */
+  /* Collected to read text aloud, and starting with no labels. */
+  await request.post("/api/purpose", { data: { purpose: "tts" } });
   while ((await (await request.get("/api/state")).json()).can_undo) await request.post("/api/undo");
   const clips: { id: string; start: number }[] = await (
     await request.get("/api/clips?episode=ep01")
@@ -108,7 +109,6 @@ test("README demo", async ({ page, request }) => {
   await page.addInitScript((lang) => {
     localStorage.setItem("lang", lang);
     localStorage.setItem("guide-seen", "1");
-    localStorage.setItem("purpose", "tts");
   }, LANG);
   await page.addInitScript(overlay);
   await page.goto("/#view=groups&ep=ep01");

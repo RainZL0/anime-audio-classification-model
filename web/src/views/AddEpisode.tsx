@@ -503,6 +503,11 @@ export interface AddEpisodeProps {
   allChecks?: boolean;
 }
 
+const purposeNames = () => ({
+  tts: tr("朗读文字（GPT-SoVITS 等）", "Read text aloud (GPT-SoVITS and such)"),
+  audio: tr("只要声音（RVC 等）", "Sound only (RVC and such)"),
+});
+
 /* The form for one episode, and the progress of the `avoc add` the server runs for it. `adding` is the server's job
    status, polled by App. */
 export function AddEpisode({
@@ -583,6 +588,9 @@ export function AddEpisode({
   const run = async (body: object) => {
     setBusy(true);
     try {
+      /* The first add also fixes what the voices are for. */
+      if (!state.purpose)
+        setState(await call<Summary>("/api/purpose", { purpose: text ? "tts" : "audio" }));
       setAdding(await call<Adding>("/api/add", body));
       /* The button is at the bottom and the progress at the top: bring the progress into view, or nothing seems to
          happen. */
@@ -775,15 +783,28 @@ export function AddEpisode({
       <MachineChecks list={checks} all={allChecks} onCheck={check} checking={checking} />
       <form className="flex flex-col gap-6" onSubmit={start}>
         <Section title={tr("收集声音做什么用", "What the voices are for")}>
-          <Choice<Purpose>
-            value={text ? "tts" : "audio"}
-            options={[
-              ["audio", tr("只要声音（RVC 等）", "Sound only (RVC and such)")],
-              ["tts", tr("朗读文字（GPT-SoVITS 等）", "Read text aloud (GPT-SoVITS and such)")],
-            ]}
-            onPick={onPurpose}
-          />
-          {text ? (
+          {/* Chosen once, before the first episode; after that only shown. */}
+          {state.purpose ? (
+            <>
+              <div className="text-sm font-medium">{purposeNames()[state.purpose]}</div>
+              <Note>
+                {tr(
+                  "开始时选定的，这个工作区的每一集都按它收集。中途换用途还不支持。",
+                  "Chosen at the start; every episode in this workspace is collected this way. Switching midway is not supported yet.",
+                )}
+              </Note>
+            </>
+          ) : (
+            <Choice<Purpose>
+              value={text ? "tts" : "audio"}
+              options={[
+                ["tts", purposeNames().tts],
+                ["audio", purposeNames().audio],
+              ]}
+              onPick={onPurpose}
+            />
+          )}
+          {state.purpose ? null : text ? (
             <Note>
               {tr(
                 "要让角色的声音朗读文字，还得采集角色每句台词的文本，所以主字幕要用原声语言（一般是日语）。这样收集的声音也能只导出声音给 RVC 用。",
@@ -887,8 +908,8 @@ export function AddEpisode({
           {wrongLanguage && found?.languages && (
             <Note warn>
               {tr(
-                `朗读文字要用角色说的语言做主字幕：这份是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。换一份${languageName(heard)}字幕填在这里；这份可以填到下面的「辅助字幕」，标注时给你看。只要声音的话，在最上面选「只要声音」。`,
-                `Reading text aloud needs main subtitles in the language spoken: these are in ${languageNames(found.languages)}, and this episode speaks ${languageName(heard)}. Put ${languageName(heard)} subtitles here; these can go under "Secondary subtitles" below, to be shown while labeling. If you only want the sound, choose "Sound only" at the top.`,
+                `朗读文字要用角色说的语言做主字幕：这份是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。换一份${languageName(heard)}字幕填在这里；这份可以填到下面的「辅助字幕」，标注时给你看。${state.purpose ? "" : "只要声音的话，在最上面选「只要声音」。"}`,
+                `Reading text aloud needs main subtitles in the language spoken: these are in ${languageNames(found.languages)}, and this episode speaks ${languageName(heard)}. Put ${languageName(heard)} subtitles here; these can go under "Secondary subtitles" below, to be shown while labeling.${state.purpose ? "" : ' If you only want the sound, choose "Sound only" at the top.'}`,
               )}
             </Note>
           )}
