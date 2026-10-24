@@ -33,7 +33,7 @@ export type View = "groups" | "scene" | "roles" | "export";
 
 /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
 const EPISODE_VIEWS = (): [View, string, string][] => [
-  ["groups", tr("自动分组", "Groups"), "G"],
+  ["groups", tr("分组", "Groups"), "G"],
   ["scene", tr("场景", "Scenes"), "S"],
 ];
 const ALL_VIEWS = (): [View, string, string][] => [
@@ -54,6 +54,9 @@ interface TopBarProps {
   setView: (v: View) => void;
   /* Lines left to check in this episode, shown on the Scenes tab. */
   work: number;
+  /* Lines the machine gave the target characters that no one has checked, in all episodes, shown on the
+     Characters tab. */
+  toCheck: number;
   /* The episode being added, while its dialog is closed. */
   adding: string | null;
   onShowAdding: () => void;
@@ -87,6 +90,15 @@ export function TopBar(p: TopBarProps) {
           `. ${lines(p.work)} in ${p.episode} still to do: the machine isn't sure, too little voice to tell, or no guess yet. "Only to do" lists them`,
         )
       : "";
+  const checkHint =
+    p.toCheck > 0
+      ? tr(
+          `。机器把 ${p.toCheck} 句归给了目标角色，还没人核对（全部集数）`,
+          `. ${lines(p.toCheck)} the machine gave the target characters, not checked yet (all episodes)`,
+        )
+      : "";
+  /* The orange count on a tab: what is still to do there. Groups has none, as its lines are the Scenes count. */
+  const countOf = (v: View) => (v === "scene" ? p.work : v === "roles" ? p.toCheck : 0);
   const tabs = (list: [View, string, string][]) =>
     list.map(([v, label, key]) => (
       <Tip
@@ -94,7 +106,7 @@ export function TopBar(p: TopBarProps) {
         text={withKeys(
           (v === "groups" ? groupsHint() : "") +
             tr(`快捷键 [${key}]`, `Shortcut [${key}]`) +
-            (v === "scene" ? workHint : ""),
+            (v === "scene" ? workHint : v === "roles" ? checkHint : ""),
         )}
       >
         <button
@@ -107,9 +119,7 @@ export function TopBar(p: TopBarProps) {
           )}
         >
           {label}
-          {v === "scene" && p.work > 0 && (
-            <span className={cn("ml-1.5", TODO_COUNT)}>{p.work}</span>
-          )}
+          {countOf(v) > 0 && <span className={cn("ml-1.5", TODO_COUNT)}>{countOf(v)}</span>}
         </button>
       </Tip>
     ));
@@ -129,7 +139,7 @@ export function TopBar(p: TopBarProps) {
               perEpisode
                 ? undefined
                 : tr(
-                    "「角色」和「导出」看的是全部集数，换集只影响「自动分组」和「场景」",
+                    "「角色」和「导出」看的是全部集数，换集只影响「分组」和「场景」",
                     "Characters and Export cover all episodes; switching only changes Groups and Scenes",
                   )
             }

@@ -1023,6 +1023,7 @@ export function App() {
     <div className="flex h-screen flex-col">
       <TopBar
         episodes={state.episodes.map((e) => e.name)}
+        toCheck={state.roles.filter((r) => r.target).reduce((n, r) => n + r.predicted, 0)}
         todo={Object.fromEntries(state.episodes.map((e) => [e.name, workOf(e.counts)]))}
         episode={episode}
         setEpisode={setEpisode}
