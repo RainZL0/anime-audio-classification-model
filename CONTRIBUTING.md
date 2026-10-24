@@ -52,6 +52,10 @@ If two branches both changed the built files, git shows a conflict there. Take e
 
 No pictures, GIFs or videos are committed, so `git clone` stays small. Upload them as attachments to a comment on the GitHub issue for media, and link to their addresses from the Markdown.
 
+## README
+
+The README comes in English (`README.md`) and Simplified Chinese (`README.zh.md`). When you change one, change the other in the same commit. The other docs are in English only.
+
 ## Text in the web app
 
 Both languages are written side by side as `tr(Chinese, English)` where the text is used. Use the terms in the [glossary](docs/HOW_IT_WORKS.md#glossary), and follow the design rules in [docs/UI_DESIGN.md](docs/UI_DESIGN.md).
