@@ -13,7 +13,7 @@ import { Avatar } from "./Avatar";
 import { LowButton } from "./Chip";
 import { Choice } from "./Choice";
 import { Note } from "./Notes";
-import { Tag } from "./Pills";
+import { NoText, Tag } from "./Pills";
 import { RoleName } from "./RoleName";
 import { Tip } from "./Tip";
 
@@ -29,15 +29,15 @@ const ASK = "mt-[18px] mb-2 text-xs tracking-[0.3px] text-muted-foreground";
 const STRANGER = "mb-2 rounded-lg px-2.5 py-[7px] text-xs leading-[1.7]";
 
 /* The text that export writes for this line, in the language spoken, when it differs from the subtitles shown
-   above. For a target character's line that cannot be exported with text, the reason, unless only the sound is
-   collected (see purpose.ts). */
+   above. For a target character's line that cannot be exported with text, the same short pill as in the lists
+   (the reason is in its hint) and whatever spoken text was found, unless only the sound is collected (see
+   purpose.ts). */
 function SpokenLine({ clip }: { clip: Clip }) {
   if (needsText() && clip.role && clip.spoken_problem)
     return (
-      <div className="mx-0.5 mb-1 text-xs leading-normal text-warning">
-        {tr("导出时没有文字：", "No text on export: ")}
-        {clip.spoken_problem}
-        {clip.spoken && <span className="ml-1.5 text-muted-foreground">{clip.spoken}</span>}
+      <div className="mx-0.5 mb-1 flex flex-wrap items-center gap-1.5 text-[13px] text-muted-foreground">
+        <NoText problem={clip.spoken_problem} />
+        {clip.spoken}
       </div>
     );
   if (!clip.spoken || clip.spoken === clip.text) return null;

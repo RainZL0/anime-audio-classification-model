@@ -75,6 +75,21 @@ export function Closest({
   );
 }
 
+/* A target character's line that will be exported without text. The pill stays short; the reason is in its hint. */
+export function NoText({ problem }: { problem: string }) {
+  return (
+    <Tag
+      look="noText"
+      tip={tr(
+        `导出时没有文字，需要文字的导出会跳过这句。原因：${problem}`,
+        `Exported without text, so exports that need text leave it out. Why: ${problem}`,
+      )}
+    >
+      {tr("导不出文字", "No text to export")}
+    </Tag>
+  );
+}
+
 export function Pill({ clip }: { clip: Clip }) {
   if (clip.status === "review" && clip.familiar === false) {
     return (

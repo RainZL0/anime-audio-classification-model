@@ -6,7 +6,7 @@ import { pct, stamp } from "../format";
 import { tr } from "../language";
 import { needsText } from "../purpose";
 import { Avatar } from "./Avatar";
-import { Closest, Pill, Tag } from "./Pills";
+import { Closest, NoText, Pill, Tag } from "./Pills";
 import { RoleName } from "./RoleName";
 
 interface RowProps {
@@ -89,9 +89,7 @@ export function Row({
             </Tag>
           )}
           {needsText() && clip.role && clip.spoken_problem && !clip.unusable && (
-            <Tag look="noText" tip={clip.spoken_problem}>
-              {tr("导不出文字", "No text to export")}
-            </Tag>
+            <NoText problem={clip.spoken_problem} />
           )}
           {clip.maybe && (
             <Tag
