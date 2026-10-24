@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,8 @@ from typing import Any
 import soundfile as sf
 
 SEPARATION_MODEL = "mel_band_roformer_kim_ft2_bleedless_unwa.ckpt"
+MODELS_DIR = Path("models")
+"""Where the voice separation model is kept: `models` in the folder avoc was started in."""
 DIARIZATION_MODEL = "pyannote/speaker-diarization-community-1"
 PRECISIONS = {"fp32": "float32", "fp16": "float16", "bf16": "bfloat16"}
 ANALYSIS_SAMPLE_RATE = 16000
@@ -101,6 +104,62 @@ def extract_audio(video: Path, dst: Path, track: int = 0) -> None:
     FLAC. The sample rate and channels are not changed."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     _ffmpeg(["-i", str(video), "-vn", "-map", f"0:a:{track}", "-c:a", "flac", str(dst)])
+
+
+def download_separation_model(
+    report: Callable[[str], None], models_dir: Path = MODELS_DIR, model: str = SEPARATION_MODEL
+) -> None:
+    """Download the voice separation model the first time, saying how big it is, with a progress
+    bar on stderr (the add page shows it). audio-separator would download it by itself inside
+    `separate_vocals`, but silently, and straight into the final file, so a download cut off
+    halfway left a broken model behind. Here each file goes to a .part file first and is renamed
+    when complete. Which files to fetch, and from where, is still audio-separator's choice."""
+    if (models_dir / model).is_file():
+        return
+    import requests
+    from audio_separator.separator import Separator
+    from tqdm import tqdm
+
+    from avoc.language import say
+
+    class Reporting(Separator):
+        def download_file_if_not_exists(self, url: str, output_path: str) -> None:
+            target = Path(output_path)
+            if target.is_file():
+                return
+            response = requests.get(url, stream=True, timeout=300)
+            if response.status_code != 200:
+                # audio-separator tries the next place on this error.
+                raise RuntimeError(f"Failed to download {url}: {response.status_code}")
+            size = int(response.headers.get("content-length", 0))
+            if size >= 2**20:
+                where = target.parent.resolve()
+                report(
+                    say(
+                        f"第一次用：下载人声分离模型 {target.name}（{size / 2**20:.0f} MB），"
+                        f"存到 {where}，以后不用再下",
+                        f"First time: downloading the voice separation model {target.name} "
+                        f"({size / 2**20:.0f} MB) to {where}; it is only downloaded once",
+                    )
+                )
+            part = target.with_name(target.name + ".part")
+            with (
+                part.open("wb") as file,
+                tqdm(
+                    total=size,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    disable=size < 2**20,
+                ) as bar,
+            ):
+                for chunk in response.iter_content(chunk_size=1 << 16):
+                    file.write(chunk)
+                    bar.update(len(chunk))
+            part.replace(target)
+
+    models_dir.mkdir(parents=True, exist_ok=True)
+    Reporting(log_level=logging.WARNING, model_file_dir=str(models_dir)).download_model_files(model)
 
 
 def separate_vocals(

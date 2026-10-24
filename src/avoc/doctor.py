@@ -120,7 +120,7 @@ def checks(where: Path) -> list[Check]:
     """`where` is the folder whose disk is checked for free space."""
     import torch
 
-    from avoc.audio import SEPARATION_MODEL
+    from avoc.audio import MODELS_DIR, SEPARATION_MODEL
     from avoc.pipeline import TOKEN_HOWTO, has_hf_token
 
     cuda = torch.cuda.is_available()
@@ -156,6 +156,7 @@ def checks(where: Path) -> list[Check]:
     ]
     # One line for both: ffprobe always comes with ffmpeg.
     missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    ffmpeg_folder = Path(shutil.which("ffmpeg") or "").parent
     found.append(
         Check(
             not missing,
@@ -164,7 +165,7 @@ def checks(where: Path) -> list[Check]:
                 f"FFmpeg: {' and '.join(missing)} not found",
             )
             if missing
-            else f"FFmpeg: {Path(shutil.which('ffmpeg') or '').parent}",
+            else say(f"FFmpeg：{ffmpeg_folder}", f"FFmpeg: {ffmpeg_folder}"),
             ffmpeg_howto(),
             # The page shows the Windows steps, with the one-click button, in its own box; on other
             # systems the plain text above is enough.
@@ -172,7 +173,7 @@ def checks(where: Path) -> list[Check]:
             can_install=sys.platform == "win32",
         )
     )
-    model = Path("models") / SEPARATION_MODEL
+    model = MODELS_DIR / SEPARATION_MODEL
     found.append(
         Check(
             True,

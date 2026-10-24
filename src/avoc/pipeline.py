@@ -159,6 +159,7 @@ def prepare(
     give the value measured for the previous episode.
     """
     from avoc.audio import (
+        MODELS_DIR,
         audio_info,
         audio_tracks,
         can_read,
@@ -249,7 +250,7 @@ def prepare(
         # Half precision is only faster on the GPU, so use full precision on the CPU.
         precision = "fp16" if device == "cuda" else "fp32"
         vocals = separate_vocals(
-            audio, out / "separated", Path("models"), source.sample_rate, precision=precision
+            audio, out / "separated", MODELS_DIR, source.sample_rate, precision=precision
         )
     analysis = out / "analysis_16k.wav"
     make_analysis_copy(vocals, analysis)
@@ -717,6 +718,9 @@ def add_episode(
             report(styles_note(subtitles, styles))
             if found := marked_dialogue(subtitles, styles):
                 report(marked_note(found))
+        from avoc.audio import download_separation_model
+
+        download_separation_model(report)
         report(
             say(
                 "提取音轨、分离人声、按字幕切片段（这一步最慢）",
