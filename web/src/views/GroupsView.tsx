@@ -251,6 +251,7 @@ export function GroupsView({
                       >
                         {/* The tick box only selects; the rest of the row plays the line. */}
                         <Checkbox
+                          aria-label={c.text}
                           checked={ticked.has(c.id)}
                           onClick={(e) => tick(c, e)}
                           onMouseDown={(e) => e.preventDefault()}

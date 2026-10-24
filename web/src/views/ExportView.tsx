@@ -114,7 +114,7 @@ function SpokenTexts({
                 </>
               ) : s.source === "cut" ? (
                 <span className="text-muted-foreground tabular-nums">
-                  {tr("切片段用的字幕就是", "the cutting subtitles are")}
+                  {tr("文字取自切片段用的字幕", "text from the subtitles the clips were cut from")}
                 </span>
               ) : (
                 <span className="text-warning">{s.problem}</span>
@@ -127,28 +127,35 @@ function SpokenTexts({
               )}
               {t?.marked && <Note warn>{t.marked}</Note>}
             </span>
-            <PathInput
-              className="@max-5xl:col-span-2 @max-5xl:col-start-2"
-              kind="subtitles"
-              placeholder={
-                t
-                  ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file")
-                  : tr(
-                      `${languageName(s.language)}字幕的路径（ASS 或 SRT）`,
-                      `Path to ${languageName(s.language)} subtitles (ASS or SRT)`,
-                    )
-              }
-              value={paths[e.name] || ""}
-              onChange={(path) => setPaths((p) => ({ ...p, [e.name]: path }))}
-              toast={toast}
-            />
-            <Button
-              variant="outline"
-              disabled={busy !== null || !(paths[e.name] || "").trim()}
-              onClick={() => attach(e.name)}
-            >
-              {busy === e.name ? tr("正在对…", "Aligning…") : tr("对齐并配上", "Align and attach")}
-            </Button>
+            {/* Cut from subtitles in the spoken language, each clip already has its own line: nothing to attach. */}
+            {s.source !== "cut" && (
+              <>
+                <PathInput
+                  className="@max-5xl:col-span-2 @max-5xl:col-start-2"
+                  kind="subtitles"
+                  placeholder={
+                    t
+                      ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file")
+                      : tr(
+                          `${languageName(s.language)}字幕的路径（ASS 或 SRT）`,
+                          `Path to ${languageName(s.language)} subtitles (ASS or SRT)`,
+                        )
+                  }
+                  value={paths[e.name] || ""}
+                  onChange={(path) => setPaths((p) => ({ ...p, [e.name]: path }))}
+                  toast={toast}
+                />
+                <Button
+                  variant="outline"
+                  disabled={busy !== null || !(paths[e.name] || "").trim()}
+                  onClick={() => attach(e.name)}
+                >
+                  {busy === e.name
+                    ? tr("正在对…", "Aligning…")
+                    : tr("对齐并配上", "Align and attach")}
+                </Button>
+              </>
+            )}
           </div>
         );
       })}

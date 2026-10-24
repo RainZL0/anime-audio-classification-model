@@ -20,6 +20,7 @@ import { Divider } from "./components/Divider";
 import { Dock } from "./components/Dock";
 import { Guide, GUIDE_SEEN } from "./components/Guide";
 import { Help } from "./components/Help";
+import { RenameDialog } from "./components/RenameDialog";
 import { LanguageButton } from "./components/LanguageButton";
 import { withKeys } from "./components/Keys";
 import { Empty } from "./components/Notes";
@@ -122,6 +123,8 @@ export function App() {
   const [flashes, setFlashes] = useState(() => new Set<string>());
   const [playing, setPlaying] = useState(false);
   const [crop, setCrop] = useState<Crop | null>(null);
+  /* The Name / Rename or merge dialog for the open character is showing. */
+  const [renaming, setRenaming] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
   const [stageWidth, setStageWidth] = useState(savedStageWidth);
   /* Only here to re-render everything when the language changes; the strings read the module's language. */
@@ -662,38 +665,23 @@ export function App() {
       reload();
     }
   };
-  const renameRole = async () => {
-    if (!role) return;
-    const unnamed = roles[role]?.named === false;
-    const next = unnamed
-      ? prompt(
-          tr(
-            `给「${role}」起个名字。填一个已有的名字就是把两个角色合并。`,
-            `Name "${role}". Typing an existing name merges the two characters.`,
-          ),
-          "",
-        )
-      : prompt(
-          tr(
-            `把「${role}」改成什么名字？填一个已有的名字就是把两个角色合并。`,
-            `Rename "${role}" to what? Typing an existing name merges the two characters.`,
-          ),
-          role,
-        );
-    if (!next || next.trim() === role) return;
+  const renameRole = async (typed: string) => {
+    setRenaming(false);
+    const next = typed.trim();
+    if (!role || !next || next === role) return;
     /* A rename keeps the number key: the new name takes the old name's place. On a merge the old name leaves the bar. */
-    const renamed = !roles[next.trim()];
+    const renamed = !roles[next];
     if (renamed)
-      dockOrder.current = dockOrder.current.flatMap((n) => (n === role ? [n, next.trim()] : [n]));
+      dockOrder.current = dockOrder.current.flatMap((n) => (n === role ? [n, next] : [n]));
     const result = await send(
       "/api/roles",
-      { name: role, new_name: next.trim() },
-      roles[next.trim()]
-        ? tr(`已并进 ${next.trim()}`, `Merged into ${next.trim()}`)
-        : tr(`已改名为 ${next.trim()}`, `Renamed to ${next.trim()}`),
+      { name: role, new_name: next },
+      renamed
+        ? tr(`已改名为 ${next}`, `Renamed to ${next}`)
+        : tr(`已并进 ${next}`, `Merged into ${next}`),
     );
     if (result) {
-      setRole(next.trim());
+      setRole(next);
     }
   };
   const toggleTarget = async () => {
@@ -871,7 +859,7 @@ export function App() {
   /* All shortcuts */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (crop) return;
+      if (crop || renaming) return;
       if (help || addOpen || guide) {
         if (e.key === "Escape") {
           setHelp(false);
@@ -969,8 +957,15 @@ export function App() {
   };
 
   undoNow.current = undo;
+  /* Messages show above everything. At the bottom they would cover a dialog's buttons, so while one is open they
+     move to the top of the window. */
+  const dialog = !!crop || renaming || help || guide || addOpen;
   const toaster = (
-    <Toaster theme={theme === "dark" ? "dark" : "light"} position="bottom-center" offset={70} />
+    <Toaster
+      theme={theme === "dark" ? "dark" : "light"}
+      position={dialog ? "top-center" : "bottom-center"}
+      offset={dialog ? 12 : 70}
+    />
   );
   /* The language button on pages without the top bar (empty workspace, can't connect). */
   const corner = (
@@ -1117,7 +1112,7 @@ export function App() {
               focus={focus}
               setFocus={pick}
               onConfirmRest={confirmRest}
-              onRename={renameRole}
+              onRename={() => setRenaming(true)}
               onToggleTarget={toggleTarget}
               flashes={flashes}
               onAvatar={() => openCrop(role)}
@@ -1178,6 +1173,15 @@ export function App() {
           taken={nameTaken}
           onSave={saveCrop}
           onClose={crop.naming ? cancelNew : closeCrop}
+        />
+      )}
+      {renaming && role && roles[role] && (
+        <RenameDialog
+          name={role}
+          unnamed={roles[role].named === false}
+          others={Object.keys(roles).filter((n) => n !== role && n !== OTHER)}
+          onSave={renameRole}
+          onClose={() => setRenaming(false)}
         />
       )}
       {help && (

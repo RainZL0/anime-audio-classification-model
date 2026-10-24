@@ -42,8 +42,7 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 ## Typing
 
 - **No text box unless typing is the only way.** People pick characters by avatar, chip or key, not by typing names; there is no search box for characters.
-- The one place to type a character's name is the "New character" dialog, and there it can be left blank. Renaming and merging are in the Characters view.
-- **Every box for a file or folder path has a "Browse…" button right after it.** It opens the system's own file window in the nearest folder of the path already in the box that exists (so an export folder not made yet opens in the workspace), or else in the folder `avoc app` was started from. A default path is written in full, so the person sees where it goes. Pasting a path into the box still works. Files cannot be dragged in ([why](DECISIONS.md#settled)).
+- A character's name is typed in only two places, both the app's own dialogs, never the browser's: "New character", where it can be left blank, and "Name" / "Rename or merge" in the Characters view, which says before saving when the name typed merges two characters.- **Every box for a file or folder path has a "Browse…" button right after it.** It opens the system's own file window in the nearest folder of the path already in the box that exists (so an export folder not made yet opens in the workspace), or else in the folder `avoc app` was started from. A default path is written in full, so the person sees where it goes. Pasting a path into the box still works. Files cannot be dragged in ([why](DECISIONS.md#settled)).
 
 ## Layout
 
@@ -55,3 +54,4 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 - Choices of the same kind sit together in one row.
 - A button that cannot be used yet is shown grayed out, not hidden, so nothing jumps when it becomes usable. For example, the chips under a group stay gray until a line is ticked.
 - A count is shown once, next to what it counts, not repeated on every button.
+- Short messages show at the bottom, above the bottom bar; **while a dialog is open they show at the top of the window**, so they never cover its buttons.

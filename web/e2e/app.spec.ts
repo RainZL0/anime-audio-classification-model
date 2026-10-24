@@ -57,6 +57,26 @@ test("Q labels the line Other, and Z undoes it", async ({ page }) => {
   await expect(confirmed).toHaveCount(0);
 });
 
+test("a new character is named in the app's own dialog, not the browser's", async ({ page }) => {
+  await open(page);
+  page.on("dialog", (d) => {
+    throw new Error(`the browser's own ${d.type()} box opened`);
+  });
+  await page.keyboard.press("n");
+  await page.getByRole("dialog").getByRole("button", { name: /Save/ }).click();
+  await page.keyboard.press("o");
+  await page.getByRole("button", { name: "Name", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText('Name "Character 1"')).toBeVisible();
+  await dialog.getByRole("textbox").fill("Alice");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/role=Alice/);
+  await page.keyboard.press("z");
+  await expect(page).toHaveURL(/role=Character(%20|\+)1/);
+  await page.keyboard.press("z");
+  await expect(page.getByRole("button", { name: "Name", exact: true })).toHaveCount(0);
+});
+
 test("the episode menu switches episodes", async ({ page }) => {
   await open(page);
   await page.getByRole("button", { name: "ep01" }).click();
