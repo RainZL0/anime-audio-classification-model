@@ -897,8 +897,8 @@ export function AddEpisode({
           />
           <Note>
             {tr(
-              "辅助字幕是另一份你看得懂的字幕，一般是译文。标注时它显示在每句台词上面，帮你听懂角色在说什么。它只给你看：不影响怎么切台词、机器认人，也不会被导出。",
-              "Secondary subtitles are another subtitle file you can read, usually a translation. While labeling they are shown above each line, so you know what is being said. They are only for you: they change nothing in how lines are cut or who the machine thinks is speaking, and they are not exported.",
+              "辅助字幕是另一份你看得懂的字幕，一般是译文。标注时它用浅色小字显示在每句台词下面，帮你听懂角色在说什么。它只给你看：不影响怎么切台词、机器认人，也不会被导出。",
+              "Secondary subtitles are another subtitle file you can read, usually a translation. While labeling they are shown in small gray type under each line, so you know what is being said. They are only for you: they change nothing in how lines are cut or who the machine thinks is speaking, and they are not exported.",
             )}
           </Note>
           <DisplayNote path={displaySubtitles} />

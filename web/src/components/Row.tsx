@@ -128,8 +128,13 @@ export function Row({
         <div className={cn("mt-px text-[15px]", !clip.text && "text-muted-foreground italic")}>
           {clip.text || tr("（没有字幕文字）", "(no subtitle text)")}
         </div>
-        {/* The text written on export, in the language spoken, when it differs from the subtitles. */}
-        {clip.spoken && clip.spoken !== clip.text && (
+        {/* The secondary subtitle line, such as a translation. */}
+        {clip.display && clip.display !== clip.text && (
+          <div className="mt-px text-[13px] text-muted-foreground">{clip.display}</div>
+        )}
+        {/* The text written on export, in the language spoken, when it differs from the main subtitles. Only when
+            the text is exported at all (see purpose.ts). */}
+        {needsText() && clip.spoken && clip.spoken !== clip.text && (
           <div className="mt-px text-[13px] text-muted-foreground">{clip.spoken}</div>
         )}
       </div>

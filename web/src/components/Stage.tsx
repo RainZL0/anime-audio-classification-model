@@ -28,12 +28,13 @@ const ASK = "mt-[18px] mb-2 text-xs tracking-[0.3px] text-muted-foreground";
 /* A note above the choices when the voice may be someone new. */
 const STRANGER = "mb-2 rounded-lg px-2.5 py-[7px] text-xs leading-[1.7]";
 
-/* The text that export writes for this line, in the language spoken, when it differs from the subtitles shown
-   above. For a target character's line that cannot be exported with text, the same short pill as in the lists
-   (the reason is in its hint) and whatever spoken text was found, unless only the sound is collected (see
-   purpose.ts). */
+/* The text that export writes for this line, in the language spoken, when it differs from the main subtitles
+   shown above. For a target character's line that cannot be exported with text, the same short pill as in the
+   lists (the reason is in its hint) and whatever spoken text was found. Nothing when only the sound is collected
+   (see purpose.ts). */
 function SpokenLine({ clip }: { clip: Clip }) {
-  if (needsText() && clip.role && clip.spoken_problem)
+  if (!needsText()) return null;
+  if (clip.role && clip.spoken_problem)
     return (
       <div className="mx-0.5 mb-1 flex flex-wrap items-center gap-1.5 text-[13px] text-muted-foreground">
         <NoText problem={clip.spoken_problem} />
@@ -335,6 +336,13 @@ export function Stage({
           </span>
         )}
       </div>
+      {clip.display && clip.display !== clip.text && (
+        <Tip text={tr("辅助字幕", "Secondary subtitles")}>
+          <div className="mx-0.5 mb-1 text-[15px] leading-normal text-muted-foreground">
+            {clip.display}
+          </div>
+        </Tip>
+      )}
       <SpokenLine clip={clip} />
       <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
         <span>{clip.episode}</span>

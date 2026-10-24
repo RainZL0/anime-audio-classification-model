@@ -63,6 +63,9 @@ class Clip:
     spoken_hits: tuple[TextLine, ...] | None = None
     """The lines in the spoken language that touch this clip (see `touching` in
     stages/text_subtitle.py). None when the episode has no text in the spoken language."""
+    display: str = ""
+    """The secondary subtitle line that overlaps this clip, shown small under `text`. Empty when the
+    episode has no secondary subtitles or none of their lines overlaps."""
 
     @property
     def duration(self) -> float:
@@ -321,7 +324,7 @@ def load_workspace(
         reach = max((x.end - x.start for x in said.lines), default=0.0)
         lines = subtitle_lines(episode)
         starts = [line[0] for line in lines]
-        # With display subtitles, the line shown is theirs; the spoken text is shown under it.
+        # The main subtitle line is shown large; a secondary subtitle line, small under it.
         shown = display_lines(episode)
         shown_starts = [line[0] for line in shown]
         spans = sorted((float(row["start"]), float(row["end"])) for row in rows)
@@ -337,8 +340,7 @@ def load_workspace(
                     episode=episode["name"],
                     start=float(row["start"]),
                     end=float(row["end"]),
-                    text=text_for(shown, shown_starts, float(row["start"]), float(row["end"]))
-                    or text_for(lines, starts, float(row["start"]), float(row["end"])),
+                    text=text_for(lines, starts, float(row["start"]), float(row["end"])),
                     scene=scene,
                     row=position.get(row["id"]),
                     gap=gaps[(float(row["start"]), float(row["end"]))],
@@ -347,6 +349,7 @@ def load_workspace(
                     else hits_for(
                         said.lines, said_starts, reach, float(row["start"]), float(row["end"])
                     ),
+                    display=text_for(shown, shown_starts, float(row["start"]), float(row["end"])),
                 )
             )
     width = feature_rows[0].shape[0] if feature_rows else 0

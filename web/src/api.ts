@@ -20,7 +20,10 @@ export interface Clip {
   end: number;
   duration: number;
   gap: number | null;
+  /* The main subtitle line, shown large. */
   text: string;
+  /* The secondary subtitle line, shown small under it ("" when there is none). */
+  display?: string;
   scene: number;
   voiced: boolean;
   label: string | null;

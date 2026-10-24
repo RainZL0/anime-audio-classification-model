@@ -209,6 +209,7 @@ class AppState:
             "duration": round(clip.duration, 2),
             "gap": None if clip.gap is None else round(clip.gap, 2),
             "text": clip.text,
+            "display": clip.display,
             "scene": clip.scene,
             "voiced": clip.row is not None,
             "label": self.store.labels.get(clip.id),

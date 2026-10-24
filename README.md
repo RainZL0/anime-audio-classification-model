@@ -64,7 +64,7 @@ For each episode you need:
 
 - **the video** (`.mkv`, `.mp4`, …);
 - **main subtitles** whose lines match the dialogue (`.ass` or `.srt`); each line becomes one clip. They are best in the language spoken, such as Japanese subtitles for a Japanese anime;
-- if you like, **secondary subtitles** you can read, such as a translation. They are shown above each line while labeling and change nothing else.
+- if you like, **secondary subtitles** you can read, such as a translation. They are shown in small type under each line while labeling and change nothing else.
 
 Start the app on a folder of your choice, here `workspace`:
 

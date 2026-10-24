@@ -244,6 +244,12 @@ export function GroupsView({
                       )}
                     >
                       {c.text || tr("（没有字幕文字）", "(no subtitle text)")}
+                      {/* The secondary subtitle line, small under it. */}
+                      {c.display && c.display !== c.text && (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {c.display}
+                        </span>
+                      )}
                     </span>
                     {c.label ? (
                       <Tag

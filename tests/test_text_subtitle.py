@@ -222,11 +222,11 @@ def test_cutting_lines_are_one_person_each_and_repeats_are_one_entry(tmp_path: P
     ]
 
 
-def test_display_subtitles_are_shown_and_the_spoken_text_comes_from_the_clip(
+def test_the_main_line_is_shown_with_the_secondary_line_under_it(
     tmp_path: Path,
 ) -> None:
     """Cut from Japanese, one person at a time: each clip's own line is its text, with nothing to
-    match. Chinese display subtitles give the line shown above it."""
+    match. The Chinese secondary subtitles give the small line shown under it."""
     root = _workspace(tmp_path)
     directory = root / "episodes/ep1"
     lines = [(i, i + 0.9, t) for i, (_, _, t) in enumerate(JA[:4])] + [(7.3, 9.8, JA[6][2])]
@@ -240,11 +240,11 @@ def test_display_subtitles_are_shown_and_the_spoken_text_comes_from_the_clip(
     assert shown["display_subtitle_offset"] == 0.0
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
     clips = TestClient(create_app(state)).get("/api/clips").json()
-    assert [(c["text"], c["spoken"]) for c in clips[:4]] == [
-        ("中文0", "ボクだよ"),
-        ("中文1", "いくよ"),
-        ("中文2", "はちみー"),
-        ("中文3", "よし がんばる"),
+    assert [(c["text"], c["display"], c["spoken"]) for c in clips[:4]] == [
+        ("ボクだよ", "中文0", "ボクだよ"),
+        ("いくよ", "中文1", "いくよ"),
+        ("はちみー", "中文2", "はちみー"),
+        ("よし がんばる", "中文3", "よし がんばる"),
     ]
     assert all(c["spoken_problem"] is None for c in clips[:4])
 

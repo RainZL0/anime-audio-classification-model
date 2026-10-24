@@ -30,7 +30,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Spoken language | The language the voices in an episode speak, such as Japanese. Exported text must be in it, because a voice model learns which sounds go with which words. |
 | Main subtitles (主字幕) | The subtitle file an episode is cut from (`--subs`): each line becomes one clip, at its times. Best in the spoken language, so each clip's text is its own line. |
 | Text subtitles | An extra subtitle file attached to an episode, in the spoken language, used only for the text of each clip. Needed when the main subtitles are a translation. |
-| Secondary subtitles (辅助字幕) | An optional subtitle file in a language the person reads, usually a translation (`--display-subs`; "display subtitles" in the code). While labeling, its line is shown above each clip so the person understands what is said. It changes nothing in how clips are cut or who the machine thinks is speaking, and nothing is exported from it. |
+| Secondary subtitles (辅助字幕) | An optional subtitle file in a language the person reads, usually a translation (`--display-subs`; "display subtitles" in the code). While labeling, its line is shown in small gray type under each clip's main subtitle line, so the person understands what is said. It changes nothing in how clips are cut or who the machine thinks is speaking, and nothing is exported from it. |
 | Workspace | The folder that the interface opens. Inside it are `episodes/` (one folder per episode), `labels/` (the labels made in the interface) and, unless another folder is picked, `exports/` (the exported datasets). |
 
 ## Flow
@@ -110,7 +110,7 @@ Not measured: other characters, episodes from another season, and labeling in Gr
 1. Separate [text subtitles](#glossary) attached to the episode.
 2. The main subtitles, when they are in the spoken language. Bilingual subtitles count: only their lines in the spoken language are used. An episode cut one person at a time ([flow](#flow)) uses the same pieces as its clips, so each clip's text is exactly its own line.
 
-With [secondary subtitles](#glossary), the line shown in large type is theirs (found by the same overlap rule as under "Text of a line"), and the spoken text is shown under it. A clip that no display line overlaps shows its own subtitle line.
+Each clip shows its own main subtitle line in large type. With [secondary subtitles](#glossary), the line of theirs that overlaps it (by the same rule as under "Text of a line") is shown in small gray type under it. The spoken text is shown under that only when it differs from the main line and the text is exported at all: with "Sound only", nothing about exported text is shown.
 
 The language of each line is worked out from its letters. Two or more kana mean Japanese and two or more Hangul mean Korean. Any other line (Chinese characters only, Latin letters, digits) takes the language most common at its place in the file: the same style and the same line number within the entry. So in a file with Chinese on the first line and Japanese on the second, the Japanese line ６連勝 still counts as Japanese. A file has a language when at least 30% of its lines are in it. The interface's add form and the Export view show the language of each file.
 
