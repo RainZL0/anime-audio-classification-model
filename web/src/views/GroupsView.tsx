@@ -143,8 +143,8 @@ export function GroupsView({
           <p>
             {progress.auto > 0
               ? tr(
-                  "机器已经替你做了大部分判断，这里没有要你做的了。下一步：",
-                  "The machine has made most of the calls, so there is no work left here. Next:",
+                  "你标的已经够机器学了，它替你做了大部分判断，这里没有要你做的了。下一步：",
+                  "You have labeled enough for the machine to learn from, and it has made most of the calls, so there is no work left here. Next:",
                 )
               : tr("这里没有要你做的了。下一步：", "There is no work left here. Next:")}
           </p>
