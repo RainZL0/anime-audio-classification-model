@@ -447,7 +447,7 @@ export function Stage({
                   <div
                     key={g.name}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-lg border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary/40",
+                      "grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-lg border bg-background px-2.5 py-2 text-left transition-[border-color,box-shadow] hover:border-primary hover:shadow-md",
                       i === 0 && "border-primary/40 bg-accent",
                     )}
                     onClick={() => onAssign(g.name)}

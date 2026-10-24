@@ -24,6 +24,7 @@ Two words used below:
 - **Keys are shown as key caps** right after the button's words, the same way in the top bar, the bottom bar, dialogs and messages.
 - **One thing, one name.** The label for everyone else is called "Other" (「其他」) everywhere, and no character can take that name: typing it where a name is asked for is refused. Two buttons side by side must not start with the same word unless they do the same kind of thing.
 - **Picking several uses tick boxes**, as in Groups and Export. Picking one of a few uses a row of joined buttons, as in "Whole episode / Only to do". Picking several must never look like picking one.
+- **A choice that labels the line shows it on hover**: under the mouse, a "who is it" chip or a guess on the left gets a solid border in the main color and a light shadow. The machine's top guess keeps its accent background (see [Color](#color)), so the hover look tells which one a click will pick.
 - **Selecting and playing are kept apart.** In a list with tick boxes, the box selects and the rest of the row plays the line.
 
 ## Color

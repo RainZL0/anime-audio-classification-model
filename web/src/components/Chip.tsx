@@ -68,10 +68,10 @@ export function Chip({
         aria-disabled={off || undefined}
         onClick={() => !off && onPick()}
         className={cn(
-          "inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-full border bg-background whitespace-nowrap transition-colors hover:border-primary",
+          "inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-full border bg-background whitespace-nowrap transition-[border-color,box-shadow] hover:border-primary hover:shadow-md",
           small ? "py-0.5 pr-2.5 pl-0.5 text-[13px]" : "py-1 pr-2.5 pl-1",
           top && "border-primary/40 bg-accent",
-          off && "cursor-default opacity-45 hover:border-border",
+          off && "cursor-default opacity-45 hover:border-border hover:shadow-none",
         )}
       >
         {picture}
