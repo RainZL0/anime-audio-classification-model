@@ -132,7 +132,18 @@ export function TopBar(p: TopBarProps) {
   return (
     <header className="flex items-center gap-2.5 border-b bg-background px-[18px] py-2.5 max-[860px]:gap-1 max-[860px]:px-2.5">
       <div className="flex flex-none items-center gap-2 font-semibold tracking-wide">
-        <span className="size-2.5 rounded-full bg-primary"></span>avoc
+        {/* The logo: a screen with a voice waveform above two subtitle lines. Same drawing as public/favicon.svg. */}
+        <svg viewBox="80 64 864 864" className="size-5" aria-hidden="true">
+          <rect x="96" y="176" width="832" height="640" rx="128" fill="#25292D" />
+          <path
+            d="M320 400V448M416 336V512M512 288V560M608 336V512M704 400V448"
+            stroke="#5EDBA5"
+            strokeWidth="64"
+            strokeLinecap="round"
+          />
+          <path d="M272 664H752M368 736H656" stroke="#FFF" strokeWidth="48" strokeLinecap="round" />
+        </svg>
+        avoc
       </div>
       <TabBox>
         <DropdownMenu>
