@@ -4,14 +4,14 @@
 
 **English** · [简体中文](README.zh.md)
 
-**Turn anime episodes into a voice dataset for one character: clean clips, each with its line, ready for GPT-SoVITS and RVC.**
+**Collect one anime character's voice from whole episodes: clean clips of only them speaking, each with the words they said. Ready to train GPT-SoVITS or RVC.**
 
 [![CI](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white)](#platforms)
 
-[Quick start](#quick-start) · [How labeling works](#how-labeling-works) · [Export formats](#export-formats) · [Docs](docs/index.md) · [Contributing](CONTRIBUTING.md)
+[Install](#install) · [Your first episode](#your-first-episode) · [Labeling](#labeling) · [What you get](#what-you-get) · [Questions](#questions) · [Docs](docs/index.md)
 
 <!-- Demo GIF: upload it to the media issue, then put its address here. No pictures are kept in git. -->
 
@@ -19,86 +19,100 @@
 
 ## Why
 
-To train a voice model of one character (GPT-SoVITS, RVC), you need minutes or hours of that character speaking alone, each clip with its line. Doing it by hand means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
+To train a voice model of one character, you need minutes of that character speaking alone, each clip with its line. By hand, that means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
 
-Here you label a few clips while watching the scene. A small model learns your character, sorts the rest, and **retrains in a few seconds every time you correct it**, so its other guesses update right away.
+Here you label a few lines while watching the scene. A small model learns your character, sorts the rest, and **retrains in a few seconds every time you correct it**, so its other guesses improve right away. You check its work instead of doing all of it.
 
 ## Features
 
-- 🎬 **Cut by subtitles.** Each dialogue line becomes one clip, so no line is lost to a speech detector.
-- 🎤 **Voices separated** from music and effects for every clip.
-- 🧠 **Learns from your corrections.** Label a target character and "other"; the model updates as you go.
+- 🎬 **One clip per subtitle line,** so no line is lost to a speech detector.
+- 🎤 **Voice only:** music and sound effects are removed from every clip.
+- 🧠 **Learns from your corrections.** Name the characters you want; everyone else is "Other".
 - 📺 **Label while watching.** The video plays with each line, with more context one key away.
-- ⌨️ **Keyboard first,** with undo.
-- 🈶 **Text in the language spoken.** Cut with translated or bilingual subtitles; the exported text is always the words actually said, and each clip shows it while you label.
-- 📦 **Export** to GPT-SoVITS or one folder per character (for RVC), at the original sample rate.
+- ⌨️ **Keyboard first,** and every step can be undone.
+- 🈶 **The words actually said.** The exported text is in the language spoken, even if you read a translation while labeling.
+- 📦 **Export** one folder per character for RVC, or GPT-SoVITS with each line's text, at the quality of the video.
 - 🔒 **Runs on your machine.** Nothing is uploaded.
 
-## Quick start
+## Install
 
-You need [uv](https://docs.astral.sh/uv/) (it installs the right Python for you) and [FFmpeg](https://ffmpeg.org/) on your `PATH` (`ffmpeg` and `ffprobe`). An NVIDIA GPU is strongly recommended; without one, separating the voices of one episode takes much longer.
+You need Windows, [uv](https://docs.astral.sh/uv/) (it installs the right Python for you) and [FFmpeg](https://ffmpeg.org/). An NVIDIA graphics card is strongly recommended; without one, removing the music from one episode takes much longer.
+
+If you don't have uv and FFmpeg yet, open PowerShell and run:
+
+```powershell
+winget install astral-sh.uv
+winget install Gyan.FFmpeg
+```
+
+Then open a new terminal, so it finds them, and run:
 
 ```bash
 git clone https://github.com/RainZL0/anime-voice-collector.git
 cd anime-voice-collector
 uv sync --locked
-uv run avoc doctor
 ```
 
-`doctor` checks the GPU, FFmpeg, the voice separation model, your Hugging Face token and free disk space. Fix anything it marks as missing.
+`uv sync` downloads everything, about 5 GB. To check the machine, run `uv run avoc doctor`: it looks at the graphics card, FFmpeg and free disk space, and says how to fix anything missing.
 
-**1. Add an episode** to a workspace folder. You need its video and a subtitle file (`.ass` or `.srt`) whose lines match the dialogue, best in the language spoken. One command separates the voices, cuts the clips and computes everything the labeling app needs:
+## Your first episode
 
-```bash
-uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt" --offset 0
-```
+For each episode you need:
 
-| Option | What it does |
-| --- | --- |
-| `--offset` | Seconds to add to the subtitle times so they line up with the audio. Episodes from the same video source and subtitle group almost always share one offset: find it once, then reuse it. |
-| *(no `--offset`)* | The offset is measured with [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1). That model is gated: accept its terms on Hugging Face, create a Read token on the [tokens page](https://huggingface.co/settings/tokens), then run `uv run hf auth login` and paste it. |
-| `--display-subs "Episode 01.zh.ass"` | A translation you can read, shown above each line while labeling. Nothing is exported from it. |
-| `--text-subs "Episode 01.ja.ass"` | Only when `--subs` is a translation: attach subtitles in the language spoken, and the exported text is taken from them. Many clips get no text this way, so prefer `--subs` in the spoken language. |
-| `--spoken ja` | The language spoken (`ja`, `zh`, `en`, `ko`). By default it is read from the audio track, and the matching track of a dual-audio video is used. |
+- **the video** (`.mkv`, `.mp4`, …);
+- **subtitles whose lines match the dialogue** (`.ass` or `.srt`), best in the language spoken, such as Japanese subtitles for a Japanese anime;
+- if you like, **subtitles for you to read**, such as a translation. They are shown while labeling and change nothing else.
 
-If a run stops halfway (out of GPU memory, for example), run the same command again. It continues where it stopped. You can also add episodes from inside the app.
-
-**2. Open the labeling app:**
+Start the app on a folder of your choice, here `workspace`:
 
 ```bash
 uv run avoc app workspace
 ```
 
-It opens `http://127.0.0.1:8765` in your browser.
+It opens in your browser and shows the form to add an episode. Pick the files and press Start: it removes the music, cuts the lines and gets everything ready, with its progress shown as it goes. Then add the next episodes the same way, from the episode menu.
 
-## How labeling works
+**The subtitle offset** is how many seconds the subtitle times are off from the sound. Leave it empty and it is measured for you. Measuring uses a free [Hugging Face](https://huggingface.co) model that asks you to accept its terms and make a token once; the form shows the steps when they are needed. Later episodes from the same video source and subtitle group get the same value filled in.
 
-You only name the characters you want (the targets). Everyone else gets a single label, "other". You can add or remove targets at any time, and existing labels stay valid.
+## Labeling
+
+You only name the characters you want (the target characters). Everyone else is "Other". You can add or remove target characters at any time, and the labels you made stay.
 
 | View | Key | What you do there |
 | --- | :---: | --- |
-| **Groups** | `G` | Start here. Clips that sound alike are grouped, so you can label a whole group at once. |
-| **Scenes** | `S` | Every line in order, with the video playing. `Enter` accepts the model's guess, a number picks a target, `Q` means "other", `Shift` + number marks a target's clip as low quality (background noise, overlapping voices). |
-| **Characters** | `O` | Everything the model gave one character, least confident first. Fix the wrong ones, then confirm the rest with `Shift+Enter`. Below it are clips the model may have missed. |
+| **Groups** | `G` | Start here. Lines that sound alike are grouped, so you can label a whole group at once. |
+| **Scenes** | `S` | Every line in order, with the video playing. `Enter` accepts the machine's guess, a number picks a character, `Q` means "Other", `Shift` + number marks the line low quality (loud background, two people at once). |
+| **Characters** | `O` | Everything the machine gave one character, least sure first. Fix the wrong ones, then confirm the rest with `Shift+Enter`. Below are lines it may have missed. |
 | **Export** | `E` | Write the dataset. |
 
-`Z` undoes the last step. Low-quality clips are never used for training and are skipped on export. Run `uv run avoc --help` to list all commands; the full guide is in [docs/USAGE.md](docs/USAGE.md).
+After 20 to 30 lines of a character, the machine starts guessing. `Z` undoes the last step, `?` lists every key, and the Guide button explains the four views. The full guide is in [docs/USAGE.md](docs/USAGE.md).
 
-## Export formats
+## What you get
 
-| Format | Output |
-| --- | --- |
-| GPT-SoVITS | Clips and `train.list` with each line's text |
-| One folder per character | Plain audio clips, for RVC and other tools that need no text |
+```text
+exports/2026-10-24/
+├── Teio/
+│   ├── ep01_00083.120000_00085.430000.wav
+│   └── ...
+├── train.list      (GPT-SoVITS only: path|character|language|text)
+└── rejected.tsv    (lines left out, and why)
+```
 
-Clips are cut from the separated vocals at the original sample rate. The text is in the language spoken. Clips whose text cannot be matched completely are left out and listed in `rejected.tsv`.
+Each clip is one line of one character: voice only, mono, at the sample rate of the video, with even loudness. Lines marked low quality are never exported. For GPT-SoVITS, a line is left out when its words in the spoken language cannot be found completely.
+
+## Questions
+
+**Can I use translated subtitles?** Yes. Lines are best cut from subtitles in the spoken language, but translated or bilingual ones work. For GPT-SoVITS you then also attach subtitles in the spoken language, on the Export page.
+
+**It stopped halfway, for example out of graphics memory.** Add the same episode again. It continues where it stopped.
+
+**Can I do it from the command line?** Yes: `uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt"`. Run `uv run avoc --help` for all commands and options; the add form also shows the command for your workspace.
 
 ## Platforms
 
 | Platform | Status |
 | --- | --- |
-| Windows 11 + NVIDIA GPU | ✅ Tested (RTX 4060 Laptop) |
-| Windows without a GPU | Runs on the CPU, slower |
+| Windows 11 + NVIDIA graphics card | ✅ Tested (RTX 4060 Laptop) |
+| Windows without a graphics card | Runs on the CPU, slower |
 | Linux | ⚠️ Not tested yet. The install already picks the CUDA build of torch. |
 | macOS | ⚠️ Not tested yet. CPU only. |
 
@@ -106,11 +120,7 @@ Reports from Linux and macOS are welcome in the issues.
 
 ## Docs
 
-How it works, the terms it uses, and what was tried and ruled out are in [docs/index.md](docs/index.md).
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+How it works, the words it uses, and what was tried and ruled out are in [docs/index.md](docs/index.md). To help, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Usage rules
 
