@@ -691,7 +691,7 @@ export function AddEpisode({
             className="max-w-[120px]"
             value={offset}
             onChange={(e) => setOffset(e.target.value)}
-            placeholder={tr("自动测", "measure")}
+            placeholder={tr("自动测", "Auto-measure")}
           />
           <Note>
             {last
