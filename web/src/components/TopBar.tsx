@@ -180,7 +180,7 @@ export function TopBar(p: TopBarProps) {
           )}
         >
           <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
-            <span className="min-w-0 truncate max-[1200px]:hidden">
+            <span className="min-w-0 truncate max-[1280px]:hidden">
               {tr(`${p.episode}：确认 ${pct}%`, `${p.episode}: ${pct}% confirmed`)}
             </span>
             <div className="flex h-1.5 w-40 min-w-10 flex-[0_1_160px] overflow-hidden rounded-full bg-muted">
