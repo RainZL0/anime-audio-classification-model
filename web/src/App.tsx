@@ -21,6 +21,7 @@ import { Dock } from "./components/Dock";
 import { Guide, GUIDE_SEEN } from "./components/Guide";
 import { Help } from "./components/Help";
 import { LanguageButton } from "./components/LanguageButton";
+import { withKeys } from "./components/Keys";
 import { Empty } from "./components/Notes";
 import { Stage } from "./components/Stage";
 import { TopBar, type View } from "./components/TopBar";
@@ -1048,9 +1049,11 @@ export function App() {
       />
       {state.outdated !== false && (
         <div className="border-b bg-warning/15 px-[18px] py-2 text-[13px] text-warning">
-          {tr(
-            "avoc 已经更新，但正在运行的服务还是旧的，有些内容会显示不出来。关掉运行 avoc app 的窗口（或按 Ctrl+C），再重新运行它，然后刷新这个页面。",
-            "avoc was updated, but the running server is still the old one, so some things will not show. Close the window running avoc app (or press Ctrl+C), run it again, then refresh this page.",
+          {withKeys(
+            tr(
+              "avoc 已经更新，但正在运行的服务还是旧的，有些内容会显示不出来。关掉运行 avoc app 的窗口（或按 [Ctrl]+[C]），再重新运行它，然后刷新这个页面。",
+              "avoc was updated, but the running server is still the old one, so some things will not show. Close the window running avoc app (or press [Ctrl]+[C]), run it again, then refresh this page.",
+            ),
           )}
         </div>
       )}

@@ -15,6 +15,7 @@ import { Choice } from "./Choice";
 import { Note } from "./Notes";
 import { NoText, Tag } from "./Pills";
 import { RoleName } from "./RoleName";
+import { withKeys } from "./Keys";
 import { Tip } from "./Tip";
 
 /* @container: parts inside can follow the stage's own width, which the divider changes. */
@@ -194,7 +195,7 @@ export function Stage({
                 videoRef.current = el;
               }}
               key={shown}
-              className="block size-full object-contain"
+              className="block size-full cursor-pointer object-contain"
               src={media("video", clip.id, context, fresh)}
               autoPlay
               playsInline
@@ -333,8 +334,8 @@ export function Stage({
         <span>{tr(`${clip.duration.toFixed(2)} 秒`, `${clip.duration.toFixed(2)} s`)}</span>
         <Tip
           text={tr(
-            "看不出是谁时，前后各多放一些。选好的会一直用到你改回来；L 键依次切换",
-            "When you can't tell who it is, play more on each side. Your choice stays until you change it; L steps through them",
+            "看不出是谁时，前后各多放一些。选好的会一直用到你改回来",
+            "When you can't tell who it is, play more on each side. Your choice stays until you change it",
           )}
         >
           <span className="inline-flex items-center gap-1.5">
@@ -377,9 +378,11 @@ export function Stage({
                 )}
               </div>
               <div className="text-xs">
-                {tr(
-                  "要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低",
-                  "To change it, press another number key or pick below. Shift + number means low quality",
+                {withKeys(
+                  tr(
+                    "要改的话，直接按别的数字键或在下面选；[Shift] + 数字是质量低",
+                    "To change it, press another number key or pick below. [Shift] + number means low quality",
+                  ),
                 )}
               </div>
             </div>
@@ -405,8 +408,8 @@ export function Stage({
               : clip.voiced
                 ? tr("这是谁？", "Who is this?")
                 : tr(
-                    "这句太短，机器听不出来，请直接选人",
-                    "Too short for the machine to tell. Pick the character yourself",
+                    "太短，没有声纹，请直接选人",
+                    "Too short for a voiceprint. Pick the character yourself",
                   )}
           </div>
           {clip.familiar === false && (
@@ -500,10 +503,7 @@ export function Stage({
                         </Tip>
                         <LowButton
                           hotkey={k ?? undefined}
-                          tip={
-                            tr(`标成 ${g.name}·质量低：`, `Label as ${g.name}, low quality: `) +
-                            lowTip()
-                          }
+                          tip={lowTip()}
                           onClick={() => onAssign(g.name, true)}
                         />
                       </div>

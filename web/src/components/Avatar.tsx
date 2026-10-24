@@ -117,7 +117,7 @@ export function Avatar({ role, name, size = "base", blank, plus, onClick, title 
     ...(role?.avatar && { backgroundImage: `url(/media/avatar/${role.avatar})` }),
   } as CSSProperties;
   return (
-    <Tip text={title || name}>
+    <Tip text={title}>
       <div
         className={cn(base, edit)}
         onClick={onClick ?? undefined}

@@ -11,6 +11,7 @@ import { Chip, LowButton } from "../components/Chip";
 import { Empty, Welcome } from "../components/Notes";
 import { Closest, Tag } from "../components/Pills";
 import { RoleName } from "../components/RoleName";
+import { withKeys } from "../components/Keys";
 import { Tip } from "../components/Tip";
 import { stamp } from "../format";
 import { lines, tr } from "../language";
@@ -81,15 +82,19 @@ export function GroupsView({
           </p>
           <ol className="mt-1.5 list-decimal pl-[18px]">
             <li>
-              {tr(
-                "一组里混着几个人时，分几次勾、几次标。按住 Shift 点，能一下勾上中间的几句。",
-                "When a group mixes several people, tick and label them in turns. Shift+click ticks all the lines in between.",
+              {withKeys(
+                tr(
+                  "一组里混着几个人时，分几次勾、几次标。按住 [Shift] 点，能一下勾上中间的几句。",
+                  "When a group mixes several people, tick and label them in turns. [Shift]+click ticks all the lines in between.",
+                ),
               )}
             </li>
             <li>
-              {tr(
-                "有勾选时，数字键、Q、N 标勾上的台词；没勾选时，标正在播放的那一句。",
-                "While lines are ticked, the number keys, Q and N label the ticked lines; with none ticked, they label the line playing.",
+              {withKeys(
+                tr(
+                  "有勾选时，[1]–[9]、[Q]、[N] 标勾上的台词；没勾选时，标正在播放的那一句。",
+                  "While lines are ticked, [1]–[9], [Q] and [N] label the ticked lines; with none ticked, they label the line playing.",
+                ),
               )}
             </li>
             <li>
@@ -176,9 +181,11 @@ export function GroupsView({
                       <span></span>
                     ) : (
                       <Tip
-                        text={tr(
-                          "勾上，下面的按钮就标这一句；按住 Shift 点，勾上中间的几句",
-                          "Tick it for the buttons below to label it; Shift+click ticks the lines in between",
+                        text={withKeys(
+                          tr(
+                            "勾上，下面的按钮就标这一句；按住 [Shift] 点，勾上中间的几句",
+                            "Tick it for the buttons below to label it; [Shift]+click ticks the lines in between",
+                          ),
                         )}
                       >
                         {/* The tick box only selects; the rest of the row plays the line. */}
@@ -200,9 +207,11 @@ export function GroupsView({
                     {c.label ? (
                       <Tag
                         look="done"
-                        tip={tr(
-                          "已经标了；按 Z 撤销，或在左边改",
-                          "Already labeled. Press Z to undo, or change it on the left",
+                        tip={withKeys(
+                          tr(
+                            "已经标了；按 [Z] 撤销，或在左边改",
+                            "Already labeled. Press [Z] to undo, or change it on the left",
+                          ),
                         )}
                       >
                         {labelText[c.label] || c.label}
@@ -224,9 +233,11 @@ export function GroupsView({
                   </Button>
                   <span className="text-xs text-muted-foreground">
                     {keep.length
-                      ? tr(
-                          `勾了 ${keep.length} 句；数字键、Q、N 也标勾上的`,
-                          `${lines(keep.length)} ticked; number keys, Q and N label them too`,
+                      ? withKeys(
+                          tr(
+                            `勾了 ${keep.length} 句；[1]–[9]、[Q]、[N] 也标勾上的`,
+                            `${lines(keep.length)} ticked; [1]–[9], [Q] and [N] label them too`,
+                          ),
                         )
                       : tr(
                           "先勾上同一个人的台词，再选是谁",
@@ -251,10 +262,7 @@ export function GroupsView({
                       extra={
                         <LowButton
                           disabled={!keep.length}
-                          tip={
-                            tr(`标成 ${name}·质量低：`, `Label as ${name}, low quality: `) +
-                            lowTip()
-                          }
+                          tip={lowTip()}
                           hotkey={i < 9 ? i + 1 : undefined}
                           onClick={() => onName(ids, name, true)}
                         />
@@ -266,7 +274,7 @@ export function GroupsView({
                   <Chip
                     small
                     off={!keep.length}
-                    tip={tr("不是你要收集的人", "Not someone you want to collect")}
+                    tip={tr("不是任何一个目标角色", "Not any of the target characters")}
                     onPick={() => onName(ids, OTHER)}
                     picture={<Avatar blank size="sm" />}
                     hotkey="Q"

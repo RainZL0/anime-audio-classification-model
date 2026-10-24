@@ -23,24 +23,12 @@ export function Dock({ dock, roles, labelText, canNew, onName, onNew }: DockProp
       {dock.map((name, i) => (
         <Chip
           key={name}
-          tip={
-            i < 9
-              ? tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`)
-              : tr(`标成 ${name}`, `Label as ${name}`)
-          }
           onPick={() => onName(name)}
           picture={<Avatar role={roles[name]} name={name} size="md" />}
           hotkey={i < 9 ? String(i + 1) : undefined}
           extra={
             <LowButton
-              tip={
-                (i < 9
-                  ? tr(
-                      `按 Shift + ${i + 1} 标成 ${name}·质量低：`,
-                      `Press Shift + ${i + 1} to label as ${name}, low quality: `,
-                    )
-                  : tr(`标成 ${name}·质量低：`, `Label as ${name}, low quality: `)) + lowTip()
-              }
+              tip={lowTip()}
               hotkey={i < 9 ? i + 1 : undefined}
               onClick={() => onName(name, true)}
             />

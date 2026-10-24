@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Note } from "../components/Notes";
 import { Choice } from "../components/Choice";
+import { withKeys } from "../components/Keys";
 import { PathInput } from "../components/PathInput";
 import { Tip } from "../components/Tip";
 import { minutes } from "../format";
@@ -138,7 +139,10 @@ function SubtitleStyles({
         )}
       </Note>
       {shown.map((s) => (
-        <label className="flex cursor-pointer items-start gap-2 text-[13px]" key={s.name}>
+        <label
+          className="-mx-1.5 flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-0.5 text-[13px] hover:bg-muted/60"
+          key={s.name}
+        >
           <Checkbox
             className="mt-0.5"
             checked={chosen.has(s.name)}
@@ -668,9 +672,11 @@ export function AddEpisode({
           </Note>
         </Field>
         <Note>
-          {tr(
-            "按「浏览…」选文件，或者把整段路径粘贴进框里。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
-            'Press "Browse…" to pick each file, or paste its full path into the box. On Windows, hold Shift, right-click the file, and choose "Copy as path".',
+          {withKeys(
+            tr(
+              "按「浏览…」选文件，或者把整段路径粘贴进框里。Windows 上按住 [Shift] 右键文件，选「复制文件地址」。",
+              'Press "Browse…" to pick each file, or paste its full path into the box. On Windows, hold [Shift], right-click the file, and choose "Copy as path".',
+            ),
           )}
         </Note>
         <div>

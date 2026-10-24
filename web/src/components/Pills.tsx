@@ -64,11 +64,8 @@ export function Closest({
   title?: string;
 }) {
   return (
-    <Tag
-      look="closest"
-      tip={title || tr("机器觉得最像的角色", "The character the machine finds closest")}
-    >
-      <Avatar role={roles[name]} name={name} size="xs" title={name} />
+    <Tag look="closest" tip={title}>
+      <Avatar role={roles[name]} name={name} size="xs" />
       {tr("最像", "Closest:")} {name}
       {p != null ? ` ${pct(p)}` : ""}
     </Tag>

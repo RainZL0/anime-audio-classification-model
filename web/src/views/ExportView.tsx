@@ -70,7 +70,9 @@ function SpokenTexts({
         const s = e.spoken;
         return (
           <div
-            className="grid grid-cols-[40px_auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-xs"
+            /* When the page is narrow, the path box and its button go to a second line, so the text in the middle
+               is not squeezed into a thin column. */
+            className="grid grid-cols-[40px_auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-xs @max-5xl:grid-cols-[40px_auto_minmax(0,1fr)_auto]"
             key={e.name}
           >
             <span className="text-muted-foreground tabular-nums">{e.name}</span>
@@ -97,7 +99,7 @@ function SpokenTexts({
                 ))}
               </NativeSelect>
             </Tip>
-            <span className="min-w-0">
+            <span className="min-w-0 @max-5xl:col-span-2">
               {s.source === "text" && t ? (
                 <>
                   <Tip text={t.file}>
@@ -126,6 +128,7 @@ function SpokenTexts({
               {t?.marked && <Note warn>{t.marked}</Note>}
             </span>
             <PathInput
+              className="@max-5xl:col-span-2 @max-5xl:col-start-2"
               kind="subtitles"
               placeholder={
                 t
@@ -237,7 +240,7 @@ export function ExportView({
             <label
               key={r.name}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5",
+                "flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 transition-colors hover:border-primary/40",
                 picked.has(r.name) && "border-primary/40 bg-accent",
               )}
             >

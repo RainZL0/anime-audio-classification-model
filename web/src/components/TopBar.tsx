@@ -14,6 +14,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { lines, many, tr } from "../language";
+import { withKeys } from "./Keys";
 import { LanguageButton } from "./LanguageButton";
 import { Tip } from "./Tip";
 
@@ -71,7 +72,7 @@ export function TopBar(p: TopBarProps) {
   const perEpisode = EPISODE_VIEWS().some(([v]) => v === p.view);
   const tabs = (list: [View, string, string][]) =>
     list.map(([v, label, key]) => (
-      <Tip key={v} text={tr(`快捷键 ${key}`, `Shortcut ${key}`)}>
+      <Tip key={v} text={withKeys(tr(`快捷键 [${key}]`, `Shortcut [${key}]`))}>
         <button
           type="button"
           aria-pressed={p.view === v}
@@ -101,8 +102,9 @@ export function TopBar(p: TopBarProps) {
         <DropdownMenu>
           <Tip
             text={
+              /* Only Characters and Export need a word on what the picker changes. */
               perEpisode
-                ? tr("换一集", "Switch episode")
+                ? undefined
                 : tr(
                     "「角色」和「导出」看的是全部集数，换集只影响「起步分组」和「场景」",
                     "Characters and Export cover all episodes; switching only changes Groups and Scenes",
@@ -111,7 +113,7 @@ export function TopBar(p: TopBarProps) {
           >
             <DropdownMenuTrigger
               className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-md bg-background px-2 text-sm whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30",
+                "inline-flex h-7 items-center gap-1 rounded-md bg-background px-2 text-sm whitespace-nowrap outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30",
                 perEpisode ? "font-semibold" : "text-muted-foreground",
               )}
             >
@@ -149,12 +151,10 @@ export function TopBar(p: TopBarProps) {
         {tabs(ALL_VIEWS())}
       </TabBox>
       {p.adding && (
-        <Tip text={tr("点开看进度", "Click to see the progress")}>
-          <Button variant="ghost" size="sm" className="flex-none" onClick={p.onShowAdding}>
-            <Spinner />
-            {tr(`正在加 ${p.adding}`, `Adding ${p.adding}`)}
-          </Button>
-        </Tip>
+        <Button variant="ghost" size="sm" className="flex-none" onClick={p.onShowAdding}>
+          <Spinner />
+          {tr(`正在加 ${p.adding}`, `Adding ${p.adding}`)}
+        </Button>
       )}
       <span className="flex-1"></span>
       {perEpisode && (
@@ -192,17 +192,15 @@ export function TopBar(p: TopBarProps) {
               : tr("机器还没学过", "Not trained yet")}
         </span>
       </Tip>
-      <Tip text={tr("撤销上一步", "Undo the last step")}>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex-none"
-          disabled={!p.canUndo}
-          onClick={p.onUndo}
-        >
-          {tr("撤销", "Undo")} <Kbd>Z</Kbd>
-        </Button>
-      </Tip>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="flex-none"
+        disabled={!p.canUndo}
+        onClick={p.onUndo}
+      >
+        {tr("撤销", "Undo")} <Kbd>Z</Kbd>
+      </Button>
       <LanguageButton onSwitch={p.onLanguage} />
       <Tip text={themeText}>
         <Button
