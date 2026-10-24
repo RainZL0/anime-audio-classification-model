@@ -566,7 +566,7 @@ export function AddEpisode({
           <Choice<Purpose>
             value={text ? "tts" : "audio"}
             options={[
-              ["tts", tr("语音合成（GPT-SoVITS 等）", "Speech synthesis (GPT-SoVITS and such)")],
+              ["tts", tr("朗读文字（GPT-SoVITS 等）", "Read text aloud (GPT-SoVITS and such)")],
               ["audio", tr("只要声音（RVC 等）", "Sound only (RVC and such)")],
             ]}
             onPick={onPurpose}
@@ -574,8 +574,8 @@ export function AddEpisode({
           <Note>
             {text
               ? tr(
-                  "语音合成要每句说的话，用这一集说的语言（一般是日语），所以要有这种语言的字幕。",
-                  "Speech synthesis needs the words of each line in the language spoken (usually Japanese), so subtitles in that language are needed.",
+                  "要让角色的声音朗读文字，就要每句说的话，用这一集说的语言（一般是日语），所以要有这种语言的字幕。",
+                  "To have the voice read text aloud, each line needs its words in the language spoken (usually Japanese), so subtitles in that language are needed.",
                 )
               : tr(
                   "只要声音就不用管台词文字，什么语言的字幕都行。以后在导出页也能改。",
@@ -657,15 +657,15 @@ export function AddEpisode({
                   )}
             </Note>
           )}
-          {/* Speech synthesis needs the words in the language spoken, which a translation can't give. */}
+          {/* Reading text aloud needs the words in the language spoken, which a translation can't give. */}
           {text &&
             found?.languages &&
             found.languages.length > 0 &&
             !found.languages.includes(heard) && (
               <Note warn>
                 {tr(
-                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。语音合成的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面的显示用字幕；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
-                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for speech synthesis need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under display subtitles below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
+                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面的显示用字幕；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
+                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under display subtitles below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
                 )}
               </Note>
             )}
