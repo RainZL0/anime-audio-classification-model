@@ -318,6 +318,14 @@ def set_spoken_language(
     typer.echo(f"{result['episode']}: spoken language {result['spoken_language']}")
 
 
+def _serve_reloaded(port: int) -> None:
+    """The server of `avoc app --reload`, run in a new process after each change."""
+    import uvicorn
+
+    uvicorn.run("avoc.app.server:reloaded_app", factory=True, host="127.0.0.1", port=port,
+                log_level="warning")  # fmt: skip
+
+
 @app.command("app")
 def run_app(
     workspace: Annotated[Path, typer.Argument(help="Workspace folder, which contains episodes/")],
@@ -360,9 +368,18 @@ def run_app(
             import threading
 
             threading.Timer(4.0, webbrowser.open, args=[url]).start()
-        package = Path(__file__).parent
-        uvicorn.run("avoc.app.server:reloaded_app", factory=True, host="127.0.0.1", port=port,
-                    log_level="warning", reload=True, reload_dirs=[str(package)])  # fmt: skip
+        # Not uvicorn's own reload: on Windows it stops the old server with Ctrl+C, which never
+        # arrives when the server has no console window of its own, so it never restarted.
+        # watchfiles ends the old process outright and starts a new one.
+        from watchfiles import PythonFilter, run_process
+
+        run_process(
+            Path(__file__).parent,
+            target=_serve_reloaded,
+            args=(port,),
+            watch_filter=PythonFilter(),
+            callback=lambda _: typer.echo("avoc's Python files changed, restarting"),
+        )
         return
 
     state = AppState(workspace, tuple(model) if model else DEFAULT_MODELS)
