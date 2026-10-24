@@ -104,8 +104,6 @@ export interface Model {
   min_labels?: number;
   /* Targets not guessed yet: their confirmed lines, and lines known not to be them. */
   waiting?: Record<string, { lines: number; others: number }>;
-  /* Labels borrowed from another workspace: where from, and how many of its lines count. */
-  borrowed?: { from: string; lines: number } | null;
   auto_confidence: number;
 }
 

@@ -62,9 +62,6 @@ interface TopBarProps {
   onShowAdding: () => void;
   busy: boolean;
   trainedOn: number;
-  /* Labels borrowed from another workspace, which also teach the machine. */
-  borrowed: { from: string; lines: number } | null;
-  onStopBorrowing: () => void;
   targets: number;
   dark: boolean;
   onTheme: () => void;
@@ -225,26 +222,6 @@ export function TopBar(p: TopBarProps) {
               : tr("机器还没学过", "Not trained yet")}
         </span>
       </Tip>
-      {p.borrowed && (
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex h-7 flex-none items-center gap-1 rounded-md border bg-background px-2 text-xs whitespace-nowrap text-muted-foreground outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30">
-            {tr(`另借 ${p.borrowed.lines} 句`, `+ ${lines(p.borrowed.lines)} borrowed`)}
-            <ChevronDownIcon className="size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <div className="px-2 py-1.5 text-xs wrap-anywhere text-muted-foreground">
-              {tr(
-                `机器还从 ${p.borrowed.from} 的标注里学。它们只帮机器猜，不显示也不导出。这里标够了就停掉。`,
-                `The machine also learns from the labels in ${p.borrowed.from}. They only help it guess; they are not shown or exported. Stop once enough is labeled here.`,
-              )}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={p.onStopBorrowing}>
-              {tr("停止借用", "Stop borrowing")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
       <LanguageButton onSwitch={p.onLanguage} />
       <Tip text={themeText}>
         <Button

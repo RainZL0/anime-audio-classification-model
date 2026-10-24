@@ -1037,15 +1037,6 @@ export function App() {
         onShowAdding={() => setAddOpen(true)}
         busy={busy}
         trainedOn={state.model.labels || 0}
-        borrowed={state.model.borrowed ?? null}
-        onStopBorrowing={() =>
-          call<Summary>("/api/borrowed/stop", {})
-            .then((s) => {
-              setState(s);
-              showToast(tr("不再借用别处的标注", "No longer borrowing labels"));
-            })
-            .catch((e: Error) => showToast(e.message, true))
-        }
         targets={state.roles.filter((r) => r.target).length}
         dark={theme === "dark"}
         onTheme={() => setTheme(theme === "dark" ? "light" : "dark")}

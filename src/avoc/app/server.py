@@ -20,9 +20,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from avoc.app import borrowing
 from avoc.app.adding import Adding, clean_path
-from avoc.app.borrowing import Borrowed
 from avoc.app.labels import OLD_FLAGS, OTHER, LabelStore, flag_of
 from avoc.app.model import AUTO_CONFIDENCE, MIN_GUESS_LABELS, Guess, train_and_predict
 from avoc.app.video import VIDEO_PAD, cut_video
@@ -81,17 +79,7 @@ class AppState:
         person moves to another line, the whole list is replaced."""
         self._prefetch_ready = threading.Condition()
         self._prefetchers: list[threading.Thread] = []
-        self.borrowed: Borrowed | None = None
-        self.load_borrowed()
-
-    def load_borrowed(self) -> None:
-        """Read the labels this workspace borrows from another one (see borrowing.py), then
-        retrain."""
-        other = borrowing.borrowed_from(self.workspace.labels_dir)
-        found = borrowing.load(other, self.models) if other and other.is_dir() else None
-        with self.lock:
-            self.borrowed = found
-            self.retrain()
+        self.retrain()
 
     def reload(self) -> None:
         """Load the workspace again after an episode was added. Labels are kept as they are."""
@@ -107,10 +95,7 @@ class AppState:
         """Positive examples for each target character are clips labeled as them. Negative
         examples are clips labeled with other names, clips labeled "other" while that character
         was already a target, and clips the person said are not them. Clips marked "low quality"
-        are not used in training. Borrowed labels count by the same rules, as extra rows after
-        this workspace's own; they get no guess."""
-        import numpy as np
-
+        are not used in training."""
         targets = self.store.targets()
         examples: dict[str, tuple[list[int], list[int]]] = {t: ([], []) for t in targets}
         used: set[int] = set()
@@ -139,35 +124,11 @@ class AppState:
                 if self.store.labels.get(clip_id) != target:
                     examples[target][1].append(clip.row)
                     used.add(clip.row)
-        features = self.workspace.features
-        lent: set[int] = set()
-        if self.borrowed is not None and len(self.borrowed.features):
-            b = self.borrowed
-            first = len(features)
-            features = np.vstack([features, b.features])
-            for k, name in enumerate(b.labels):
-                row = first + k
-                for target in targets:
-                    if name == target:
-                        examples[target][0].append(row)
-                    elif (
-                        (name and name != OTHER)
-                        or target in b.against[k]
-                        or (target in b.rejects[k])
-                    ):
-                        examples[target][1].append(row)
-                    else:
-                        continue
-                    lent.add(row)
         began = time.perf_counter()
-        trained = train_and_predict(features, examples, rejects, MIN_GUESS_LABELS)
-        own = len(self.workspace.features)
-        self.guesses = {row: g for row, g in trained.guesses.items() if row < own}
+        trained = train_and_predict(self.workspace.features, examples, rejects, MIN_GUESS_LABELS)
+        self.guesses = trained.guesses
         self.trained = {
             "labels": len(used),
-            "borrowed": None
-            if self.borrowed is None
-            else {"from": str(self.borrowed.root), "lines": len(lent)},
             "roles": len(targets),
             "seconds": round(time.perf_counter() - began, 2),
             "familiar_threshold": trained.threshold,
@@ -952,14 +913,6 @@ def create_app(state: AppState) -> Any:
                 return state.summary()
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-
-    @app.post("/api/borrowed/stop")
-    def post_stop_borrowing() -> dict[str, Any]:
-        """Stop learning from another workspace's labels; see borrowing.py."""
-        borrowing.stop(state.workspace.root)
-        state.load_borrowed()
-        with state.lock:
-            return state.summary()
 
     @app.post("/api/audio-tracks")
     def post_audio_tracks(body: SubtitleStylesBody) -> dict[str, Any]:
