@@ -62,7 +62,7 @@ cd anime-voice-collector
 uv sync --locked
 ```
 
-`uv sync` downloads everything, about 5 GB. To check the machine, run `uv run avoc doctor`: it looks at the graphics card, FFmpeg and free disk space, and says how to fix anything missing.
+`uv sync` downloads everything, about 5 GB.
 
 You also need [FFmpeg](https://ffmpeg.org/). If you don't have it, the app's first page installs it for you in one click, without administrator rights. To install it yourself instead, see [Set up](docs/USAGE.md#set-up).
 
@@ -115,6 +115,8 @@ Each clip is one line of one character: voice only, mono, at the sample rate of 
 **Can I use translated subtitles?** Yes. Lines are best cut from subtitles in the spoken language, but translated or bilingual ones work. But an episode cut from a translation can only be exported as sound (RVC and such), not with text for GPT-SoVITS. With a translation you read, give it as the secondary subtitles.
 
 **It stopped halfway, for example out of graphics memory.** Add the same episode again. It continues where it stopped.
+
+**Something doesn't work, or shows an error.** Run `uv run avoc doctor`: it checks the graphics card, FFmpeg, the models and free disk space, and says how to fix anything missing. When you report a problem, include its output.
 
 **Can I do it from the command line?** Yes: `uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt"`. Run `uv run avoc --help` for all commands and options; the add form also shows the command for your workspace.
 

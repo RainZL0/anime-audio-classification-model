@@ -62,7 +62,7 @@ cd anime-voice-collector
 uv sync --locked
 ```
 
-`uv sync` 会下载所需的全部东西，大约 5 GB。想检查这台机器，运行 `uv run avoc doctor`：它会看显卡、FFmpeg 和剩余磁盘空间，缺什么会告诉你怎么补。
+`uv sync` 会下载所需的全部东西，大约 5 GB。
 
 另外还需要 [FFmpeg](https://ffmpeg.org/)。没有的话，界面的第一页可以一键帮你装好，不需要管理员权限。想自己装的话，见 [Set up](docs/USAGE.md#set-up)（英文）。
 
@@ -115,6 +115,8 @@ exports/2026-10-24/
 **能用翻译字幕吗？** 能。最好用原声语言的字幕切台词，但翻译字幕或双语字幕也行。但用翻译字幕切的集只能导出声音（RVC 等），导不出 GPT-SoVITS 要的文字。看得懂的译文请放在辅助字幕里。
 
 **做到一半停了，比如显存不够。** 再加一次同一集，会从停下的地方继续。
+
+**出了问题，或者报错。** 运行 `uv run avoc doctor`：它会检查显卡、FFmpeg、模型和剩余磁盘空间，缺什么会告诉你怎么补。反馈问题时请附上它的输出。
 
 **能用命令行吗？** 能：`uv run avoc add workspace "Episode 01.mkv" --subs "Episode 01.ja.srt"`。所有命令和选项见 `uv run avoc --help`；添加表单里也会写出对应你这个工作文件夹的命令。
 
