@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Clip } from "../api";
 import type { Roles } from "../api";
-import { statusText } from "../clips";
+import { novoiceTip, skippedTip, statusText } from "../clips";
 import { pct } from "../format";
 import { tr } from "../language";
 import { Avatar } from "./Avatar";
@@ -109,5 +109,11 @@ export function Pill({ clip }: { clip: Clip }) {
       </Tag>
     );
   }
-  return <Tag look={clip.status}>{statusText(clip.status)}</Tag>;
+  const tip =
+    clip.status === "novoice" ? novoiceTip() : clip.status === "skipped" ? skippedTip() : undefined;
+  return (
+    <Tag look={clip.status} tip={tip}>
+      {statusText(clip.status)}
+    </Tag>
+  );
 }

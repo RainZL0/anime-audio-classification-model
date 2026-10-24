@@ -1,9 +1,10 @@
 import { cn } from "cn";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Choice } from "../components/Choice";
 import type { Clip, Roles } from "../api";
-import { NEEDS_WORK, type LabelText } from "../clips";
+import { NEEDS_WORK, skippedTip, type LabelText } from "../clips";
 import { Empty } from "../components/Notes";
 import { Row } from "../components/Row";
 import { Tip } from "../components/Tip";
@@ -51,9 +52,27 @@ export function SceneView({
   }
   const left = clips.filter((c) => NEEDS_WORK.has(c.status)).length;
   const skipped = clips.filter((c) => c.status === "skipped").length;
+  /* The summary stays at the top while scrolling, so each scene header sticks just below it, and a selected
+     line scrolls into view below both. Its height changes when it wraps, so it is measured. */
+  const head = useRef<HTMLDivElement>(null);
+  const [headHeight, setHeadHeight] = useState(0);
+  useLayoutEffect(() => {
+    const box = head.current;
+    if (!box) return;
+    const watch = new ResizeObserver(() => setHeadHeight(box.offsetHeight));
+    watch.observe(box);
+    return () => watch.disconnect();
+  }, []);
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2.5 px-1 pt-3 pb-1">
+    <div
+      style={{ "--head": `${headHeight}px` } as CSSProperties}
+      className="[&_section>*]:scroll-mt-(--head)"
+    >
+      {/* -top-2 cancels the top padding of the list, so lines don't show through above it. */}
+      <div
+        ref={head}
+        className="sticky -top-2 z-[3] flex flex-wrap items-center gap-2.5 border-b bg-background px-1 pt-3 pb-2"
+      >
         <h2 className="text-base font-semibold">{episode}</h2>
         <span className="text-xs text-muted-foreground">
           {tr(
@@ -63,32 +82,23 @@ export function SceneView({
         </span>
         {skipped > 0 && (
           <>
-            <Tip
-              text={tr(
-                "短于 1 秒、前后 0.5 秒内没有别的台词，训练用不上，默认不显示",
-                "Shorter than 1 second with no other line within 0.5 seconds: no use for training, hidden by default",
-              )}
-            >
+            <Tip text={skippedTip()}>
               <span className="text-xs text-muted-foreground">
-                ·{" "}
-                {tr(
-                  `跳过 ${skipped} 句短句`,
-                  `${skipped} short ${skipped === 1 ? "line" : "lines"} skipped`,
-                )}
+                · {tr(`跳过 ${skipped} 句`, `${lines(skipped)} skipped`)}
               </span>
             </Tip>
-            {/* Grayed out under "Only to do", not hidden: skipped short lines are not work to do. The span
-                holds the hint, since a disabled button gets no mouse events. */}
+            {/* Grayed out under "Only to do", not hidden: skipped lines are not work to do. The span holds the
+                hint, since a disabled button gets no mouse events. */}
             <Tip
               text={
                 onlyWork
                   ? tr(
-                      "只在「整集」里能显示：跳过的短句不算要处理的",
-                      "Only under Whole episode: skipped short lines are not work to do",
+                      "只在「整集」里能显示：跳过的句子不算要处理的",
+                      "Only under Whole episode: skipped lines are not work to do",
                     )
                   : tr(
-                      "在「整集」里显示跳过的短句，想标也可以标",
-                      "Show the skipped short lines under Whole episode; you can still label them",
+                      "在「整集」里显示跳过的句子，想标也可以标",
+                      "Show the skipped lines under Whole episode; you can still label them",
                     )
               }
             >
@@ -104,8 +114,8 @@ export function SceneView({
                   onClick={() => setShowShort(!showShort)}
                 >
                   {showShort && !onlyWork
-                    ? tr("隐藏短句", "Hide short lines")
-                    : tr("显示短句", "Show short lines")}
+                    ? tr("隐藏跳过的", "Hide skipped")
+                    : tr("显示跳过的", "Show skipped")}
                 </Button>
               </span>
             </Tip>
@@ -138,8 +148,8 @@ export function SceneView({
       )}
       {scenes.map((s) => (
         <section key={`${s.scene}-${s.clips[0].id}`}>
-          {/* -top-2 cancels the top padding of the list, so lines don't show through above a stuck header. */}
-          <div className="sticky -top-2 z-[2] flex items-center gap-2 bg-background px-1 pt-3.5 pb-1.5 text-xs text-muted-foreground">
+          {/* Sticks right under the summary, which sits 0.5rem above the top of the list. */}
+          <div className="sticky top-[calc(var(--head)-0.5rem)] z-[2] flex items-center gap-2 bg-background px-1 pt-3.5 pb-1.5 text-xs text-muted-foreground">
             <b className="font-semibold text-foreground/80">
               {tr(`第 ${s.scene + 1} 场`, `Scene ${s.scene + 1}`)}
             </b>

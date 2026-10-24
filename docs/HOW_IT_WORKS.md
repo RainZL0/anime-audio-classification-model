@@ -22,7 +22,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Distance threshold | In the Groups view, two groups merge only if their distance is smaller than this value. |
 | Average linkage | A merge rule for hierarchical clustering: two groups merge only if the average distance between all their clips is within the threshold. |
 | Too short for a voiceprint | A clip shorter than 0.5 seconds. It stays in the clip table, but it has no voiceprint, so the machine makes no guess for it. |
-| Target character | A character the user wants to collect. Only target characters get names. Everyone else is labeled "Other". |
+| Skipped line | A clip shorter than 1 second with no other line within 0.5 seconds before or after it. It is hidden in Scenes by default and is not work to do. A short clip with other lines close by is not skipped. | A character the user wants to collect. Only target characters get names. Everyone else is labeled "Other". |
 | Small classifier | A logistic regression trained on the manual labels, with voiceprints as input. There is one per target character. Its output is the probability that a clip is that target. |
 | Confidence | The small classifier's probability for the top-ranked character. |
 | Similarity check | Checks whether a clip is similar enough to the closest confirmed clip of the top-ranked character. If it is not, the speaker may be someone who has not been labeled yet. |

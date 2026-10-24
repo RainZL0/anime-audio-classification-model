@@ -18,8 +18,20 @@ export const statusText = (status: Status) =>
     review: tr("待确认", "Check"),
     novoice: tr("太短，没有声纹", "Too short for a voiceprint"),
     unlabeled: tr("还没有模型", "No model yet"),
-    skipped: tr("太短，默认跳过", "Short, skipped"),
+    skipped: tr("已跳过", "Skipped"),
   })[status];
+
+/* Two kinds of short line, easy to mix up, so each hint names the other. */
+export const novoiceTip = () =>
+  tr(
+    "短于 0.5 秒，机器认不出是谁。前后有别的台词，可能是对话的一部分，所以没跳过，请直接选人",
+    "Shorter than 0.5 seconds, so the machine can't tell who it is. Other lines are close by, so it may be part of a conversation and is not skipped: pick the character yourself",
+  );
+export const skippedTip = () =>
+  tr(
+    "短于 1 秒，前后 0.5 秒内又没有别的台词，训练用不上，不算要处理的。前后有台词的短句不跳过，显示为「太短，没有声纹」",
+    'Shorter than 1 second with no other line within 0.5 seconds: no use for training, and not work to do. A short line with other lines close by is not skipped; it shows as "Too short for a voiceprint"',
+  );
 
 export const NEEDS_WORK = new Set<Status>(["review", "novoice", "unlabeled"]);
 
