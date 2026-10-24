@@ -6,7 +6,10 @@
     <title>avoc</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script>
-      if (localStorage.getItem("theme") === "dark") document.documentElement.dataset.theme = "dark";
+      if (localStorage.getItem("theme") === "dark") {
+        document.documentElement.classList.add("dark");
+        document.documentElement.dataset.theme = "dark";
+      }
     </script>
   </head>
   <body>

@@ -175,6 +175,7 @@ export function App() {
   const firstRun = !!state && totalConfirmed === 0;
 
   useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
     if (theme === "dark") document.documentElement.dataset.theme = "dark";
     else delete document.documentElement.dataset.theme;
     localStorage.setItem("theme", theme);

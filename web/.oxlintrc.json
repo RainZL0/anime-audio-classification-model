@@ -10,5 +10,12 @@
     "react/refs": "off",
     "react/set-state-in-effect": "off",
     "react/immutability": "off"
-  }
+  },
+  "overrides": [
+    {
+      // shadcn/ui components also export their style variants (buttonVariants and so on), as shadcn writes them.
+      "files": ["src/components/ui/**"],
+      "rules": { "react/only-export-components": "off" }
+    }
+  ]
 }
