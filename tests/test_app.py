@@ -385,6 +385,26 @@ def test_api_labels_retrains_and_undoes(tmp_path: Path) -> None:
     assert client.get(f"/media/avatar/{avatar}").status_code == 200
 
 
+def test_groups_hold_only_lines_still_to_do(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _workspace(tmp_path)
+    state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
+    client = TestClient(create_app(state))
+    clips = [c["id"] for c in client.get("/api/clips", params={"episode": "ep1"}).json()]
+    client.post("/api/label", json={"clips": [clips[0]], "label": "A"})
+
+    def grouped() -> set[str]:
+        return {c["id"] for g in client.get("/api/groups").json() for c in g["clips"]}
+
+    assert grouped() == set(clips[1:])
+    # The test set is too small for the machine to be confident, so make one guess confident. Its
+    # partner is then alone, and a group of one is not shown.
+    status = state.status
+    monkeypatch.setattr(state, "status", lambda c: "auto" if c.id == clips[1] else status(c))
+    assert grouped() == set(clips[3:])
+
+
 def test_skipped_clips_stay_out_of_the_work_lists_until_someone_labels_them(
     tmp_path: Path,
 ) -> None:

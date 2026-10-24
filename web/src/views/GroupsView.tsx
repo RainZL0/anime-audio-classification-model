@@ -130,8 +130,8 @@ export function GroupsView({
         <Empty title={tr("没有可分的组了", "No groups left")}>
           <p>
             {tr(
-              "这一集还没标的台词，要么彼此都不太像，要么已经全部有了名字。去「场景」视图逐句确认吧。",
-              "The unlabeled lines in this episode are either not much alike, or all named already. Go confirm them line by line in the Scenes view.",
+              "这一集要处理的台词，要么彼此都不太像，要么已经没有了。机器有把握的不分组，去「角色」视图核对；剩下的去「场景」视图逐句确认。",
+              "The lines still to do in this episode are either not much alike, or none are left. Lines the machine is confident about are not grouped: check them in the Characters view, and confirm the rest line by line in Scenes.",
             )}
           </p>
         </Empty>

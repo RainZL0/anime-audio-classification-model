@@ -348,13 +348,13 @@ class AppState:
     def groups(self, episode: str | None) -> list[dict[str, Any]]:
         from sklearn.cluster import AgglomerativeClustering
 
+        # Only lines still to do, as in "Only to do" in Scenes: not labeled, not skipped, with a
+        # voiceprint, and not a guess the machine is confident about.
         pool = [
             c
             for c in self.workspace.clips
-            if c.row is not None
-            and not c.skipped
-            and self.store.labels.get(c.id) is None
-            and (episode is None or c.episode == episode)
+            if (episode is None or c.episode == episode)
+            and self.status(c) in ("review", "unlabeled")
         ]
         if len(pool) < 2:
             return []
