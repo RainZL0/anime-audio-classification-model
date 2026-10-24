@@ -74,6 +74,29 @@ The probability of "Other" is recorded as 1 minus the probability of the top tar
 
 The small classifier only picks among the characters it already knows, so the second condition is required.
 
+### How many labels before the guesses are good
+
+Measured once, for one character (Tokai Teio, `teo`). The confirmed labels of episodes 1 and 2 (636 lines, 159 of them Teio, the rest "Other"; "low quality" left out) were replayed one at a time, as a person labels them in Scenes from the start of episode 1. After each step the machine was retrained the way the interface does it, and its guesses were scored on episode 3, which it never trained on: 310 lines, 57 of them Teio. Saying "Other" for every line there is already right 82% of the time, so that is the number to beat.
+
+The chance gap measures whether the probabilities can be taken at their word: lines the machine gives 80% should turn out to be Teio about 80% of the time. It is the average distance between the two, so 0 is perfect and 0.05 means about 5 points off. "Found" is the share of Teio's 57 lines that the machine named as Teio with confidence 0.6 or more.
+
+| Lines labeled | Of them Teio | Right | Right when confident | Found | Chance gap |
+| --- | --- | --- | --- | --- | --- |
+| 1–29 | 0 | no guess yet | | | |
+| 30 | 1 | 82% | 82% | 0% | 0.17 |
+| 50 | 6 | 93% | 95% | 58% | 0.06 |
+| 60 | 10 | 94% | 97% | 77% | 0.05 |
+| 150 | 25 | 96% | 97% | 81% | 0.03 |
+| 200 | 43 | 98% | 98% | 89% | 0.025 |
+| 636 | 159 | 99% | 99% | 95% | 0.014 |
+
+- The guesses become useful at about 10 Teio lines and 50 "Other": 94% right, and three quarters of her lines found.
+- The probabilities can be trusted, to within about 3 points, from about 25 Teio lines (150 labeled).
+- What counts is the number of Teio lines, not the total. Labeled in random order, Teio turns up sooner: 20 lines (about 6 Teio) give 94% right, and the chance gap drops under 0.03 by about 80 lines.
+- The interface is more careful than this table: no line counts as confident before 20 confirmed lines of the target (see above).
+
+Not measured: other characters, episodes from another season, and labeling in Groups. To repeat it on a workspace: `uv run python scripts/replay_labels.py workspace teo --train ep01,ep02 --test ep03` ([script](../scripts/replay_labels.py)).
+
 **Starting groups.** Only clips still to do are grouped: not labeled yet, not skipped, with a voiceprint, and without a guess the machine is confident about. These are the lines "Only to do" lists in Scenes, apart from those with too little voice. They are grouped with `anime-va`, average linkage and a threshold of 0.70. A person then names each whole group.
 
 **Text of a line.** A subtitle line counts as the text of a clip when their times overlap by at least half of the shorter of the two. Two clips that are more than 3 seconds apart start a new scene.
@@ -151,4 +174,5 @@ web/src/
   components/ui/           shadcn/ui components, copied in by its command
   views/                   Groups, Scenes, Characters, Export, adding an episode, the first page of an empty workspace
 web/e2e/                   browser tests, and the script that serves a small made-up workspace for them
+scripts/replay_labels.py   replays a workspace's labels to measure how fast the guesses become good
 ```
