@@ -30,7 +30,7 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
   const allEpisodes = tr("全部集数", "All episodes");
   const views: ViewCard[] = [
     {
-      name: tr("机器分组", "Guessed groups"),
+      name: tr("自动分组", "Auto groups"),
       key: "G",
       scope: oneEpisode,
       what: tr(
@@ -150,7 +150,7 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
           <Button variant="ghost" onClick={onClose}>
             {tr("关掉", "Close")}
           </Button>
-          <Button onClick={onStart}>{tr("从「机器分组」开始", "Start in Guessed groups")}</Button>
+          <Button onClick={onStart}>{tr("从「自动分组」开始", "Start in Auto groups")}</Button>
         </div>
       </DialogContent>
     </Dialog>

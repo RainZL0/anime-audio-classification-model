@@ -19,7 +19,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Style | In an ASS subtitle file, every line belongs to a named style, such as "Default" or "OP", which sets its font and place on screen. Subtitle groups often put dialogue, song lyrics and on-screen text in different styles. SRT files have no styles, so all their lines count as one style, "Default". |
 | Voiceprint | A set of numbers that describes a voice. It is used to check whether two clips may come from the same person. |
 | Distance | The cosine distance between two voiceprints. 0 means the same direction exactly. A larger number means less alike. It is not "the chance that these are the same person". |
-| Distance threshold | In the Guessed groups view, two groups merge only if their distance is smaller than this value. |
+| Distance threshold | In the Auto groups view, two groups merge only if their distance is smaller than this value. |
 | Average linkage | A merge rule for hierarchical clustering: two groups merge only if the average distance between all their clips is within the threshold. |
 | Too little voice | A clip shorter than 0.5 seconds. It stays in the clip table, but it is too short for a voiceprint, so the machine makes no guess for it and a person picks the character. |
 | Skipped line | A clip shorter than 1 second with no other line within 0.5 seconds before or after it. It is hidden in Scenes by default and is not work to do. A short clip with other lines close by is not skipped. |
@@ -148,6 +148,6 @@ web/src/
   components/              the top and bottom bars, the stage, one line, avatars, the avatar cropper, help,
                            and small shared parts (chips, pills, hints, rows of joined buttons)
   components/ui/           shadcn/ui components, copied in by its command
-  views/                   Guessed groups, Scenes, Characters, Export, adding an episode, the first page of an empty workspace
+  views/                   Auto groups, Scenes, Characters, Export, adding an episode, the first page of an empty workspace
 web/e2e/                   browser tests, and the script that serves a small made-up workspace for them
 ```

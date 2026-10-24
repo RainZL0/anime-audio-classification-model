@@ -102,7 +102,7 @@ export function GroupsView({
       {/* Says why there is nothing to do here, then where the work goes on. Wider than usual, so each step fits on one line when there is room. */}
       {groups.length === 0 && (
         <Empty
-          title={tr("「机器分组」里没有要做的了", "No more work to do in Guessed groups")}
+          title={tr("「自动分组」里没有要做的了", "No more work to do in Auto groups")}
           className="max-w-4xl"
         >
           <p>
