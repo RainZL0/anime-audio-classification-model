@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { media, mediaProblem, type Clip, type Roles } from "../api";
-import { lowTip, novoiceTip, OTHER, type LabelText } from "../clips";
+import { lowTip, newTip, novoiceTip, OTHER, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
 import { tr } from "../language";
 import { needsText } from "../purpose";
 import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
-import { LowButton } from "./Chip";
+import { Chip, LowButton } from "./Chip";
 import { Choice } from "./Choice";
 import { Note } from "./Notes";
 import { NoText, Tag } from "./Pills";
@@ -534,16 +534,16 @@ export function Stage({
                 <Kbd className="ml-1">Enter</Kbd>
               </Button>
             )}
-            <Tip
-              text={tr(
-                "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
-                "Make a new target character; you can name it later. With video, crop an avatar next",
-              )}
+            {/* The same chip as in the bottom bar and under each group. */}
+            <Chip
+              small
+              tip={newTip()}
+              onPick={onNewRole}
+              picture={<Avatar plus size="sm" />}
+              hotkey="N"
             >
-              <Button variant="outline" onClick={onNewRole}>
-                {tr("新角色", "New character")} <Kbd className="ml-1">N</Kbd>
-              </Button>
-            </Tip>
+              {tr("新角色", "New character")}
+            </Chip>
             <Note>
               {tr(
                 "已有的人按数字键，或点底部的头像",

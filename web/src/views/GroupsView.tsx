@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import type { Clip, Group, Roles } from "../api";
-import { lowTip, OTHER, type LabelText } from "../clips";
+import { lowTip, newTip, OTHER, type LabelText } from "../clips";
 import { Avatar } from "../components/Avatar";
 import { Chip, LowButton } from "../components/Chip";
 import { EpisodeProgress, type Progress } from "../components/EpisodeProgress";
@@ -344,10 +344,7 @@ export function GroupsView({
                   <Chip
                     small
                     off={!keep.length}
-                    tip={tr(
-                      "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
-                      "Make a new target character; you can name it later. With video, crop an avatar next",
-                    )}
+                    tip={newTip()}
                     onPick={() => onNew(ids)}
                     picture={<Avatar plus size="sm" />}
                     hotkey="N"

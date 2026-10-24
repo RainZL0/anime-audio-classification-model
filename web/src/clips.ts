@@ -38,6 +38,11 @@ export const NEEDS_WORK = new Set<Status>(["review", "novoice", "unlabeled"]);
 
 /* Each target character has two choices: clean, and "low quality" (Shift + number). Only targets have it;
    "other" is never exported anyway. There used to be a separate "several people", now merged into low quality. */
+export const newTip = () =>
+  tr(
+    "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
+    "Make a new target character; you can name it later. With video, crop an avatar next",
+  );
 export const lowTip = () =>
   tr(
     "背景音太重、有人同时出声之类，不能进干净数据集。不拿来认人，导出时跳过",

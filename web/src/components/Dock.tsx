@@ -1,5 +1,5 @@
 import type { Roles } from "../api";
-import { lowTip, OTHER, type LabelText } from "../clips";
+import { lowTip, newTip, OTHER, type LabelText } from "../clips";
 import { tr } from "../language";
 import { Avatar } from "./Avatar";
 import { Chip, LowButton } from "./Chip";
@@ -47,10 +47,7 @@ export function Dock({ dock, roles, labelText, canNew, onName, onNew }: DockProp
       </Chip>
       <Chip
         off={!canNew}
-        tip={tr(
-          "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
-          "Make a new target character; you can name it later. With video, crop an avatar next",
-        )}
+        tip={newTip()}
         onPick={onNew}
         picture={<Avatar plus size="md" />}
         hotkey="N"
