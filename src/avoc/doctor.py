@@ -43,9 +43,11 @@ def checks(where: Path) -> list[Check]:
                 f"torch {torch.__version__}, CUDA {'available' if cuda else 'not available'}{gpu}",
             ),
             say(
-                "没找到能用的 NVIDIA 显卡，会用 CPU。能用，但分离一集的人声会慢很多",
-                "No usable NVIDIA GPU was found, so the CPU will be used. It works, but separating "
-                "vocals for one episode is much slower",
+                "没找到能用的 NVIDIA 显卡，会用 CPU：能用，但每集要慢很多。有 NVIDIA 显卡的话，"
+                "从 https://www.nvidia.com/drivers 更新显卡驱动，再重启 avoc",
+                "No usable NVIDIA GPU was found, so the CPU will be used: it works, but each "
+                "episode takes much longer. If you have an NVIDIA card, update its driver from "
+                "https://www.nvidia.com/drivers and restart avoc",
             ),
             required=False,
         )
@@ -57,8 +59,10 @@ def checks(where: Path) -> list[Check]:
                 bool(path),
                 f"{tool}: {path or say('没找到', 'not found')}",
                 say(
-                    "装上 FFmpeg，把它的 bin 文件夹加进 PATH，再重启 avoc",
-                    "Install FFmpeg, add its bin folder to PATH, and restart avoc",
+                    "装上 FFmpeg：在 PowerShell 里运行 winget install Gyan.FFmpeg，"
+                    "然后关掉终端、新开一个，再启动 avoc",
+                    "Install FFmpeg: run winget install Gyan.FFmpeg in PowerShell, then close the "
+                    "terminal, open a new one, and start avoc again",
                 ),
             )
         )
@@ -102,8 +106,9 @@ def checks(where: Path) -> list[Check]:
                 f"Free space on the disk of {where}: {free:.0f} GB",
             ),
             say(
-                "处理好的一集大约占 0.5 GB，留够空间",
-                "One processed episode takes about 0.5 GB, so leave enough space",
+                "处理好的一集大约占 0.5 GB。腾出空间，或者把工作文件夹放到空间更多的磁盘上",
+                "One processed episode takes about 0.5 GB. Free some space, or put the workspace "
+                "on a disk with more room",
             ),
         )
     )

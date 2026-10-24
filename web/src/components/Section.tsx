@@ -5,16 +5,19 @@ import { Field, FieldLabel } from "@/components/ui/field";
    when needed ("optional", "ASS or SRT"), then the box or buttons, then any longer explanation in a Note below.
    The title is clearly bigger and darker than the notes, so the parts of the form are easy to tell apart. */
 export function Section({
+  id,
   title,
   aside,
   children,
 }: {
+  /* For a link that jumps to this part. */
+  id?: string;
   title: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Field className="gap-2">
+    <Field id={id} className="scroll-mt-4 gap-2">
       <FieldLabel className="text-sm font-semibold">
         {title}
         {aside && <span className="font-normal text-muted-foreground">{aside}</span>}

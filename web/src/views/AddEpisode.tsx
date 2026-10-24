@@ -33,20 +33,24 @@ const LOG =
 
 /* What `avoc doctor` finds on this machine. On the first page (`all`) every check is listed with a tick, so the
    person sees the machine is ready before adding anything; in the dialog only problems are shown, and nothing while
-   checking or when all is well. A missing token only points to the offset box, where its steps are. */
-function MachineChecks({ list, all }: { list: Check[] | null; all: boolean }) {
+   checking or when all is well. Each failed check says what to do; the token gets its steps here, and the offset
+   box links up to them. */
+function MachineChecks({
+  list,
+  all,
+  onCheck,
+  checking,
+}: {
+  list: Check[] | null;
+  all: boolean;
+  onCheck: () => void;
+  checking: boolean;
+}) {
   if (!list && !all) return null;
-  const shown = (list ?? []).filter((c) => all || (!c.ok && c.topic !== "token"));
+  const shown = (list ?? []).filter((c) => all || !c.ok);
   if (list && !shown.length) return null;
-  const fixOf = (c: Check) =>
-    c.topic === "token"
-      ? tr(
-          "只有自动测字幕偏移时才要，步骤见下面「字幕偏移」",
-          'Only needed to measure the subtitle offset; the steps are under "Subtitle offset" below',
-        )
-      : c.fix;
   return (
-    <Section title={tr("这台机器", "This machine")}>
+    <Section id={MACHINE} title={tr("这台机器", "This machine")}>
       {!list && <Note>{tr("正在检查这台机器…", "Checking this machine…")}</Note>}
       <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
         {shown.map((c) => (
@@ -62,25 +66,36 @@ function MachineChecks({ list, all }: { list: Check[] | null; all: boolean }) {
             >
               {c.ok ? "✓" : c.required ? "✗" : "–"}
             </span>
-            <span>
+            <span className="flex min-w-0 flex-col gap-1">
               {c.text}
-              {!c.ok && fixOf(c) && (
-                <>
-                  <br />
-                  <span className="text-muted-foreground">{fixOf(c)}</span>
-                </>
-              )}
+              {!c.ok &&
+                (c.topic === "token" ? (
+                  <TokenSteps />
+                ) : (
+                  c.fix && <span className="text-muted-foreground">{c.fix}</span>
+                ))}
             </span>
           </li>
         ))}
       </ul>
+      {shown.some((c) => !c.ok) && (
+        <div>
+          <Button type="button" variant="outline" size="sm" disabled={checking} onClick={onCheck}>
+            {checking
+              ? tr("正在检查…", "Checking…")
+              : tr("改好了，再检查一次", "Fixed it, check again")}
+          </Button>
+        </div>
+      )}
     </Section>
   );
 }
 
-/* How to get the Hugging Face token that measuring the offset needs, step by step, with a button to check again
-   once it is done. */
-function TokenSteps({ onCheck, checking }: { onCheck: () => void; checking: boolean }) {
+/* The id of the machine checks, which the offset box links up to. */
+const MACHINE = "machine-checks";
+
+/* How to get the Hugging Face token that measuring the offset needs, step by step. */
+function TokenSteps() {
   const link = (href: string, text: string) => (
     <a
       href={href}
@@ -92,11 +107,11 @@ function TokenSteps({ onCheck, checking }: { onCheck: () => void; checking: bool
     </a>
   );
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-[13px]">
+    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-[13px] text-foreground">
       <div className="font-semibold">
         {tr(
-          "这台机器还没有 Hugging Face 令牌，自动测要先做一次这几步（免费，约 3 分钟）：",
-          "This machine has no Hugging Face token yet. To measure automatically, do these steps once (free, about 3 minutes):",
+          "自动测字幕偏移要用它。做一次这几步（免费，约 3 分钟）：",
+          "Measuring the subtitle offset needs it. Do these steps once (free, about 3 minutes):",
         )}
       </div>
       <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
@@ -131,16 +146,11 @@ function TokenSteps({ onCheck, checking }: { onCheck: () => void; checking: bool
           </pre>
         </li>
       </ol>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={checking} onClick={onCheck}>
-          {checking ? tr("正在检查…", "Checking…") : tr("做好了，再检查一次", "Done, check again")}
-        </Button>
-        <span className="text-muted-foreground">
-          {tr(
-            "不想弄的话，填上前面测过的同一片源、同一字幕组的偏移也行。",
-            "Or give the offset measured for an earlier episode from the same source and subtitle group.",
-          )}
-        </span>
+      <div className="text-muted-foreground">
+        {tr(
+          "不想弄的话，在下面自己填字幕偏移也行，比如同一片源、同一字幕组之前测过的值。",
+          "Or type the subtitle offset below yourself, such as the value measured for an earlier episode from the same source and subtitle group.",
+        )}
       </div>
     </div>
   );
@@ -650,7 +660,7 @@ export function AddEpisode({
           ))}
         </Section>
       )}
-      <MachineChecks list={checks} all={allChecks} />
+      <MachineChecks list={checks} all={allChecks} onCheck={check} checking={checking} />
       <form className="flex flex-col gap-6" onSubmit={start}>
         <Section title={tr("收集声音做什么用", "What the voices are for")}>
           <Choice<Purpose>
@@ -803,7 +813,23 @@ export function AddEpisode({
                   "How many seconds to add to the subtitle times so they line up with the sound. Later episodes from the same source and subtitle group get the measured value filled in.",
                 )}
           </Note>
-          {noToken && !offset.trim() && <TokenSteps onCheck={check} checking={checking} />}
+          {noToken && !offset.trim() && (
+            <Note warn>
+              {tr(
+                "这台机器没有 Hugging Face 令牌，测不了：照上面的步骤弄好，或者在这里填上偏移。",
+                "This machine has no Hugging Face token, so it cannot be measured: follow the steps above, or type the offset here.",
+              )}{" "}
+              <button
+                type="button"
+                className="text-primary underline underline-offset-2"
+                onClick={() =>
+                  document.getElementById(MACHINE)?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                {tr("看步骤", "See the steps")}
+              </button>
+            </Note>
+          )}
         </Section>
         <Note>
           {withKeys(
