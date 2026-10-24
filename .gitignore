@@ -12,6 +12,9 @@ wheels/
 # Web app: dependencies installed by npm
 web/node_modules/
 npm-debug.log*
+# Browser test output: traces and reports of failed runs
+web/test-results/
+web/playwright-report/
 
 # Data and outputs: never committed to git
 data/

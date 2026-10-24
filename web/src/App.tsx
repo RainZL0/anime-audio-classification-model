@@ -1149,6 +1149,11 @@ export function App() {
               ? tr("换成白天配色", "Switch to light colors")
               : tr("换成夜间配色", "Switch to dark colors")
           }
+          aria-label={
+            theme === "dark"
+              ? tr("换成白天配色", "Switch to light colors")
+              : tr("换成夜间配色", "Switch to dark colors")
+          }
         >
           {theme === "dark" ? "☀" : "☾"}
         </button>
