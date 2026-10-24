@@ -18,7 +18,7 @@ export const statusText = (status: Status) =>
     review: tr("待确认", "Check"),
     novoice: tr("特征不够", "Too little voice"),
     unlabeled: tr("机器还没猜", "Not guessed yet"),
-    skipped: tr("已跳过", "Skipped"),
+    skipped: tr("太短，已跳过", "Too short, skipped"),
   })[status];
 
 /* The labels stay plain; the exact rules are in the hints, for those who want them. Each hint names the other

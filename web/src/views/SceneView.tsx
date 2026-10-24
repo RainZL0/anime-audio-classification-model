@@ -88,7 +88,7 @@ export function SceneView({
           <>
             <Tip text={skippedTip()}>
               <span className="text-xs text-muted-foreground">
-                · {tr(`跳过 ${skipped} 句`, `${lines(skipped)} skipped`)}
+                · {tr(`${skipped} 句太短，已跳过`, `${lines(skipped)} too short, skipped`)}
               </span>
             </Tip>
             {/* Grayed out under "Only to do", not hidden: skipped lines are not work to do. The span holds the
@@ -97,11 +97,11 @@ export function SceneView({
               text={
                 onlyWork
                   ? tr(
-                      "只在「整集」里能显示：跳过的台词不算要处理的",
+                      "只在「整集」里能显示：太短跳过的台词不算要处理的",
                       "Only under Whole episode: skipped lines are not work to do",
                     )
                   : tr(
-                      "在「整集」里显示跳过的台词，想标也可以标",
+                      "在「整集」里显示太短跳过的台词，想标也可以标",
                       "Show the skipped lines under Whole episode; you can still label them",
                     )
               }
@@ -118,8 +118,8 @@ export function SceneView({
                   onClick={() => setShowShort(!showShort)}
                 >
                   {showShort && !onlyWork
-                    ? tr("隐藏跳过的", "Hide skipped")
-                    : tr("显示跳过的", "Show skipped")}
+                    ? tr("隐藏太短的", "Hide short ones")
+                    : tr("显示太短的", "Show short ones")}
                 </Button>
               </span>
             </Tip>
