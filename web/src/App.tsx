@@ -989,6 +989,7 @@ export function App() {
     );
   const addProps = {
     state,
+    setState,
     adding,
     setAdding,
     onOpen: openEpisode,

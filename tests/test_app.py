@@ -307,6 +307,22 @@ def test_an_unfinished_episode_can_be_carried_on_from_the_page(
     assert summary["skipped"] == {}
 
 
+def test_an_episode_never_cut_is_listed_from_the_record_and_can_be_given_up(
+    tmp_path: Path,
+) -> None:
+    root = _workspace(tmp_path)
+    record = {"video": str(tmp_path / "x.mkv"), "subtitles": str(tmp_path / "x.ass")}
+    (root / "adding.json").write_text(json.dumps({"ep9": record, "ep1": record}))
+    client = TestClient(create_app(AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")))
+    summary = client.get("/api/state", headers={"X-Language": "en"}).json()
+    # ep1 loads in full, so its record is dropped.
+    assert summary["not_cut"] == ["ep9"]
+    assert "never cut" in summary["skipped"]["ep9"]
+    after = client.post("/api/add/forget", json={"episode": "ep9"}).json()
+    assert after["not_cut"] == [] and after["skipped"] == {}
+    assert not (root / "adding.json").exists()
+
+
 def test_messages_follow_the_page_language(tmp_path: Path) -> None:
     import shutil
 

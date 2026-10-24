@@ -120,6 +120,10 @@ def add(
     # When the interface runs this command, it asks for our own lines to be marked, so it can
     # tell them apart from what the libraries print.
     mark = pipeline.PROGRESS_MARK if os.environ.get("AVOC_MARK_PROGRESS") else ""
+    from avoc.app.adding import STOP_WITH_INTERFACE, stop_with_interface
+
+    if os.environ.get(STOP_WITH_INTERFACE):
+        stop_with_interface()
 
     def report(line: str) -> None:
         typer.echo(mark + line)

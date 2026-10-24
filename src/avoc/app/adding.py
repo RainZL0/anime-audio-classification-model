@@ -4,6 +4,10 @@ runs `avoc add` in a separate process, the same command as on the command line.
 A separate process keeps the GPU memory of voice separation out of the server, lets the person stop
 it, and a crash there does not take the interface down. Only one episode is added at a time. Each
 line the command prints is kept, so the page can show the progress.
+
+The files each episode was started with are written to `adding.json` in the workspace and kept
+until the episode is added. So an episode that was stopped, failed, or cut off when the server
+restarted is still listed after a restart, and can be carried on with the same files.
 """
 
 from __future__ import annotations
@@ -30,11 +34,44 @@ COLOR_CODES = re.compile(r"\x1b\[[0-9;]*m")
 PROGRESS_BAR = re.compile(r"\d+%\|")
 """A tqdm progress bar, such as ` 3%|▎   | 44/1429 [02:32<1:26:44, 3.76s/it]`. It redraws itself
 with a carriage return, which reading the output in text mode turns into separate lines."""
+RECORD = "adding.json"
+"""In the workspace: episode name -> the files and choices it was started with."""
+STOP_WITH_INTERFACE = "AVOC_STOP_WITH_INTERFACE"
+"""Set for the `avoc add` the interface starts; see `stop_with_interface`."""
 
 
 def clean_path(text: str) -> Path:
     """A path pasted from the file manager often has quotes around it."""
     return Path(text.strip().strip('"').strip("'"))
+
+
+def stop_with_interface() -> None:
+    """Called in `avoc add` when the interface started it. The server keeps the command's input
+    open and never writes to it, so the input ends only when the server process ends: a restart
+    under `--reload`, a closed terminal, or a crash. Then stop as if Ctrl+C was pressed, so the
+    usual clean-up runs (a half-cut folder is deleted) and the command does not run on unseen,
+    holding the GPU."""
+    import _thread
+
+    def watch() -> None:
+        sys.stdin.buffer.read()
+        _thread.interrupt_main()
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
+def _remove(folder: Path) -> bool:
+    """Delete a half-built episode folder. On Windows a file may stay locked for a moment after the
+    process that wrote it ends."""
+    for _ in range(10):
+        try:
+            shutil.rmtree(folder)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            time.sleep(0.5)
+    return not folder.exists()
 
 
 class Adding:
@@ -61,6 +98,51 @@ class Adding:
         self.ended = threading.Event()
         self.program = [sys.executable, "-m", "avoc"]
         """How to run avoc. Tests swap in a small script."""
+        self._records_lock = threading.Lock()
+
+    def _folder(self, name: str) -> Path:
+        return self.workspace / "episodes" / name
+
+    def _cut(self, name: str) -> bool:
+        """Whether the slowest step, cutting the clips, is done: it writes episode.json last."""
+        return (self._folder(name) / "episode.json").exists()
+
+    def _records(self) -> dict[str, dict[str, Any]]:
+        from avoc.project import read_json
+
+        path = self.workspace / RECORD
+        return read_json(path) if path.is_file() else {}
+
+    def _change_records(self, change: Callable[[dict[str, dict[str, Any]]], None]) -> None:
+        from avoc.project import write_json
+
+        with self._records_lock:
+            records = self._records()
+            change(records)
+            path = self.workspace / RECORD
+            if records:
+                self.workspace.mkdir(parents=True, exist_ok=True)
+                write_json(path, records)
+            else:
+                path.unlink(missing_ok=True)
+
+    def not_cut(self) -> list[str]:
+        """Episodes started earlier whose clips were never cut: they cannot be loaded, so they are
+        listed only from the record. The one being added now is left out."""
+        with self.lock:
+            running = self.episode if self.state == "running" else None
+        return [n for n in self._records() if n != running and not self._cut(n)]
+
+    def drop_records(self, names: set[str]) -> None:
+        """Forget the record of these episodes: added, given up, or loading in full (including
+        ones finished from the command line)."""
+
+        def drop(records: dict[str, dict[str, Any]]) -> None:
+            for name in names & records.keys():
+                del records[name]
+
+        if names & self._records().keys():
+            self._change_records(drop)
 
     def status(self) -> dict[str, Any]:
         with self.lock:
@@ -68,6 +150,7 @@ class Adding:
             return {
                 "state": self.state,
                 "episode": self.episode,
+                "cut": self.episode is not None and self._cut(self.episode),
                 "lines": list(self.lines),
                 "errors": list(self.errors),
                 "bar": self.bar,
@@ -136,8 +219,24 @@ class Adding:
                     "and restart avoc",
                 )
             )
-        name = name or find_episode_by_video(self.workspace, video) or next_name(self.workspace)
+        records = self._records()
+        recorded = next((n for n, r in records.items() if r["video"] == str(video.resolve())), None)
+        name = (
+            name or find_episode_by_video(self.workspace, video) or recorded
+            or next_name(self.workspace)
+        )  # fmt: skip
         validate_name(name)
+        folder = self._folder(name)
+        # A folder left half-built by a run that was cut off before it could clean up. The record
+        # says it was ours, and nothing is running now, so it can go.
+        if name in records and folder.is_dir() and not self._cut(name) and not _remove(folder):
+            raise ValueError(
+                say(
+                    f"删不掉 {name} 上次做了一半的文件，可能上次的处理还没完全停下。等一会儿再试",
+                    f"Cannot delete the half-built files of {name}; the last run may not have "
+                    "fully stopped yet. Try again in a moment",
+                )
+            )
 
         command = [*self.program, "add", str(self.workspace), str(video),
                    "--subs", str(subtitles), "--name", name]  # fmt: skip
@@ -160,9 +259,27 @@ class Adding:
             # A plain traceback instead of typer's boxed one: its last line is the reason, and
             # the page shows the last lines.
             "_TYPER_STANDARD_TRACEBACK": "1",
+            STOP_WITH_INTERFACE: "1",
         }
+
+        def remember(records: dict[str, dict[str, Any]]) -> None:
+            def path(p: Path | None) -> str | None:
+                return str(p.resolve()) if p is not None else None
+
+            records[name] = {
+                "video": path(video),
+                "subtitles": path(subtitles),
+                "text_subtitles": path(text_subtitles),
+                "display_subtitles": path(display_subtitles),
+                "offset": offset,
+                "styles": styles,
+                "spoken": spoken,
+            }
+
+        self._change_records(remember)
         process = subprocess.Popen(
             command,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -192,25 +309,24 @@ class Adding:
         self._collect(process.stdout, "lines")
         errors.join()
         code = process.wait()
-        folder = self.workspace / "episodes" / name
+        if process.stdin is not None:
+            process.stdin.close()
+        folder = self._folder(name)
         with self.lock:
             stopped = self.state == "stopped"
-        if stopped and folder.is_dir() and not (folder / "episode.json").exists():
+        if stopped and folder.is_dir() and not self._cut(name):
             # Stopped before the clips were cut: delete the half-built folder, so the next try is
-            # not refused. On Windows a file may stay locked for a moment after the process ends.
-            for _ in range(10):
-                try:
-                    shutil.rmtree(folder)
-                    break
-                except OSError:
-                    time.sleep(0.5)
-        if (folder / "episode.json").exists():
+            # not refused.
+            _remove(folder)
+        if self._cut(name):
             try:
                 self.on_done(name)
             except Exception as exc:  # The episode is on disk; only loading it failed.
                 with self.lock:
                     self.errors.append(str(exc))
                 code = code or 1
+        if code == 0 and not stopped:
+            self.drop_records({name})
         with self.lock:
             if self.state == "running":
                 self.state = "done" if code == 0 else "failed"
@@ -252,3 +368,69 @@ class Adding:
             os.killpg(process.pid, signal.SIGTERM)
         self.ended.wait(timeout=30)
         return self.status()
+
+    def carry_on(self, name: str) -> dict[str, Any]:
+        """Start an unfinished episode again with the files it was started with: from the record,
+        or, for an episode added before there was one, from its episode.json."""
+        from avoc.project import read_json, validate_name
+
+        validate_name(name)
+        record = self._records().get(name)
+        meta = read_json(self._folder(name) / "episode.json") if self._cut(name) else None
+        if record is None and meta is None:
+            raise ValueError(
+                say(
+                    f"{name} 还没切好片段，没法接着做。重新加这一集",
+                    f"{name} has no clips yet, so it cannot be continued. Add it again",
+                )
+            )
+        if record is None:
+            assert meta is not None
+            # Text subtitles not attached yet are noted in episode.json, and avoc add picks them
+            # up by itself.
+            video, subtitles = Path(meta["video"]), Path(meta["subtitles"])
+            return self.start(video, subtitles, offset=meta.get("subtitle_offset"), name=name)
+
+        def path(key: str) -> Path | None:
+            return Path(record[key]) if record.get(key) else None
+
+        return self.start(
+            Path(record["video"]),
+            Path(record["subtitles"]),
+            path("text_subtitles"),
+            # Once the clips are cut the offset is known, so no token is needed to measure it.
+            meta.get("subtitle_offset") if meta else record.get("offset"),
+            name,
+            record.get("styles"),
+            record.get("spoken"),
+            path("display_subtitles"),
+        )
+
+    def forget(self, name: str) -> None:
+        """Give up an episode whose clips were never cut: delete its record and any half-built
+        folder. An episode with clips is kept; deleting it is a separate matter."""
+        from avoc.project import validate_name
+
+        validate_name(name)
+        with self.lock:
+            if self.state == "running" and self.episode == name:
+                raise ValueError(
+                    say(f"{name} 正在加，先停下", f"{name} is being added. Stop it first")
+                )
+        if self._cut(name):
+            raise ValueError(
+                say(
+                    f"{name} 已经切好了片段，这里不删",
+                    f"{name} already has its clips, so it is not deleted here",
+                )
+            )
+        folder = self._folder(name)
+        if folder.is_dir() and not _remove(folder):
+            raise ValueError(
+                say(
+                    f"删不掉 {name} 做了一半的文件，可能还在用。等一会儿再试",
+                    f"Cannot delete the half-built files of {name}; they may still be in use. "
+                    "Try again in a moment",
+                )
+            )
+        self.drop_records({name})

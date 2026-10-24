@@ -70,6 +70,7 @@ class AppState:
         self.workspace = load_workspace(root, models, grouping)
         self.store = LabelStore(self.workspace.labels_dir)
         self.adding = Adding(root, lambda _: self.reload())
+        self.adding.drop_records(set(self.workspace.episodes))
         self.lock = threading.RLock()
         self.guesses: dict[int, Guess] = {}
         self.trained: dict[str, Any] = {}
@@ -88,6 +89,7 @@ class AppState:
         with self.lock:
             self.workspace = workspace
             self.retrain()
+        self.adding.drop_records(set(workspace.episodes))
 
     # Model
 
@@ -216,6 +218,21 @@ class AppState:
             "status": self.status(clip),
         }
 
+    def _unfinished(self, not_cut: list[str]) -> dict[str, str]:
+        """Episodes not loaded, and why: ones with clips but not all voiceprints, and ones whose
+        clips were never cut, known only from the record of episodes being added."""
+        unfinished = {name: str(why) for name, why in self.workspace.skipped.items()}
+        for name in not_cut:
+            unfinished.setdefault(
+                name,
+                say(
+                    "上次没加完，片段还没切好。接着做要从头切，这一步最慢",
+                    "not finished last time, and its clips were never cut. Carrying on starts "
+                    "the cutting over, the slowest step",
+                ),
+            )
+        return unfinished
+
     def summary(self) -> dict[str, Any]:
         per_episode: dict[str, Counter[str]] = {e: Counter() for e in self.workspace.episodes}
         confirmed: Counter[str] = Counter()
@@ -253,6 +270,7 @@ class AppState:
         ]
         roles.sort(key=lambda r: (not r.get("target"), -(r["confirmed"] + r["predicted"])))
         blocked = self._blocked()
+        not_cut = self.adding.not_cut()
         return {
             "episodes": [
                 {
@@ -266,7 +284,8 @@ class AppState:
                 for name, meta in self.workspace.episodes.items()
             ],
             "workspace": str(self.workspace.root.resolve()),
-            "skipped": {name: str(why) for name, why in self.workspace.skipped.items()},
+            "skipped": self._unfinished(not_cut),
+            "not_cut": not_cut,
             "roles": roles,
             "other": counts(OTHER),
             "model": {**self.trained, "auto_confidence": AUTO_CONFIDENCE},
@@ -702,6 +721,10 @@ class AddBody(BaseModel):
     """Carry on with an episode that was not finished, using the files recorded for it."""
 
 
+class ForgetBody(BaseModel):
+    episode: str
+
+
 class SubtitleStylesBody(BaseModel):
     path: str
 
@@ -733,25 +756,6 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
         "agreement": meta.get("text_subtitle_agreement"),
         "marked": marked_note(found) if (found := meta.get("text_subtitle_marked")) else None,
     }
-
-
-def _recorded_files(root: Path, name: str) -> tuple[Path, Path, Path | None, float | None, str]:
-    """The files an unfinished episode was started with, read from its episode.json, to carry on.
-    Text subtitles not attached yet are noted in episode.json too, and avoc add picks them up by
-    itself."""
-    from avoc.project import read_json, validate_name
-
-    validate_name(name)
-    path = root / "episodes" / name / "episode.json"
-    if not path.is_file():
-        raise ValueError(
-            say(
-                f"{name} 还没切好片段，没法接着做。重新加这一集",
-                f"{name} has no clips yet, so it cannot be continued. Add it again",
-            )
-        )
-    meta = read_json(path)
-    return Path(meta["video"]), Path(meta["subtitles"]), None, meta.get("subtitle_offset"), name
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:
@@ -934,7 +938,7 @@ def create_app(state: AppState) -> Any:
         so the add form can show them."""
         from dataclasses import asdict
 
-        from avoc.audio import audio_tracks
+        from avoc.audio import audio_tracks, can_read
         from avoc.pipeline import choose_track
         from avoc.stages.text_language import from_tag
 
@@ -942,6 +946,14 @@ def create_app(state: AppState) -> Any:
         if not path.is_file():
             raise HTTPException(400, say(f"找不到视频：{path}", f"cannot find the video: {path}"))
         tracks = audio_tracks(path)
+        if not tracks and not can_read(path):
+            raise HTTPException(
+                400,
+                say(
+                    "FFmpeg 读不了这个文件，它是视频吗",
+                    "FFmpeg cannot read this file. Is it a video?",
+                ),
+            )
         if not tracks:
             return {"tracks": [], "number": None, "language": None, "from": None}
         number, language, how = choose_track(tracks, None)
@@ -977,7 +989,7 @@ def create_app(state: AppState) -> Any:
     def post_add(body: AddBody) -> dict[str, Any]:
         try:
             if body.resume:
-                return state.adding.start(*_recorded_files(state.workspace.root, body.resume))
+                return state.adding.carry_on(body.resume)
             if not body.video.strip() or not body.subtitles.strip():
                 raise ValueError(
                     say("视频和字幕都要填", "both the video and the subtitles are needed")
@@ -1032,6 +1044,14 @@ def create_app(state: AppState) -> Any:
     @app.post("/api/add/stop")
     def post_add_stop() -> dict[str, Any]:
         return state.adding.stop()
+
+    @app.post("/api/add/forget")
+    def post_add_forget(body: ForgetBody) -> dict[str, Any]:
+        try:
+            state.adding.forget(body.episode)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return state.summary()
 
     # The avatar route must come before /media/{kind}/{clip_id}, or "avatar" would be
     # taken as a kind.

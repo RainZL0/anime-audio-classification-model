@@ -112,7 +112,10 @@ export interface Model {
 export interface Summary {
   episodes: Episode[];
   workspace: string;
+  /* Episodes not loaded, and why. */
   skipped: Record<string, string>;
+  /* Those of them whose clips were never cut: they can be given up. Missing when the server is older than this page. */
+  not_cut?: string[];
   roles: Role[];
   other: Counts;
   model: Model;
@@ -170,6 +173,8 @@ export interface SubtitleStyles {
 export interface Adding {
   state: "idle" | "running" | "done" | "failed" | "stopped";
   episode: string | null;
+  /* Whether its clips are cut, the slowest step; what comes after can be carried on. */
+  cut?: boolean;
   lines: string[];
   errors: string[];
   bar: string | null;

@@ -202,6 +202,7 @@ function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) 
 
 export interface AddEpisodeProps {
   state: Summary;
+  setState: (state: Summary) => void;
   adding: Adding | null;
   setAdding: (adding: Adding) => void;
   onOpen: (episode: string) => void;
@@ -213,6 +214,7 @@ export interface AddEpisodeProps {
    status, polled by App. */
 export function AddEpisode({
   state,
+  setState,
   adding,
   setAdding,
   onOpen,
@@ -308,8 +310,41 @@ export function AddEpisode({
     }
     setBusy(false);
   };
+  const forget = async (episode: string) => {
+    setBusy(true);
+    try {
+      setState(await call<Summary>("/api/add/forget", { episode }));
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+    setBusy(false);
+  };
   const running = adding?.state === "running";
   const unfinished = Object.entries(state.skipped || {});
+  /* What is kept after it ended without finishing. The slowest step, cutting the clips, is kept only once it is
+     done; stopped partway, it starts over. */
+  const kept = adding?.cut
+    ? tr(
+        "切好的片段和算好的声纹都留着，在下面「没做完的集」里点「接着做」，从停下的地方接着做。",
+        "The clips and the voiceprints already done are kept. Press Carry on under Unfinished episodes to go on from where it stopped.",
+      )
+    : tr(
+        "切片段这一步没做完，没有留下什么。在下面「没做完的集」里点「接着做」，会从头切。",
+        "Cutting the clips was not finished, so nothing is kept. Pressing Carry on under Unfinished episodes cuts them again from the start.",
+      );
+  /* Failing on the text subtitles, the last step, still leaves a usable episode. */
+  const usable = state.episodes.some((e) => e.name === adding?.episode);
+  const after = usable
+    ? tr(
+        "这一集已经能用了，没做成的是最后一步，原因见上面。台词字幕可以以后在导出页再配。",
+        "The episode can already be used; only the last step failed, for the reason above. Text subtitles can be attached later on the Export page.",
+      )
+    : adding?.state === "failed"
+      ? tr(
+          `改好问题以后再试：文件没问题就点「接着做」，要换文件就在下面重填再点「开始」。${kept}`,
+          `Fix the problem, then try again: if the files are right, press Carry on; to use other files, fill in the form below and press Start. ${kept}`,
+        )
+      : kept;
   const heading =
     adding &&
     {
@@ -352,16 +387,20 @@ export function AddEpisode({
               {tr(
                 "有显卡时一集要几分钟，只用 CPU 会慢很多。可以关掉这个窗口接着标别的集，做完会提示。",
                 "With a GPU one episode takes a few minutes; on the CPU it takes much longer. You can close this and keep labeling other episodes; you will be told when it is done.",
-              )}
+              )}{" "}
+              {adding.cut
+                ? tr(
+                    "片段已经切好，现在停下的话，下次从这里接着做。",
+                    "The clips are cut; if it stops now, the next run goes on from here.",
+                  )
+                : tr(
+                    "切片段是最慢的一步，在这一步停下的话，下次要从头切。",
+                    "Cutting the clips is the slowest step; if it stops during this step, the next run cuts them again from the start.",
+                  )}
             </div>
           )}
           {(adding.state === "failed" || adding.state === "stopped") && (
-            <div className="note">
-              {tr(
-                "改好问题以后再点「开始」。做完的步骤会留着，从停下的地方接着做。",
-                "Fix the problem, then press Start again. Finished steps are kept, and it carries on from where it stopped.",
-              )}
-            </div>
+            <div className="note">{after}</div>
           )}
         </div>
       )}
@@ -375,6 +414,19 @@ export function AddEpisode({
               <button disabled={busy || running} onClick={() => run({ resume: name })}>
                 {tr("接着做", "Carry on")}
               </button>
+              {state.not_cut?.includes(name) && (
+                <button
+                  className="ghost"
+                  disabled={busy || running}
+                  title={tr(
+                    "删掉这一集的记录和做了一半的文件",
+                    "Delete its record and half-built files",
+                  )}
+                  onClick={() => forget(name)}
+                >
+                  {tr("不要了", "Give up")}
+                </button>
+              )}
             </div>
           ))}
         </div>
