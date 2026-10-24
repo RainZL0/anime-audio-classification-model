@@ -5,6 +5,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Choice } from "../components/Choice";
 import type { Clip, Roles } from "../api";
 import { NEEDS_WORK, skippedTip, type LabelText } from "../clips";
+import { EpisodeProgress, type Progress } from "../components/EpisodeProgress";
 import { Empty } from "../components/Notes";
 import { Row } from "../components/Row";
 import { Tip } from "../components/Tip";
@@ -24,6 +25,7 @@ interface SceneViewProps {
   setShowShort: (on: boolean) => void;
   flashes: Set<string>;
   episode: string | null;
+  progress: Progress;
 }
 
 /* ───────────── Scenes view ───────────── */
@@ -41,6 +43,7 @@ export function SceneView({
   setShowShort,
   flashes,
   episode,
+  progress,
 }: SceneViewProps) {
   const shown = new Set(order);
   const scenes: { scene: number; clips: Clip[] }[] = [];
@@ -74,6 +77,7 @@ export function SceneView({
         className="sticky -top-2 z-[3] flex flex-wrap items-center gap-2.5 border-b bg-background px-1 pt-3 pb-2"
       >
         <h2 className="text-base font-semibold">{episode}</h2>
+        <EpisodeProgress progress={progress} />
         <span className="text-xs text-muted-foreground">
           {tr(
             `${clips.length} 句 · 还有 ${left} 句要你看`,

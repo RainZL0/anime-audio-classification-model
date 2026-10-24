@@ -8,13 +8,14 @@ import type { Clip, Group, Roles } from "../api";
 import { lowTip, OTHER, type LabelText } from "../clips";
 import { Avatar } from "../components/Avatar";
 import { Chip, LowButton } from "../components/Chip";
+import { EpisodeProgress, type Progress } from "../components/EpisodeProgress";
 import { Empty, Welcome } from "../components/Notes";
 import { Closest, Tag } from "../components/Pills";
 import { RoleName } from "../components/RoleName";
 import { withKeys } from "../components/Keys";
 import { Tip } from "../components/Tip";
 import { stamp } from "../format";
-import { lines, tr } from "../language";
+import { lines, many, tr } from "../language";
 
 /* A group as the page keeps it: the server's group, with its place in the list as a key. */
 export interface KeyedGroup extends Group {
@@ -37,6 +38,8 @@ interface GroupsViewProps {
   firstRun: boolean;
   picked: Picked;
   setPicked: (next: Picked | ((p: Picked) => Picked)) => void;
+  episode: string | null;
+  progress: Progress;
 }
 
 const GUESSED_MOST = () =>
@@ -58,6 +61,8 @@ export function GroupsView({
   firstRun,
   picked,
   setPicked,
+  episode,
+  progress,
 }: GroupsViewProps) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState<Record<number, string>>({});
@@ -70,6 +75,15 @@ export function GroupsView({
     );
   return (
     <div>
+      {/* The episode's summary, kept on screen while scrolling like the one in Scenes. -top-2 cancels the top
+          padding of the list, so cards don't show through above it. */}
+      <div className="sticky -top-2 z-[3] flex flex-wrap items-center gap-2.5 border-b bg-background px-1 pt-3 pb-2">
+        <h2 className="text-base font-semibold">{episode}</h2>
+        <EpisodeProgress progress={progress} />
+        <span className="text-xs text-muted-foreground">
+          {tr(`${groups.length} 组`, many(groups.length, "group"))}
+        </span>
+      </div>
       {firstRun && (
         <Welcome
           title={tr("第一步：给声音相近的一组起个名字", "Step one: name a group of similar voices")}

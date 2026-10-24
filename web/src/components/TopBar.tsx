@@ -44,8 +44,6 @@ interface TopBarProps {
   /* The episode being added, while its dialog is closed. */
   adding: string | null;
   onShowAdding: () => void;
-  /* This episode's progress, as parts of 1: confirmed, and the machine's confident guesses. */
-  progress: { done: number; auto: number };
   busy: boolean;
   trainedOn: number;
   targets: number;
@@ -104,7 +102,6 @@ export function TopBar(p: TopBarProps) {
         </button>
       </Tip>
     ));
-  const pct = Math.round(p.progress.done * 100);
   const themeText = p.dark
     ? tr("换成白天配色", "Switch to light colors")
     : tr("换成夜间配色", "Switch to dark colors");
@@ -172,29 +169,11 @@ export function TopBar(p: TopBarProps) {
         </Button>
       )}
       <span className="flex-1"></span>
-      {perEpisode && (
-        <Tip
-          text={tr(
-            "绿色是已经确认的，浅绿是机器有把握的",
-            "Green is confirmed, light green is the machine's confident ones",
-          )}
-        >
-          <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
-            <span className="min-w-0 truncate max-[1280px]:hidden">
-              {tr(`${p.episode}：确认 ${pct}%`, `${p.episode}: ${pct}% confirmed`)}
-            </span>
-            <div className="flex h-1.5 w-40 min-w-10 flex-[0_1_160px] overflow-hidden rounded-full bg-muted">
-              <i className="block bg-success" style={{ width: `${p.progress.done * 100}%` }}></i>
-              <i className="block bg-success/35" style={{ width: `${p.progress.auto * 100}%` }}></i>
-            </div>
-          </div>
-        </Tip>
-      )}
       <Tip text={tr("机器每次标注后都会重新学一次", "The machine retrains after every label")}>
         <span
           className={cn(
             "min-w-0 flex-[0_1_auto] truncate rounded-full border bg-muted px-2.5 py-0.5 text-xs text-muted-foreground",
-            p.busy ? "border-primary/40 text-foreground" : "max-[1400px]:hidden",
+            p.busy ? "border-primary/40 text-foreground" : "max-[1200px]:hidden",
           )}
         >
           {p.busy

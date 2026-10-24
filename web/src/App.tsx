@@ -1017,6 +1017,7 @@ export function App() {
   /* Short lines skipped by default need no labeling and don't count toward progress. */
   const total =
     Object.values(counts).reduce((a: number, b) => a + (b ?? 0), 0) - (counts.skipped || 0) || 1;
+  const progress = { done: (counts.confirmed || 0) / total, auto: (counts.auto || 0) / total };
   const showStage = view !== "export";
   const cropRole = crop ? roles[crop.name] : undefined;
 
@@ -1035,7 +1036,6 @@ export function App() {
         work={(counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0)}
         adding={addingState === "running" && !addOpen ? (adding?.episode ?? "") : null}
         onShowAdding={() => setAddOpen(true)}
-        progress={{ done: (counts.confirmed || 0) / total, auto: (counts.auto || 0) / total }}
         busy={busy}
         trainedOn={state.model.labels || 0}
         targets={state.roles.filter((r) => r.target).length}
@@ -1102,6 +1102,7 @@ export function App() {
               setShowShort={setShowShort}
               flashes={flashes}
               episode={episode}
+              progress={progress}
             />
           )}
           {view === "roles" && (
@@ -1139,6 +1140,8 @@ export function App() {
               setPicked={setPicked}
               onName={(ids, name, low) => assign(name, ids, low)}
               onNew={(ids) => newRole(ids)}
+              episode={episode}
+              progress={progress}
             />
           )}
           {view === "export" && (
