@@ -48,6 +48,9 @@ const ITEM_ON = "border-primary/40 bg-accent hover:bg-accent";
 /* A short gray heading above a part of the list. */
 const SECTION_TITLE = "mx-1 mt-[18px] mb-1.5 text-xs text-muted-foreground";
 
+/* The id of the maybe-missed list, which the line at the top jumps to. */
+const MAYBE = "maybe-missed";
+
 interface RoleViewProps {
   state: Summary;
   roles: Roles;
@@ -205,6 +208,27 @@ export function RoleView({
                   {other || current.target
                     ? ""
                     : tr(" · 不是目标角色", " · not a target character")}
+                  {/* The maybe-missed list comes after every line the machine gave them, often far down the
+                      page, so the top says it is there and jumps to it. */}
+                  {maybe.length > 0 && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="text-warning underline underline-offset-2 hover:text-foreground"
+                        onClick={() =>
+                          document
+                            .getElementById(MAYBE)
+                            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        }
+                      >
+                        {tr(
+                          `另有 ${maybe.length} 句可能漏掉`,
+                          `${lines(maybe.length)} maybe missed`,
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="ml-auto flex flex-wrap gap-2">
@@ -281,7 +305,7 @@ export function RoleView({
             {pending.map((clip) => row(clip, { showTarget: other }))}
             {maybe.length > 0 && (
               <>
-                <div className={SECTION_TITLE}>
+                <div id={MAYBE} className={cn(SECTION_TITLE, "scroll-mt-4")}>
                   {tr(`可能漏掉的 ${maybe.length} 句`, `Maybe missed: ${lines(maybe.length)}`)}
                 </div>
                 <Note className="mb-2">
