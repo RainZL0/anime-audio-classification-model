@@ -155,6 +155,12 @@ kbd {
   flex: 0 1 auto;
   min-width: 0;
 }
+/* Cut the text short rather than let it run over the buttons beside it. */
+.top .progress > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .top .bar {
   flex: 0 1 160px;
   min-width: 40px;
@@ -167,6 +173,30 @@ kbd {
 }
 .top > button {
   flex: none;
+}
+/* A note cut down to "Tr…" says nothing, so as the window narrows, leave out the least needed parts whole: first the
+   training note (it still shows while retraining), then the progress text (the bar stays), then the "All episodes"
+   label. */
+@media (max-width: 1400px) {
+  .top .model-chip:not(.busy) {
+    display: none;
+  }
+}
+@media (max-width: 1200px) {
+  .top .progress > span {
+    display: none;
+  }
+}
+@media (max-width: 920px) {
+  .tabs .scope {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  .top {
+    gap: 4px;
+    padding: 10px;
+  }
 }
 .brand {
   font-weight: 650;
@@ -211,7 +241,10 @@ kbd {
 .tabs {
   align-items: center;
 }
+/* As wide as the episode shown, not as the longest choice ("+ Add an episode… (1 unfinished)"). Browsers without
+   field-sizing keep the old width. */
 .tabs select {
+  field-sizing: content;
   border: 0;
   background: var(--panel);
   font-weight: 600;
