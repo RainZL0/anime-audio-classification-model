@@ -179,12 +179,10 @@ export function ExportView({
     onPurpose(next === "folder" ? "audio" : "tts");
   };
   const [includeAuto, setIncludeAuto] = useState(false);
-  /* Local date: toISOString gives UTC, which is still the day before in UTC+8 until 8 in the morning. */
-  const [out, setOut] = useState(() => {
-    const d = new Date();
-    const two = (n: number) => String(n).padStart(2, "0");
-    return `exports/${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
-  });
+  const [out, setOut] = useState(state.export_folder);
+  /* The default folder now in the box. After an export it moves on to the next free one, unless the person typed
+     or picked their own. */
+  const [suggested, setSuggested] = useState(state.export_folder);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ExportResult | null>(null);
   /* The result appears below the button, often off screen; bring it into view. */
@@ -202,14 +200,17 @@ export function ExportView({
     setBusy(true);
     setResult(null);
     try {
-      setResult(
-        await call<ExportResult>("/api/export", {
-          roles: [...picked],
-          include_auto: includeAuto,
-          form,
-          out,
-        }),
-      );
+      const done = await call<ExportResult>("/api/export", {
+        roles: [...picked],
+        include_auto: includeAuto,
+        form,
+        out,
+      });
+      setResult(done);
+      if (out === suggested) {
+        setOut(done.next);
+        setSuggested(done.next);
+      }
     } catch (e) {
       toast((e as Error).message, true);
     }

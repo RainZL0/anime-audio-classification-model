@@ -31,7 +31,10 @@ def test_window_opens_in_the_folder_of_the_box_or_where_avoc_started(tmp_path: P
     assert start_folder("", launched) == launched
     assert start_folder(f'"{video}"', launched) == video.parent
     assert start_folder(str(video.parent), launched) == video.parent
-    assert start_folder(str(tmp_path / "gone" / "x.mkv"), launched) == launched
+    # The default export folder is made only by the first export: open in the nearest that exists.
+    assert start_folder(str(tmp_path / "exports" / "2026-10-24"), launched) == tmp_path
+    assert start_folder(str(Path(tmp_path.anchor) / "no-such-folder" / "x"), launched) == launched
+    assert start_folder("gone/x.mkv", launched) == launched
 
 
 @pytest.fixture

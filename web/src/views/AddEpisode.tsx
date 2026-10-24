@@ -203,6 +203,30 @@ function useAnswer<T>(url: string, path: string): Answer<T> | null {
   return path.trim() && answer?.for === path ? answer.found : null;
 }
 
+/* What was read from the display subtitles, so a wrong file shows before the long run, not after it. Their
+   dialogue styles are always picked automatically. */
+function DisplayNote({ path }: { path: string }) {
+  const found = useAnswer<Styles>("/api/subtitle-styles", path);
+  if (!found) return null;
+  if (found.error) return <Note warn>{found.error}</Note>;
+  if (!found.styles) return <Note>{tr("正在读字幕…", "Reading the subtitles…")}</Note>;
+  const count = found.styles
+    .filter((s) => found.picked?.includes(s.name))
+    .reduce((n, s) => n + s.lines, 0);
+  const format = (found.format ?? "").toUpperCase();
+  const said = languageNames(found.languages ?? []);
+  const read = tr(`${format}，${found.encoding}，${said}`, `${format}, ${found.encoding}, ${said}`);
+  return count ? (
+    <Note>
+      {tr(`读到 ${count} 句台词（${read}）`, `Read ${lines(count)} of dialogue (${read})`)}
+    </Note>
+  ) : (
+    <Note warn>
+      {tr(`字幕里没有台词（${read}）`, `There are no dialogue lines in the subtitles (${read})`)}
+    </Note>
+  );
+}
+
 /* Which audio track the voices are taken from, and the language it speaks. */
 function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) {
   if (!tracks.tracks.length)
@@ -348,7 +372,10 @@ export function AddEpisode({
     setBusy(false);
   };
   const running = adding?.state === "running";
-  const unfinished = Object.entries(state.skipped || {});
+  /* The episode being added now is shown in the box above, not here as well. */
+  const unfinished = Object.entries(state.skipped || {}).filter(
+    ([name]) => !(running && name === adding?.episode),
+  );
   /* What is kept after it ended without finishing. The slowest step, cutting the clips, is kept only once it is
      done; stopped partway, it starts over. */
   const kept = adding?.cut
@@ -425,9 +452,18 @@ export function AddEpisode({
           {running && (
             <Note>
               {tr(
-                "有显卡时一集要几分钟，只用 CPU 会慢很多。可以关掉这个窗口接着标别的集，做完会提示。",
-                "With a GPU one episode takes a few minutes; on the CPU it takes much longer. You can close this and keep labeling other episodes; you will be told when it is done.",
+                "有显卡时一集要 10 到 15 分钟，只用 CPU 会慢很多。",
+                "With a GPU one episode takes 10 to 15 minutes; on the CPU it takes much longer.",
               )}{" "}
+              {state.episodes.length > 0
+                ? tr(
+                    "可以关掉这个窗口接着标别的集，做完会提示。",
+                    "You can close this and keep labeling other episodes; you will be told when it is done.",
+                  )
+                : tr(
+                    "做完后从这里打开这一集。",
+                    "When it is done, open the episode from here.",
+                  )}{" "}
               {adding.cut
                 ? tr(
                     "片段已经切好，现在停下的话，下次从这里接着做。",
@@ -615,6 +651,7 @@ export function AddEpisode({
             placeholder="D:\anime\Episode 01.zh.ass"
             toast={toast}
           />
+          <DisplayNote path={displaySubtitles} />
         </Field>
         <Field className="gap-1.5">
           <FieldLabel className="text-xs font-normal text-muted-foreground">
@@ -627,10 +664,15 @@ export function AddEpisode({
             placeholder={tr("自动测", "measure")}
           />
           <Note>
-            {tr(
-              "字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。不知道就填 0，或者空着让它自动测（要 Hugging Face 令牌）。",
-              "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. If you don't know, try 0, or leave it empty to measure it (needs a Hugging Face token).",
-            )}
+            {last
+              ? tr(
+                  "字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。换了片源或字幕组的话，清空让它重新测（要 Hugging Face 令牌）。",
+                  "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. For another source or subtitle group, empty it to measure again (needs a Hugging Face token).",
+                )
+              : tr(
+                  "字幕时间要加几秒才和声音对上。空着就自动测（要 Hugging Face 令牌），之后同一片源、同一字幕组的集会默认填上这个值。没有令牌的话先填 0。",
+                  "How many seconds to add to the subtitle times so they line up with the sound. Leave it empty to measure it (needs a Hugging Face token); later episodes from the same source and subtitle group get this value filled in. Without a token, try 0.",
+                )}
           </Note>
         </Field>
         <Note>

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -138,14 +139,19 @@ def test_an_episode_never_cut_can_be_given_up(files: Path) -> None:
 
 
 def test_add_stops_by_itself_when_the_server_goes(tmp_path: Path) -> None:
-    """The server holds the command's input open; when the server ends, the input closes."""
+    """On Windows the command waits on the server process; elsewhere on its input, which the
+    server holds open. Either way it cleans up when the server ends. It also loads numpy after it
+    starts waiting, as `avoc add` does: on Windows, a thread blocked reading the input made that
+    load hang forever."""
     import subprocess
 
+    server = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
     script = tmp_path / "child.py"
     script.write_text(
         "import sys, time\n"
         "from avoc.app.adding import stop_with_interface\n"
-        "stop_with_interface()\n"
+        f"stop_with_interface({server.pid})\n"
+        "import numpy\n"
         "print('ready', flush=True)\n"
         "try:\n"
         "    for _ in range(600):\n"
@@ -160,11 +166,21 @@ def test_add_stops_by_itself_when_the_server_goes(tmp_path: Path) -> None:
         stdout=subprocess.PIPE,
         text=True,
     )
-    assert child.stdout is not None and child.stdin is not None
-    assert child.stdout.readline().strip() == "ready"
-    child.stdin.close()
-    assert child.wait(timeout=20) == 0
-    assert child.stdout.read().strip() == "cleaned up"
+    # A hang must fail the test, not stop it forever.
+    guard = threading.Timer(60, child.kill)
+    guard.start()
+    try:
+        assert child.stdout is not None and child.stdin is not None
+        assert child.stdout.readline().strip() == "ready"
+        server.kill()
+        if sys.platform != "win32":
+            child.stdin.close()
+        assert child.wait(timeout=20) == 0
+        assert child.stdout.read().strip() == "cleaned up"
+    finally:
+        guard.cancel()
+        server.kill()
+        child.kill()
 
 
 def test_bad_input_is_refused_before_starting(files: Path, monkeypatch: pytest.MonkeyPatch) -> None:

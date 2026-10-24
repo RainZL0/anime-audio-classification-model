@@ -122,8 +122,8 @@ def add(
     mark = pipeline.PROGRESS_MARK if os.environ.get("AVOC_MARK_PROGRESS") else ""
     from avoc.app.adding import STOP_WITH_INTERFACE, stop_with_interface
 
-    if os.environ.get(STOP_WITH_INTERFACE):
-        stop_with_interface()
+    if os.environ.get(STOP_WITH_INTERFACE, "").isdigit():
+        stop_with_interface(int(os.environ[STOP_WITH_INTERFACE]))
 
     def report(line: str) -> None:
         typer.echo(mark + line)

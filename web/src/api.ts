@@ -112,6 +112,8 @@ export interface Model {
 export interface Summary {
   episodes: Episode[];
   workspace: string;
+  /* Where an export goes by default, in full: exports/<today> in the workspace, or <today>-2 and so on when used. */
+  export_folder: string;
   /* Episodes not loaded, and why. */
   skipped: Record<string, string>;
   /* Those of them whose clips were never cut: they can be given up. Missing when the server is older than this page. */
@@ -186,6 +188,8 @@ export interface ExportResult {
   files: number;
   total_sec: number;
   rejected: Record<string, number>;
+  /* The next free default folder, so exporting again does not land in the one just written. */
+  next: string;
 }
 
 /* ───────────── Talking to the server ───────────── */
@@ -210,10 +214,13 @@ export async function call<T>(url: string, body?: unknown): Promise<T> {
     } catch {
       /* Not JSON: keep the status text. */
     }
-    throw new Error(detail);
+    throw new Error(sentence(detail));
   }
   return response.json() as Promise<T>;
 }
+
+/* The server's messages start in lower case, as on the command line; on the page they are sentences. */
+export const sentence = (message: string) => message.charAt(0).toUpperCase() + message.slice(1);
 
 export type MediaKind = "audio" | "video";
 
@@ -233,7 +240,7 @@ export async function mediaProblem(url: string): Promise<string | null> {
   const response = await fetch(url, { headers: { "X-Language": currentLanguage() } });
   if (response.ok) return null;
   try {
-    return ((await response.json()) as { detail?: string }).detail || response.statusText;
+    return sentence(((await response.json()) as { detail?: string }).detail || response.statusText);
   } catch {
     return response.statusText;
   }

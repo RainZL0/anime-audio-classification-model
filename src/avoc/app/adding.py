@@ -37,7 +37,8 @@ with a carriage return, which reading the output in text mode turns into separat
 RECORD = "adding.json"
 """In the workspace: episode name -> the files and choices it was started with."""
 STOP_WITH_INTERFACE = "AVOC_STOP_WITH_INTERFACE"
-"""Set for the `avoc add` the interface starts; see `stop_with_interface`."""
+"""Set for the `avoc add` the interface starts, to the server's process number; see
+`stop_with_interface`."""
 
 
 def clean_path(text: str) -> Path:
@@ -45,16 +46,33 @@ def clean_path(text: str) -> Path:
     return Path(text.strip().strip('"').strip("'"))
 
 
-def stop_with_interface() -> None:
-    """Called in `avoc add` when the interface started it. The server keeps the command's input
-    open and never writes to it, so the input ends only when the server process ends: a restart
-    under `--reload`, a closed terminal, or a crash. Then stop as if Ctrl+C was pressed, so the
-    usual clean-up runs (a half-cut folder is deleted) and the command does not run on unseen,
-    holding the GPU."""
+def stop_with_interface(server: int) -> None:
+    """Called in `avoc add` when the interface started it. When the server process ends (a
+    restart under `--reload`, a closed terminal, or a crash), stop as if Ctrl+C was pressed, so
+    the usual clean-up runs (a half-cut folder is deleted) and the command does not run on unseen,
+    holding the GPU.
+
+    On Windows, wait on the server process itself. Waiting on the input instead (the server keeps
+    it open and never writes to it, so it ends only with the server) makes numpy's OpenBLAS hang
+    forever while it loads: a thread blocked reading a pipe stops it from starting. Elsewhere,
+    wait for the input to end."""
     import _thread
 
     def watch() -> None:
-        sys.stdin.buffer.read()
+        if sys.platform == "win32":
+            import ctypes
+
+            synchronize, forever = 0x00100000, 0xFFFFFFFF
+            kernel = ctypes.windll.kernel32
+            kernel.OpenProcess.restype = ctypes.c_void_p
+            kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            handle = kernel.OpenProcess(synchronize, False, server)
+            if not handle:  # Already gone.
+                _thread.interrupt_main()
+                return
+            kernel.WaitForSingleObject(handle, forever)
+        else:
+            sys.stdin.buffer.read()
         _thread.interrupt_main()
 
     threading.Thread(target=watch, daemon=True).start()
@@ -259,7 +277,7 @@ class Adding:
             # A plain traceback instead of typer's boxed one: its last line is the reason, and
             # the page shows the last lines.
             "_TYPER_STANDARD_TRACEBACK": "1",
-            STOP_WITH_INTERFACE: "1",
+            STOP_WITH_INTERFACE: str(os.getpid()),
         }
 
         def remember(records: dict[str, dict[str, Any]]) -> None:

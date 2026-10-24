@@ -284,6 +284,7 @@ class AppState:
                 for name, meta in self.workspace.episodes.items()
             ],
             "workspace": str(self.workspace.root.resolve()),
+            "export_folder": str(free_export_folder(self.workspace.root)),
             "skipped": self._unfinished(not_cut),
             "not_cut": not_cut,
             "roles": roles,
@@ -665,7 +666,12 @@ class AppState:
         if rejected:
             _write_rejected(out / "rejected.tsv", rejected)
         reasons = Counter(r["reason"] for r in rejected)
-        return {"out": str(out.resolve()), **summarize(written), "rejected": dict(reasons)}
+        return {
+            "out": str(out.resolve()),
+            **summarize(written),
+            "rejected": dict(reasons),
+            "next": str(free_export_folder(self.workspace.root)),
+        }
 
 
 class LabelBody(BaseModel):
@@ -756,6 +762,17 @@ def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
         "agreement": meta.get("text_subtitle_agreement"),
         "marked": marked_note(found) if (found := meta.get("text_subtitle_marked")) else None,
     }
+
+
+def free_export_folder(root: Path) -> Path:
+    """Where an export goes unless the person picks another folder: exports/<today> in the
+    workspace, or <today>-2 and so on when that one already holds an export."""
+    base = root.resolve() / "exports" / time.strftime("%Y-%m-%d")
+    folder, number = base, 1
+    while folder.exists() and any(folder.iterdir()):
+        number += 1
+        folder = base.with_name(f"{base.name}-{number}")
+    return folder
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:

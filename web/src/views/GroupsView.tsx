@@ -70,6 +70,8 @@ export function GroupsView({
 }: GroupsViewProps) {
   /* The last line ticked in each group, so Shift+click can tick the lines between. */
   const [anchor, setAnchor] = useState<Record<number, string>>({});
+  /* Groups stay put while labeling, so a group whose lines are all labeled no longer counts as left. */
+  const left = groups.filter((g) => g.clips.some((c) => !c.label)).length;
   if (loading)
     return (
       <Empty>
@@ -91,7 +93,7 @@ export function GroupsView({
           )}
         >
           <span className="text-xs text-muted-foreground">
-            {tr(`还剩 ${groups.length} 组`, `${many(groups.length, "group")} left`)}
+            {tr(`还剩 ${left} 组`, `${many(left, "group")} left`)}
           </span>
         </Tip>
       </div>

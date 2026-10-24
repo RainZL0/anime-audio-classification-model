@@ -125,8 +125,8 @@ def open_subtitles(path: Path) -> tuple[Any, str]:
     except pysubs2.Pysubs2Error as exc:
         raise ValueError(
             say(
-                f"读不出这个字幕文件，它要是 ASS 或 SRT：{path}（{exc}）",
-                f"cannot read this subtitle file; it must be ASS or SRT: {path} ({exc})",
+                f"读不出这个字幕文件，它要是 ASS 或 SRT：{path}",
+                f"cannot read this subtitle file; it must be ASS or SRT: {path}",
             )
         ) from exc
 

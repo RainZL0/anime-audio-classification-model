@@ -30,7 +30,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Spoken language | The language the voices in an episode speak, such as Japanese. Exported text must be in it, because a voice model learns which sounds go with which words. |
 | Text subtitles | A second subtitle file attached to an episode, in the spoken language, used only for the text of each clip. Needed when the subtitles used for cutting are a translation. |
 | Display subtitles | A subtitle file in a language the person reads, usually a translation, attached to an episode cut from subtitles in the spoken language. Its lines are only shown while labeling; nothing is exported from it. |
-| Workspace | The folder that the interface opens. Inside it are `episodes/` (one folder per episode) and `labels/` (the labels made in the interface). |
+| Workspace | The folder that the interface opens. Inside it are `episodes/` (one folder per episode), `labels/` (the labels made in the interface) and, unless another folder is picked, `exports/` (the exported datasets). |
 
 ## Flow
 

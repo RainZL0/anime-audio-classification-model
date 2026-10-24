@@ -32,15 +32,17 @@ _open = threading.Lock()
 
 
 def start_folder(current: str, launched: Path) -> Path:
-    """Where the window opens: the folder of the path already in the box, if it exists, else the
-    folder `avoc app` was started from."""
+    """Where the window opens: the nearest folder on the path already in the box that exists, so a
+    default export folder not made yet opens in the workspace; else the folder `avoc app` was
+    started from. A drive root alone does not count."""
     text = current.strip().strip('"').strip("'")
     if text:
         path = Path(text)
-        if path.is_dir():
-            return path
-        if path.parent.is_dir() and path.parent != Path():
-            return path.parent
+        for folder in [path, *path.parents]:
+            if folder == Path(folder.anchor):
+                break
+            if folder.is_dir():
+                return folder
     return launched
 
 

@@ -43,7 +43,7 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 
 - **No text box unless typing is the only way.** People pick characters by avatar, chip or key, not by typing names; there is no search box for characters.
 - The one place to type a character's name is the "New character" dialog, and there it can be left blank. Renaming and merging are in the Characters view.
-- **Every box for a file or folder path has a "Browse…" button right after it.** It opens the system's own file window, in the folder of the path already in the box, or else in the folder `avoc app` was started from. Pasting a path into the box still works. Files cannot be dragged in ([why](DECISIONS.md#settled)).
+- **Every box for a file or folder path has a "Browse…" button right after it.** It opens the system's own file window in the nearest folder of the path already in the box that exists (so an export folder not made yet opens in the workspace), or else in the folder `avoc app` was started from. A default path is written in full, so the person sees where it goes. Pasting a path into the box still works. Files cannot be dragged in ([why](DECISIONS.md#settled)).
 
 ## Layout
 

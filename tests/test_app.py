@@ -523,6 +523,17 @@ def test_unusable_keeps_the_name_but_stays_out_of_training_and_export(tmp_path: 
     assert none.status_code == 400 and "2 条都标了质量低" in none.json()["detail"]
 
 
+def test_default_export_folder_moves_on_once_used(tmp_path: Path) -> None:
+    from avoc.app.server import free_export_folder
+
+    first = free_export_folder(tmp_path)
+    assert first.parent == tmp_path.resolve() / "exports"
+    first.mkdir(parents=True)
+    assert free_export_folder(tmp_path) == first, "an empty folder can still take an export"
+    (first / "train.list").write_text("", encoding="utf-8")
+    assert free_export_folder(tmp_path).name == f"{first.name}-2"
+
+
 def test_one_choice_sets_who_and_quality_together(tmp_path: Path) -> None:
     """One choice: labeling "target, low quality" sets both at once. Changing it to clean target,
     to "other", or clearing it also turns "low quality" off."""
