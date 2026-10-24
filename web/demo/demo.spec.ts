@@ -83,12 +83,20 @@ test("README demo", async ({ page, request }) => {
   const pick = async (start: number) => {
     const clip = clips.find((c) => Math.abs(c.start - start) < 0.06);
     if (!clip) throw new Error(`no line starts at ${start} s`);
-    /* The rows are the grids with the avatar column. */
-    await page
+    /* The rows are the grids with the avatar column. The Characters view only draws the lines near the screen, so
+       when the line is not drawn, scroll down from the top until it is. */
+    const row = page
       .locator('main div[class*="grid-cols-[36px"]')
       .filter({ hasText: stamp(clip.start) })
-      .first()
-      .click();
+      .first();
+    if (!(await row.count())) {
+      await page.locator("main").evaluate((m) => m.scrollTo({ top: 0 }));
+      for (let i = 0; i < 100 && !(await row.count()); i++) {
+        await page.locator("main").evaluate((m) => m.scrollBy({ top: 300 }));
+        await page.waitForTimeout(50);
+      }
+    }
+    await row.click();
     await expect(page).toHaveURL(new RegExp(`clip=${clip.id}`));
   };
   const group = (n: number) =>

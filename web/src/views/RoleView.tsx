@@ -1,4 +1,6 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "cn";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
@@ -48,8 +50,14 @@ const ITEM_ON = "border-primary/40 bg-accent hover:bg-accent";
 /* A short gray heading above a part of the list. */
 const SECTION_TITLE = "mx-1 mt-[18px] mb-1.5 text-xs text-muted-foreground";
 
-/* The id of the maybe-missed list, which the line at the top jumps to. */
-const MAYBE = "maybe-missed";
+/* The lines of the list on the right, with the headings between its parts. */
+type Item =
+  | { kind: "row"; clip: Clip; maybeOf?: string; showTarget?: boolean }
+  | { kind: "maybe" }
+  | { kind: "confirmed" };
+
+/* A first guess at a line's height before it is drawn and measured; one line of text with its pills. */
+const ROW_HEIGHT = 62;
 
 interface RoleViewProps {
   state: Summary;
@@ -99,19 +107,48 @@ export function RoleView({
   const confirmed = confirmedOf(clips, role);
   /* Who the machine gave these lines to, as written inside a sentence. */
   const them = other ? tr("「其他」", '"Other"') : role;
-  const row = (clip: Clip, extra: { maybeOf?: string; showTarget?: boolean }) => (
-    <Row
-      key={clip.id}
-      clip={clip}
-      roles={roles}
-      labelText={labelText}
-      selected={clip.id === focus}
-      flash={flashes.has(clip.id)}
-      onSelect={() => setFocus(clip.id)}
-      showEpisode
-      {...extra}
-    />
-  );
+  /* A character can have thousands of lines, and drawing them all made every key press take half a second. So the
+     list on the right is one long scroll, but only the lines near the screen are drawn. */
+  const items: Item[] = [
+    ...pending.map((clip): Item => ({ kind: "row", clip, showTarget: other })),
+    ...(maybe.length > 0 ? [{ kind: "maybe" } as Item] : []),
+    ...maybe.map((clip): Item => ({ kind: "row", clip, maybeOf: role ?? undefined })),
+    ...(confirmed.length > 0 ? [{ kind: "confirmed" } as Item] : []),
+    ...confirmed.map((clip): Item => ({ kind: "row", clip, showTarget: other })),
+  ];
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  /* Where the list starts inside the scrolling page, below the character's heading. */
+  const [margin, setMargin] = useState(0);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- measured after every render; sets state only when it moved
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const page = list?.closest("main") ?? null;
+    if (page !== scroller) setScroller(page);
+    if (list && page) {
+      const top =
+        list.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop;
+      if (Math.abs(top - margin) > 0.5) setMargin(top);
+    }
+  });
+  // oxlint-disable-next-line react/incompatible-library -- the compiler then leaves this view unmemoized, which is fine
+  const lister = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scroller,
+    estimateSize: (i) => (items[i].kind === "row" ? ROW_HEIGHT : 40),
+    getItemKey: (i) => {
+      const item = items[i];
+      return item.kind === "row" ? item.clip.id : item.kind;
+    },
+    overscan: 8,
+    scrollMargin: margin,
+  });
+  const focusAt = items.findIndex((item) => item.kind === "row" && item.clip.id === focus);
+  /* The selected line comes into view, whether J/K, playing all or a click on the picture side picked it. */
+  useEffect(() => {
+    if (focusAt >= 0) lister.scrollToIndex(focusAt, { align: "auto" });
+  }, [focusAt, lister]);
+  const maybeAt = items.findIndex((item) => item.kind === "maybe");
   /* The list on the left is as wide as its longest row, up to 230px. When the list side of the page is narrow
      (the divider can make it so), the list goes on top as a row of characters instead. */
   return (
@@ -216,11 +253,7 @@ export function RoleView({
                       <button
                         type="button"
                         className="text-warning underline underline-offset-2 hover:text-foreground"
-                        onClick={() =>
-                          document
-                            .getElementById(MAYBE)
-                            ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                        }
+                        onClick={() => lister.scrollToIndex(maybeAt, { align: "start" })}
                       >
                         {tr(
                           `另有 ${maybe.length} 句可能漏掉`,
@@ -304,32 +337,63 @@ export function RoleView({
                 </Button>
               </div>
             )}
-            {pending.map((clip) => row(clip, { showTarget: other }))}
-            {maybe.length > 0 && (
-              <>
-                <div id={MAYBE} className={cn(SECTION_TITLE, "scroll-mt-4")}>
-                  {tr(`可能漏掉的 ${maybe.length} 句`, `Maybe missed: ${lines(maybe.length)}`)}
-                </div>
-                <Note className="mb-2">
-                  {tr(
-                    `百分比是机器猜这句是 ${role} 的概率。机器没归给 ${role}，但有可能是，概率高的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
-                    `The percentage is the machine's chance that the line is ${role}. It didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`,
-                  )}
-                </Note>
-                {maybe.map((clip) => row(clip, { maybeOf: role }))}
-              </>
-            )}
-            {confirmed.length > 0 && (
-              <>
-                <div className={SECTION_TITLE}>
-                  {tr(`确认过的 ${confirmed.length} 句`, `Confirmed: ${lines(confirmed.length)}`)}
-                  {other
-                    ? tr("，最像某个目标角色的排在前面", ", most like a target character first")
-                    : ""}
-                </div>
-                {confirmed.map((clip) => row(clip, { showTarget: other }))}
-              </>
-            )}
+            <div ref={listRef} className="relative" style={{ height: lister.getTotalSize() }}>
+              {lister.getVirtualItems().map((v) => {
+                const item = items[v.index];
+                return (
+                  <div
+                    key={v.key}
+                    data-index={v.index}
+                    ref={lister.measureElement}
+                    className="absolute top-0 left-0 w-full"
+                    style={{ transform: `translateY(${v.start - margin}px)` }}
+                  >
+                    {item.kind === "row" ? (
+                      <Row
+                        clip={item.clip}
+                        roles={roles}
+                        labelText={labelText}
+                        selected={item.clip.id === focus}
+                        flash={flashes.has(item.clip.id)}
+                        onSelect={() => setFocus(item.clip.id)}
+                        showEpisode
+                        follow={false}
+                        maybeOf={item.maybeOf}
+                        showTarget={item.showTarget}
+                      />
+                    ) : item.kind === "maybe" ? (
+                      <div className="pb-2">
+                        <div className={SECTION_TITLE}>
+                          {tr(
+                            `可能漏掉的 ${maybe.length} 句`,
+                            `Maybe missed: ${lines(maybe.length)}`,
+                          )}
+                        </div>
+                        <Note>
+                          {tr(
+                            `百分比是机器猜这句是 ${role} 的概率。机器没归给 ${role}，但有可能是，概率高的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
+                            `The percentage is the machine's chance that the line is ${role}. It didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`,
+                          )}
+                        </Note>
+                      </div>
+                    ) : (
+                      <div className={SECTION_TITLE}>
+                        {tr(
+                          `确认过的 ${confirmed.length} 句`,
+                          `Confirmed: ${lines(confirmed.length)}`,
+                        )}
+                        {other
+                          ? tr(
+                              "，最像某个目标角色的排在前面",
+                              ", most like a target character first",
+                            )
+                          : ""}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </>
         )}
       </div>

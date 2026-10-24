@@ -22,6 +22,9 @@ interface RowProps {
   showTarget?: boolean;
   /* Show which episode the line is from, in lists that cover all episodes. */
   showEpisode?: boolean;
+  /* Scroll the line into view when it becomes selected. Off in lists that only draw the lines near the screen:
+     there a line is drawn again each time it scrolls back in, and the list scrolls to it itself. */
+  follow?: boolean;
 }
 
 /* The look of the selected line, the same in every list. The line needs `border border-transparent` so it
@@ -40,11 +43,12 @@ export function Row({
   maybeOf,
   showTarget,
   showEpisode,
+  follow = true,
 }: RowProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (selected && ref.current) ref.current.scrollIntoView({ block: "nearest" });
-  }, [selected]);
+    if (follow && selected && ref.current) ref.current.scrollIntoView({ block: "nearest" });
+  }, [selected, follow]);
   const who = whoOf(clip);
   const isOther = !!who && !!labelText[who.name];
   const stranger = !clip.label && clip.familiar === false;
