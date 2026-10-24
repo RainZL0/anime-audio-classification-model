@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1><img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" height="48" align="center" alt=""> anime-voice-collector</h1>
+<h1><img src="https://github.com/user-attachments/assets/bb732174-9cbf-4033-bb64-9fb1866dc1a2" height="48" align="center" alt=""> anime-voice-collector</h1>
 
 [English](README.md) · **简体中文**
 
