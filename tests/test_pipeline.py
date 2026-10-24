@@ -164,7 +164,7 @@ def test_add_refuses_a_missing_file_before_starting(tmp_path: Path) -> None:
     video = tmp_path / "ep1.mp4"
     video.write_bytes(b"video")
     lines: list[str] = []
-    with pytest.raises(ValueError, match="Second subtitles not found"):
+    with pytest.raises(ValueError, match="Secondary subtitles not found"):
         pipeline.add_episode(
             tmp_path / "ws", video, subtitles, display_subtitles=tmp_path / "none.ass",
             report=lines.append,

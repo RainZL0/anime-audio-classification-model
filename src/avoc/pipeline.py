@@ -653,7 +653,7 @@ def add_episode(
         (video, "视频", "Video"),
         (subtitles, "主字幕", "Main subtitles"),
         (text_subtitles, "文本字幕", "Text subtitles"),
-        (display_subtitles, "次字幕", "Second subtitles"),
+        (display_subtitles, "辅助字幕", "Secondary subtitles"),
         (audio, "音轨", "Audio track"),
     ):
         if path is not None and not path.is_file():
@@ -757,22 +757,22 @@ def add_episode(
             )
 
     if display_subtitles is not None:
-        report(say("配次字幕", "Attaching the second subtitles"))
+        report(say("配辅助字幕", "Attaching the secondary subtitles"))
         try:
             shown = attach_display_subtitles(out, display_subtitles)
             report(
                 say(
-                    f"次字幕偏移 {shown['display_subtitle_offset']:+.2f} 秒，"
+                    f"辅助字幕偏移 {shown['display_subtitle_offset']:+.2f} 秒，"
                     f"和主字幕对上 {shown['display_subtitle_agreement']:.0%}",
-                    f"Second subtitles: offset {shown['display_subtitle_offset']:+.2f} seconds, "
+                    f"Secondary subtitles: offset {shown['display_subtitle_offset']:+.2f} seconds, "
                     f"{shown['display_subtitle_agreement']:.0%} line up with the main subtitles",
                 )
             )
         except ValueError as exc:
             report(
                 say(
-                    f"注意：次字幕没配上：{exc}。以后可以用 avoc set-display-subtitles 再配",
-                    f"Note: the second subtitles were not attached: {exc}. Attach them later "
+                    f"注意：辅助字幕没配上：{exc}。以后可以用 avoc set-display-subtitles 再配",
+                    f"Note: the secondary subtitles were not attached: {exc}. Attach them later "
                     "with avoc set-display-subtitles",
                 )
             )

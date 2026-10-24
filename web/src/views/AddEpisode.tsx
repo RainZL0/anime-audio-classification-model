@@ -439,7 +439,7 @@ function useAnswer<T>(url: string, path: string): Answer<T> | null {
   return path.trim() && answer?.for === path ? answer.found : null;
 }
 
-/* What was read from the second subtitles (display subtitles in the code), so a wrong file shows before the long run, not after it. Their
+/* What was read from the secondary subtitles (display subtitles in the code), so a wrong file shows before the long run, not after it. Their
    dialogue styles are always picked automatically. */
 function DisplayNote({ path }: { path: string }) {
   const found = useAnswer<Styles>("/api/subtitle-styles", path);
@@ -547,6 +547,9 @@ export function AddEpisode({
   /* "Reading" is worked out here rather than set when the text changes: setting a new {} on every key made
      React stop with "Maximum update depth exceeded" when text arrived fast. */
   const found: Found = !subtitles.trim() ? null : answer?.for === subtitles ? answer.found : {};
+  /* Reading text aloud needs each clip's own words, so its main subtitles must be in the language spoken (a
+     bilingual file counts). Clips cut from a translation don't line up with the original lines. */
+  const wrongLanguage = text && !!found?.languages?.length && !found.languages.includes(heard);
   const [chosen, setChosen] = useState(new Set<string>());
   const log = useRef<HTMLPreElement>(null);
   useEffect(() => {
@@ -875,31 +878,27 @@ export function AddEpisode({
                   )}
             </Note>
           )}
-          {/* Reading text aloud needs the words in the language spoken, which a translation can't give. */}
-          {text &&
-            found?.languages &&
-            found.languages.length > 0 &&
-            !found.languages.includes(heard) && (
-              <Note warn>
-                {tr(
-                  `主字幕是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份改填到下面的「次字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少台词会导不出文字。`,
-                  `The main subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and move these to "Second subtitles" below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
-                )}
-              </Note>
-            )}
+          {wrongLanguage && found?.languages && (
+            <Note warn>
+              {tr(
+                `朗读文字要用角色说的语言做主字幕：这份是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。换一份${languageName(heard)}字幕填在这里；这份可以填到下面的「辅助字幕」，标注时给你看。只要声音的话，在最上面选「只要声音」。`,
+                `Reading text aloud needs main subtitles in the language spoken: these are in ${languageNames(found.languages)}, and this episode speaks ${languageName(heard)}. Put ${languageName(heard)} subtitles here; these can go under "Secondary subtitles" below, to be shown while labeling. If you only want the sound, choose "Sound only" at the top.`,
+              )}
+            </Note>
+          )}
         </Section>
-        <Section title={tr("次字幕", "Second subtitles")} aside={tr("可以不填", "optional")}>
+        <Section title={tr("辅助字幕", "Secondary subtitles")} aside={tr("可以不填", "optional")}>
           <PathInput
             kind="subtitles"
             value={displaySubtitles}
             onChange={setDisplaySubtitles}
-            placeholder={tr("次字幕文件的路径", "Path to the second subtitles")}
+            placeholder={tr("辅助字幕文件的路径", "Path to the secondary subtitles")}
             toast={toast}
           />
           <Note>
             {tr(
-              "次字幕是另一份你看得懂的字幕，一般是译文。标注时它显示在每句台词上面，帮你听懂角色在说什么。它只给你看：不影响怎么切台词、机器认人，也不会被导出。",
-              "Second subtitles are another subtitle file you can read, usually a translation. While labeling they are shown above each line, so you know what is being said. They are only for you: they change nothing in how lines are cut or who the machine thinks is speaking, and they are not exported.",
+              "辅助字幕是另一份你看得懂的字幕，一般是译文。标注时它显示在每句台词上面，帮你听懂角色在说什么。它只给你看：不影响怎么切台词、机器认人，也不会被导出。",
+              "Secondary subtitles are another subtitle file you can read, usually a translation. While labeling they are shown above each line, so you know what is being said. They are only for you: they change nothing in how lines are cut or who the machine thinks is speaking, and they are not exported.",
             )}
           </Note>
           <DisplayNote path={displaySubtitles} />
@@ -962,6 +961,7 @@ export function AddEpisode({
               running ||
               !video.trim() ||
               !subtitles.trim() ||
+              wrongLanguage ||
               (!!found?.styles && chosen.size === 0)
             }
           >

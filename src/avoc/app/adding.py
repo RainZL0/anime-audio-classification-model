@@ -217,8 +217,8 @@ class Adding:
         if display_subtitles is not None and not display_subtitles.is_file():
             raise ValueError(
                 say(
-                    f"找不到次字幕文件：{display_subtitles}",
-                    f"cannot find the second subtitles: {display_subtitles}",
+                    f"找不到辅助字幕文件：{display_subtitles}",
+                    f"cannot find the secondary subtitles: {display_subtitles}",
                 )
             )
         from avoc.stages.subtitle import load_dialogue
