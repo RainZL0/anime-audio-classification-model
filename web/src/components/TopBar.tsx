@@ -70,9 +70,22 @@ function TabBox({ children }: { children: ReactNode }) {
 /* The bar at the top. What is left out as the window narrows follows docs/UI_DESIGN.md#layout. */
 export function TopBar(p: TopBarProps) {
   const perEpisode = EPISODE_VIEWS().some(([v]) => v === p.view);
+  /* The count on the Scenes tab means nothing by itself, so its hint says what it counts. */
+  const workHint =
+    p.work > 0
+      ? tr(
+          `。${p.episode} 还有 ${p.work} 句要你处理：机器没把握、太短没有声纹，或还没有猜测。「只看要处理的」列的就是这些`,
+          `. ${lines(p.work)} in ${p.episode} still to do: the machine isn't sure, too short for a voiceprint, or no guess yet. "Only to do" lists them`,
+        )
+      : "";
   const tabs = (list: [View, string, string][]) =>
     list.map(([v, label, key]) => (
-      <Tip key={v} text={withKeys(tr(`快捷键 [${key}]`, `Shortcut [${key}]`))}>
+      <Tip
+        key={v}
+        text={withKeys(
+          tr(`快捷键 [${key}]`, `Shortcut [${key}]`) + (v === "scene" ? workHint : ""),
+        )}
+      >
         <button
           type="button"
           aria-pressed={p.view === v}
@@ -84,7 +97,9 @@ export function TopBar(p: TopBarProps) {
         >
           {label}
           {v === "scene" && p.work > 0 && (
-            <span className="ml-1.5 text-[11px] text-warning tabular-nums">{p.work}</span>
+            <span className="ml-1.5 min-w-4 rounded-full bg-warning/15 px-1.5 text-center text-[11px] leading-4 font-semibold text-warning tabular-nums">
+              {p.work}
+            </span>
           )}
         </button>
       </Tip>

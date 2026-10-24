@@ -7,5 +7,7 @@ import { Kbd } from "@/components/ui/kbd";
 export function withKeys(text: string): ReactNode {
   const parts = text.split(/\[([^\]]+)\]/);
   if (parts.length === 1) return text;
-  return parts.map((part, i) => (i % 2 ? <Kbd key={i}>{part}</Kbd> : part));
+  /* One span, so the text and keys flow as one line even inside a box that lays out its children side by side,
+     such as a hover hint. */
+  return <span>{parts.map((part, i) => (i % 2 ? <Kbd key={i}>{part}</Kbd> : part))}</span>;
 }
