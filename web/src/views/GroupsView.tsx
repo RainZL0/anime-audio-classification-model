@@ -98,11 +98,20 @@ export function GroupsView({
             {tr(`还剩 ${left} 组`, `${many(left, "group")} left`)}
           </span>
         </Tip>
+        {/* The tab is only called "Groups", so the view says who made them. */}
+        {groups.length > 0 && (
+          <p className="m-0 basis-full text-xs text-muted-foreground">
+            {tr(
+              "机器按声音自动分的组：每组的台词听起来像同一个人，但可能混进别人。",
+              "The machine made these groups by itself, by voice: each sounds like one person, but may mix in others.",
+            )}
+          </p>
+        )}
       </div>
       {/* Says why there is nothing to do here, then where the work goes on. Wider than usual, so each step fits on one line when there is room. */}
       {groups.length === 0 && (
         <Empty
-          title={tr("「自动分组」里没有要做的了", "No more work to do in Auto groups")}
+          title={tr("「自动分组」里没有要做的了", "No more work to do in Groups")}
           className="max-w-4xl"
         >
           <p>

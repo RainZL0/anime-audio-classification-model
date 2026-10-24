@@ -18,6 +18,13 @@ import { withKeys } from "./Keys";
 import { LanguageButton } from "./LanguageButton";
 import { Tip } from "./Tip";
 
+/* The tab says "Groups"; its hint says who made them. */
+const groupsHint = () =>
+  tr(
+    "机器按声音自动分的组，可能把几个人混在一组。",
+    "Groups the machine made by itself, by voice; a group may mix people. ",
+  );
+
 /* The orange count of lines still to do. */
 const TODO_COUNT =
   "min-w-4 rounded-full bg-warning/15 px-1.5 text-center text-[11px] leading-4 font-semibold text-warning tabular-nums";
@@ -26,7 +33,7 @@ export type View = "groups" | "scene" | "roles" | "export";
 
 /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
 const EPISODE_VIEWS = (): [View, string, string][] => [
-  ["groups", tr("自动分组", "Auto groups"), "G"],
+  ["groups", tr("自动分组", "Groups"), "G"],
   ["scene", tr("场景", "Scenes"), "S"],
 ];
 const ALL_VIEWS = (): [View, string, string][] => [
@@ -85,7 +92,9 @@ export function TopBar(p: TopBarProps) {
       <Tip
         key={v}
         text={withKeys(
-          tr(`快捷键 [${key}]`, `Shortcut [${key}]`) + (v === "scene" ? workHint : ""),
+          (v === "groups" ? groupsHint() : "") +
+            tr(`快捷键 [${key}]`, `Shortcut [${key}]`) +
+            (v === "scene" ? workHint : ""),
         )}
       >
         <button
@@ -121,7 +130,7 @@ export function TopBar(p: TopBarProps) {
                 ? undefined
                 : tr(
                     "「角色」和「导出」看的是全部集数，换集只影响「自动分组」和「场景」",
-                    "Characters and Export cover all episodes; switching only changes Auto groups and Scenes",
+                    "Characters and Export cover all episodes; switching only changes Groups and Scenes",
                   )
             }
           >

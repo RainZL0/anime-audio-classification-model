@@ -79,7 +79,7 @@ You only name the characters you want (the target characters). Everyone else is 
 
 | View | Key | What you do there |
 | --- | :---: | --- |
-| **Auto groups** | `G` | Start here. The machine puts lines that sound like the same person into a group, so you can label them all at once. It may mix people up, so you tick the lines of one person before picking who it is. |
+| **Groups** | `G` | Start here. The machine puts lines that sound like the same person into a group, so you can label them all at once. It may mix people up, so you tick the lines of one person before picking who it is. |
 | **Scenes** | `S` | Every line in order, with the video playing. `Enter` accepts the machine's guess, a number picks a character, `Q` means "Other", `Shift` + number marks the line low quality (loud background, two people at once). |
 | **Characters** | `O` | Everything the machine gave one character, least sure first. Fix the wrong ones, then confirm the rest with `Shift+Enter`. Below are lines it may have missed. |
 | **Export** | `E` | Write the dataset. |

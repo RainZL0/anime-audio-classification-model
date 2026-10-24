@@ -32,7 +32,7 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 **Voiceprints**
 
 - **Clips shorter than 0.5 seconds get no voiceprint.** At that length, telling two characters apart is barely better than a coin toss. Clips of 0.5 to 1 second are still usable, so they are kept.
-- **The first groups in the Auto groups view use the `anime-va` model and average linkage** (merging two groups by the average distance between all their clips). Among the models and merge rules tried, this pair made the fewest wrong merges.
+- **The first groups in the Groups view use the `anime-va` model and average linkage** (merging two groups by the average distance between all their clips). Among the models and merge rules tried, this pair made the fewest wrong merges.
 - **Each model has its own similarity scale, so a threshold cannot be copied from one model to another.**
 
 **Identity and interface**
