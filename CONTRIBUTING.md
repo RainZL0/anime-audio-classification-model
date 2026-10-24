@@ -66,6 +66,8 @@ It is copied into `web/src/components/ui/`, where it can be changed like any oth
 
 No pictures, GIFs or videos are committed, so `git clone` stays small. Upload them as attachments to a comment on the GitHub issue for media, and link to their addresses from the Markdown.
 
+The demo GIF at the top of the README is recorded by a script, so it can be made again after the interface changes: [web/demo/demo.spec.ts](web/demo/demo.spec.ts) says how.
+
 ## README
 
 The README comes in English (`README.md`) and Simplified Chinese (`README.zh.md`). When you change one, change the other in the same commit. The other docs are in English only.
