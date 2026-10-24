@@ -123,7 +123,7 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
         return SpokenText(spoken, assumed, "text", None, tuple(shifted(lines, offset)))
     path = Path(episode.get("subtitles") or "")
     if not path.is_file():
-        return failed("没记切片段用的字幕", "no subtitles are recorded for cutting")
+        return failed("没记主字幕", "no main subtitles are recorded")
     styles = episode.get("subtitle_styles")
     offset = float(episode.get("subtitle_offset") or 0.0)
     try:
@@ -137,8 +137,8 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
     except ValueError as exc:
         return failed(str(exc), str(exc))
     return failed(
-        f"没有{language.zh}字幕：切片段用的字幕不是{language.zh}，也没另配",
-        f"no {language.en} subtitles: the cutting subtitles are not in {language.en}, and none "
+        f"没有{language.zh}字幕：主字幕不是{language.zh}，也没另配",
+        f"no {language.en} subtitles: the main subtitles are not in {language.en}, and none "
         "are attached",
     )
 

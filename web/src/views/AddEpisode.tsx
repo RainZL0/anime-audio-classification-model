@@ -311,7 +311,7 @@ function AddCommand({ workspace }: { workspace: string }) {
 /* null: no subtitle path yet. {}: reading. Otherwise the server's description, or {error}. */
 type Found = (Partial<Styles> & { error?: string }) | null;
 
-/* What the server read from the dialogue subtitles: the text encoding, and the styles (the named looks an ASS file
+/* What the server read from the main subtitles: the text encoding, and the styles (the named looks an ASS file
    gives its lines, such as "Default" or "OP"). The ticked styles are cut into clips; they start as the ones picked
    automatically. With a single style there is nothing to choose, so only the line count is shown. */
 function SubtitleStyles({
@@ -439,7 +439,7 @@ function useAnswer<T>(url: string, path: string): Answer<T> | null {
   return path.trim() && answer?.for === path ? answer.found : null;
 }
 
-/* What was read from the display subtitles, so a wrong file shows before the long run, not after it. Their
+/* What was read from the second subtitles (display subtitles in the code), so a wrong file shows before the long run, not after it. Their
    dialogue styles are always picked automatically. */
 function DisplayNote({ path }: { path: string }) {
   const found = useAnswer<Styles>("/api/subtitle-styles", path);
@@ -478,7 +478,7 @@ function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) 
   return (
     <Note warn={!(tagged || tracks.tracks.length === 1)}>
       {tr(
-        `共 ${tracks.tracks.length} 条音轨，人声从第 ${used.number + 1} 条（${what}）取`,
+        `视频里有 ${tracks.tracks.length} 条音轨，用第 ${used.number + 1} 条（${what}）`,
         `${many(tracks.tracks.length, "audio track")}; the voices are taken from track ${used.number + 1} (${what})`,
       )}
       {!tagged &&
@@ -576,10 +576,16 @@ export function AddEpisode({
       clearTimeout(timer);
     };
   }, [subtitles]);
+  const progress = useRef<HTMLDivElement>(null);
   const run = async (body: object) => {
     setBusy(true);
     try {
       setAdding(await call<Adding>("/api/add", body));
+      /* The button is at the bottom and the progress at the top: bring the progress into view, or nothing seems to
+         happen. */
+      requestAnimationFrame(() =>
+        progress.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+      );
     } catch (e) {
       toast((e as Error).message, true);
     }
@@ -668,6 +674,7 @@ export function AddEpisode({
     <div className="flex flex-col gap-6">
       {adding && adding.state !== "idle" && (
         <div
+          ref={progress}
           className={cn(
             "flex flex-col gap-2 rounded-xl border px-3 py-2.5",
             adding.state === "done" && "bg-success/10",
@@ -831,22 +838,25 @@ export function AddEpisode({
             )}
           </Note>
         </Section>
-        <Section title={tr("对白字幕", "Dialogue subtitles")} aside="ASS / SRT">
+        <Section title={tr("主字幕", "Main subtitles")} aside="ASS / SRT">
           <PathInput
             kind="subtitles"
             value={subtitles}
             onChange={setSubtitles}
-            placeholder={tr("对白字幕文件的路径", "Path to the dialogue subtitles")}
+            placeholder={tr("主字幕文件的路径", "Path to the main subtitles")}
             toast={toast}
           />
           {!found && (
             <Note>
               {text
                 ? tr(
-                    "每句台词按它的时间切出来。最好用这一集说的语言的字幕，导出时文字才对得上。",
-                    "Each line is cut out at its times. Best in the language spoken, so the text matches on export.",
+                    "台词按主字幕切：每句字幕按它的时间切成一段。最好用角色说的语言（一般是日语）的字幕，导出时文字才对得上。",
+                    "Lines are cut by the main subtitles: each entry becomes one clip, at its times. Best in the language the characters speak (usually Japanese), so the text matches on export.",
                   )
-                : tr("每句台词按它的时间切出来。", "Each line is cut out at its times.")}
+                : tr(
+                    "台词按主字幕切：每句字幕按它的时间切成一段。",
+                    "Lines are cut by the main subtitles: each entry becomes one clip, at its times.",
+                  )}
             </Note>
           )}
           {found && (
@@ -856,12 +866,12 @@ export function AddEpisode({
             <Note>
               {text
                 ? tr(
-                    "对白字幕就是说的语言：每段片段的文字就是它自己那一句。一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
-                    "The dialogue subtitles are in the language spoken, so each clip's text is its own line. An entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
+                    "主字幕和角色说的是同一种语言，所以每段的文字就是它自己那句台词。一条字幕里有两个人说话（用「－」或名字标出）的，会按人分开切。",
+                    "The main subtitles are in the language spoken, so each clip's text is its own line. An entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
                   )
                 : tr(
-                    "对白字幕就是说的语言：一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
-                    "The dialogue subtitles are in the language spoken: an entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
+                    "主字幕和角色说的是同一种语言。一条字幕里有两个人说话（用「－」或名字标出）的，会按人分开切。",
+                    "The main subtitles are in the language spoken: an entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
                   )}
             </Note>
           )}
@@ -872,27 +882,24 @@ export function AddEpisode({
             !found.languages.includes(heard) && (
               <Note warn>
                 {tr(
-                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面「给你看的字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
-                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under "Subtitles for you to read" below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
+                  `主字幕是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份改填到下面的「次字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
+                  `The main subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and move these to "Second subtitles" below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
                 )}
               </Note>
             )}
         </Section>
-        <Section
-          title={tr("给你看的字幕", "Subtitles for you to read")}
-          aside={tr("可以不填，比如一份译文", "optional, such as a translation")}
-        >
+        <Section title={tr("次字幕", "Second subtitles")} aside={tr("可以不填", "optional")}>
           <PathInput
             kind="subtitles"
             value={displaySubtitles}
             onChange={setDisplaySubtitles}
-            placeholder={tr("字幕文件的路径", "Path to the subtitles")}
+            placeholder={tr("次字幕文件的路径", "Path to the second subtitles")}
             toast={toast}
           />
           <Note>
             {tr(
-              "标注时显示在每句台词上面，帮你看懂在说什么。只给你看，不影响切台词、认人和导出。",
-              "Shown above each line while labeling, so you know what is being said. Only for you: it changes nothing in how lines are cut, who the machine thinks is speaking, or what is exported.",
+              "次字幕是另一份你看得懂的字幕，一般是译文。标注时它显示在每句台词上面，帮你听懂角色在说什么。它只给你看：不影响怎么切台词、机器认人，也不会被导出。",
+              "Second subtitles are another subtitle file you can read, usually a translation. While labeling they are shown above each line, so you know what is being said. They are only for you: they change nothing in how lines are cut or who the machine thinks is speaking, and they are not exported.",
             )}
           </Note>
           <DisplayNote path={displaySubtitles} />

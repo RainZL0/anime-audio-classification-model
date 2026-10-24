@@ -124,7 +124,7 @@ def checks(where: Path) -> list[Check]:
     from avoc.pipeline import TOKEN_HOWTO, has_hf_token
 
     cuda = torch.cuda.is_available()
-    gpu = f", {torch.cuda.get_device_name(0)}" if cuda else ""
+    gpu = torch.cuda.get_device_name(0) if cuda else ""
     windows = sys.platform == "win32"
     found = [
         Check(
@@ -141,8 +141,12 @@ def checks(where: Path) -> list[Check]:
         Check(
             cuda,
             say(
-                f"torch {torch.__version__}，CUDA {'可用' if cuda else '不可用'}{gpu}",
-                f"torch {torch.__version__}, CUDA {'available' if cuda else 'not available'}{gpu}",
+                f"显卡：{gpu}（CUDA 可用，torch {torch.__version__}）"
+                if cuda
+                else f"显卡：没找到能用的 NVIDIA 显卡（torch {torch.__version__}）",
+                f"Graphics card: {gpu} (CUDA available, torch {torch.__version__})"
+                if cuda
+                else f"Graphics card: no usable NVIDIA card found (torch {torch.__version__})",
             ),
             say(
                 "没找到能用的 NVIDIA 显卡，会用 CPU：能用，但每集要慢很多。有 NVIDIA 显卡的话，"
@@ -209,8 +213,8 @@ def checks(where: Path) -> list[Check]:
         Check(
             free >= FREE_GB,
             say(
-                f"{where} 所在磁盘剩余 {free:.0f} GB",
-                f"Free space on the disk of {where}: {free:.0f} GB",
+                f"磁盘空间：剩余 {free:.0f} GB（工作文件夹 {where}）",
+                f"Disk space: {free:.0f} GB free (workspace {where})",
             ),
             say(
                 "处理好的一集大约占 0.5 GB。腾出空间，或者把工作文件夹放到空间更多的磁盘上",

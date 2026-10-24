@@ -301,7 +301,7 @@ export function ExportView({
         <Section title={tr("台词文字", "Text of each line")}>
           <Note>
             {tr(
-              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。切台词的字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的句子不导出，原因写在导出目录的 rejected.tsv 里。",
+              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。主字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的句子不导出，原因写在导出目录的 rejected.tsv 里。",
               "Each line needs the words the character actually said, in the language the episode speaks (usually Japanese). If the subtitles the lines were cut from are in that language, they are used; if they are a translation, attach subtitles in the original language below. Lines without their words are not exported; the reasons are in rejected.tsv in the export folder.",
             )}
           </Note>

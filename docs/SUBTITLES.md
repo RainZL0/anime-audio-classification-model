@@ -36,7 +36,7 @@ Anyone can do this: a script, a subtitle editor, or an AI agent. The plain forma
 - When the speaker is known, the name comes first on the line in full-width brackets: （テイオー）ねえ. Brackets are used for nothing else.
 - Nothing that is not spoken: no sound notes, music notes, arrows, signs or readings.
 
-The rules leave a file in this format as it is. Use the converted file in place of the original, as the dialogue subtitles or as the text subtitles. A brief that can be handed to an agent:
+The rules leave a file in this format as it is. Use the converted file in place of the original, as the main subtitles or as the text subtitles. A brief that can be handed to an agent:
 
 > Convert `<file>` to the plain subtitle format in docs/SUBTITLES.md of the avoc project. Keep every time unchanged and keep every spoken word. Then run `uv run avoc styles "<new file>"` and check that it prints no warning about marks.
 

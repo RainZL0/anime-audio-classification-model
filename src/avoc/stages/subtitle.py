@@ -217,17 +217,23 @@ def styles_note(path: Path, styles: list[str] | None = None) -> str:
     When the styles were picked automatically, it also says how to change them."""
     found = describe_styles(path)
     chosen = found["picked"] if styles is None else styles
-    named = [f"{s['name']} ({s['lines']})" for s in found["styles"] if s["name"] in chosen]
-    rest = [f"{s['name']} ({s['lines']})" for s in found["styles"] if s["name"] not in chosen]
+
+    def counted(style: dict[str, Any]) -> str:
+        return say(f"{style['name']}（{style['lines']} 句）", f"{style['name']} ({style['lines']})")
+
+    named = [counted(s) for s in found["styles"] if s["name"] in chosen]
+    rest = [counted(s) for s in found["styles"] if s["name"] not in chosen]
     if not rest:
-        return say(f"台词取自样式 {', '.join(named)}", f"Dialogue taken from {', '.join(named)}")
+        return say(
+            f"台词取自字幕样式 {'、'.join(named)}", f"Dialogue taken from {', '.join(named)}"
+        )
     if styles is not None:
         return say(
-            f"台词取自样式 {', '.join(named)}；没用：{', '.join(rest)}",
+            f"台词取自字幕样式 {'、'.join(named)}；没用：{'、'.join(rest)}",
             f"Dialogue taken from {', '.join(named)}; left out: {', '.join(rest)}",
         )
     return say(
-        f"台词取自样式 {', '.join(named)}；没用：{', '.join(rest)}。要改就用 --styles",
+        f"台词取自字幕样式 {'、'.join(named)}；没用：{'、'.join(rest)}。要改就用 --styles",
         f"Dialogue taken from {', '.join(named)}; left out: {', '.join(rest)}. "
         "To change this, use --styles",
     )

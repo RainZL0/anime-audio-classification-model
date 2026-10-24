@@ -82,7 +82,7 @@ def add(
     subs: Annotated[
         Path,
         typer.Option(
-            help="Dialogue subtitles of this episode; clips are cut from them. Best in the "
+            help="Main subtitles of this episode; clips are cut from them. Best in the "
             "language spoken (usually Japanese)"
         ),
     ],
@@ -168,7 +168,7 @@ def add(
 @app.command()
 def prepare(
     video: Annotated[Path, typer.Argument(help="Video of this episode, required")],
-    subs: Annotated[Path, typer.Option(help="Matching dialogue subtitles, required")],
+    subs: Annotated[Path, typer.Option(help="Matching main subtitles, required")],
     out: Annotated[Path, typer.Option(help="New episode folder")],
     name: Annotated[str, typer.Option(help="Unique episode name, for example ep03")],
     audio: Annotated[

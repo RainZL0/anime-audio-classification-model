@@ -63,8 +63,8 @@ uv sync --locked
 For each episode you need:
 
 - **the video** (`.mkv`, `.mp4`, …);
-- **subtitles whose lines match the dialogue** (`.ass` or `.srt`), best in the language spoken, such as Japanese subtitles for a Japanese anime;
-- if you like, **subtitles for you to read**, such as a translation. They are shown while labeling and change nothing else.
+- **main subtitles** whose lines match the dialogue (`.ass` or `.srt`); each line becomes one clip. They are best in the language spoken, such as Japanese subtitles for a Japanese anime;
+- if you like, **second subtitles** you can read, such as a translation. They are shown above each line while labeling and change nothing else.
 
 Start the app on a folder of your choice, here `workspace`:
 

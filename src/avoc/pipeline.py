@@ -97,12 +97,17 @@ def track_note(tracks: list[Any], number: int, spoken: str, how: str) -> str:
     def described(track: Any) -> str:
         code = from_tag(track.tag)
         what = name_of(code) if code else (track.tag or say("没标语言", "no language tag"))
-        return f"{track.number + 1} ({what}{', ' + track.title if track.title else ''})"
+        title = say(f"，{track.title}", f", {track.title}") if track.title else ""
+        return say(
+            f"第 {track.number + 1} 条（{what}{title}）",
+            f"track {track.number + 1} ({what}{title})",
+        )
 
     used = tracks[number]
     line = say(
-        f"用第 {described(used)} 条音轨，共 {len(tracks)} 条；说的是{name_of(spoken)}",
-        f"Using audio track {described(used)} of {len(tracks)}; spoken language: {name_of(spoken)}",
+        f"视频里有 {len(tracks)} 条音轨，用{described(used)}；角色说的是{name_of(spoken)}",
+        f"{len(tracks)} audio track(s); using {described(used)}; the characters speak "
+        f"{name_of(spoken)}",
     )
     if how == "assumed":
         line += say(
@@ -117,7 +122,7 @@ def track_note(tracks: list[Any], number: int, spoken: str, how: str) -> str:
     others = [described(t) for t in tracks if t.number != number]
     if others:
         line += say(
-            f"。其他音轨：{', '.join(others)}；要换就用 --spoken",
+            f"。其他音轨：{'、'.join(others)}；要换就用 --spoken",
             f". Other tracks: {', '.join(others)}; to use another, give --spoken",
         )
     return line
@@ -432,8 +437,8 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     if not cut:
         raise ValueError(
             say(
-                f"{episode['name']} 还没记切片段用的字幕，先用 avoc set-subtitles 补上",
-                f"{episode['name']} has no subtitles recorded for cutting; "
+                f"{episode['name']} 还没记主字幕，先用 avoc set-subtitles 补上",
+                f"{episode['name']} has no main subtitles recorded; "
                 "add them with avoc set-subtitles",
             )
         )
@@ -446,7 +451,7 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     if agreement < MIN_AGREEMENT:
         raise ValueError(
             say(
-                f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
+                f"{subtitles.name} 和这一集的主字幕最多只对上 {agreement:.0%}，"
                 f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕。"
                 "也可能是另一个版本的视频配的字幕（帧率不同，或者删减过），那样时间会越差越多",
                 f"{subtitles.name} overlaps this episode's subtitles by at most {agreement:.0%}, "
@@ -491,8 +496,8 @@ def attach_display_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]
     if not cut:
         raise ValueError(
             say(
-                f"{episode['name']} 还没记切片段用的字幕，先用 avoc set-subtitles 补上",
-                f"{episode['name']} has no subtitles recorded for cutting; "
+                f"{episode['name']} 还没记主字幕，先用 avoc set-subtitles 补上",
+                f"{episode['name']} has no main subtitles recorded; "
                 "add them with avoc set-subtitles",
             )
         )
@@ -505,7 +510,7 @@ def attach_display_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]
     if agreement < MIN_AGREEMENT:
         raise ValueError(
             say(
-                f"{subtitles.name} 和这一集切片段用的字幕最多只重合 {agreement:.0%}，"
+                f"{subtitles.name} 和这一集的主字幕最多只对上 {agreement:.0%}，"
                 f"不到 {MIN_AGREEMENT:.0%}，多半不是这一集的字幕",
                 f"{subtitles.name} overlaps this episode's subtitles by at most {agreement:.0%}, "
                 f"below {MIN_AGREEMENT:.0%}; it is probably for another episode",
@@ -646,9 +651,9 @@ def add_episode(
     # Say a mistyped path before anything else is printed or loaded.
     for path, zh, en in (
         (video, "视频", "Video"),
-        (subtitles, "字幕", "Subtitles"),
+        (subtitles, "主字幕", "Main subtitles"),
         (text_subtitles, "文本字幕", "Text subtitles"),
-        (display_subtitles, "显示用字幕", "Display subtitles"),
+        (display_subtitles, "次字幕", "Second subtitles"),
         (audio, "音轨", "Audio track"),
     ):
         if path is not None and not path.is_file():
@@ -660,8 +665,8 @@ def add_episode(
     device = resolve_device(device)
     report(
         say(
-            f"{name}：用 {device} 计算，文件夹 {out}",
-            f"{name}: computing on {device}, folder {out}",
+            f"{name}：用{'显卡' if device == 'cuda' else ' CPU '}计算，存到 {out}",
+            f"{name}: computing on the {'GPU' if device == 'cuda' else 'CPU'}, saved in {out}",
         )
     )
 
@@ -745,29 +750,29 @@ def add_episode(
         if result["by_turns"]:
             report(
                 say(
-                    "字幕是这一集说的语言：一条字幕里有两个人说话的，按人分开切",
-                    "The subtitles are in the language spoken: an entry where two people speak "
-                    "is cut into one clip per person",
+                    "主字幕就是角色说的语言：一条字幕里有两个人说话的，按人分开切",
+                    "The main subtitles are in the language spoken: an entry where two people "
+                    "speak is cut into one clip per person",
                 )
             )
 
     if display_subtitles is not None:
-        report(say("配显示用字幕", "Attaching display subtitles"))
+        report(say("配次字幕", "Attaching the second subtitles"))
         try:
             shown = attach_display_subtitles(out, display_subtitles)
             report(
                 say(
-                    f"偏移 {shown['display_subtitle_offset']:+.2f} 秒，"
-                    f"和切片段用的字幕重合 {shown['display_subtitle_agreement']:.0%}",
-                    f"Offset {shown['display_subtitle_offset']:+.2f} seconds, overlap with the "
-                    f"subtitles used for cutting {shown['display_subtitle_agreement']:.0%}",
+                    f"次字幕偏移 {shown['display_subtitle_offset']:+.2f} 秒，"
+                    f"和主字幕对上 {shown['display_subtitle_agreement']:.0%}",
+                    f"Second subtitles: offset {shown['display_subtitle_offset']:+.2f} seconds, "
+                    f"{shown['display_subtitle_agreement']:.0%} line up with the main subtitles",
                 )
             )
         except ValueError as exc:
             report(
                 say(
-                    f"注意：显示用字幕没配上：{exc}。以后可以用 avoc set-display-subtitles 再配",
-                    f"Note: the display subtitles were not attached: {exc}. Attach them later "
+                    f"注意：次字幕没配上：{exc}。以后可以用 avoc set-display-subtitles 再配",
+                    f"Note: the second subtitles were not attached: {exc}. Attach them later "
                     "with avoc set-display-subtitles",
                 )
             )
