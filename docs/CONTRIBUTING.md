@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. Start with [docs/index.md](docs/index.md): it lists every doc and what each one covers. Before proposing a different approach, read [docs/DECISIONS.md](docs/DECISIONS.md), which lists what is settled and what was already tried and ruled out.
+Thanks for helping. Start with [docs/index.md](index.md): it lists every doc and what each one covers. Before proposing a different approach, read [docs/DECISIONS.md](DECISIONS.md), which lists what is settled and what was already tried and ruled out.
 
 ## Python side
 
@@ -17,7 +17,7 @@ The type checker is [ty](https://github.com/astral-sh/ty). It is not a project d
 
 ## Web app
 
-The labeling app is React and TypeScript, built with Vite, styled with Tailwind CSS and shadcn/ui components ([why](docs/DECISIONS.md#settled)). The source is in `web/`. The built files in `src/avoc/app/static/` are committed, so people who only install the tool never need Node. Do not edit the built files by hand.
+The labeling app is React and TypeScript, built with Vite, styled with Tailwind CSS and shadcn/ui components ([why](DECISIONS.md#settled)). The source is in `web/`. The built files in `src/avoc/app/static/` are committed, so people who only install the tool never need Node. Do not edit the built files by hand.
 
 Set up once: install Node (the current long-term-support version), then
 
@@ -66,7 +66,7 @@ It is copied into `web/src/components/ui/`, where it can be changed like any oth
 
 No pictures, GIFs or videos are committed, so `git clone` stays small. Upload them as attachments to a comment on the GitHub issue for media, and link to their addresses from the Markdown.
 
-The demo GIF at the top of the README is recorded by a script, so it can be made again after the interface changes: [web/demo/demo.spec.ts](web/demo/demo.spec.ts) says how.
+The demo GIF at the top of the README is recorded by a script, so it can be made again after the interface changes: [web/demo/demo.spec.ts](../web/demo/demo.spec.ts) says how.
 
 ## README
 
@@ -74,4 +74,4 @@ The README comes in English (`README.md`) and Simplified Chinese (`README.zh.md`
 
 ## Text in the web app
 
-Both languages are written side by side as `tr(Chinese, English)` where the text is used. Use the terms in the [glossary](docs/HOW_IT_WORKS.md#glossary), and follow the design rules in [docs/UI_DESIGN.md](docs/UI_DESIGN.md).
+Both languages are written side by side as `tr(Chinese, English)` where the text is used. Use the terms in the [glossary](HOW_IT_WORKS.md#glossary), and follow the design rules in [docs/UI_DESIGN.md](UI_DESIGN.md).

@@ -42,4 +42,4 @@ The rules leave a file in this format as it is. Use the converted file in place 
 
 ## Way 2: add a rule
 
-When the habit will come up again, for example in every file of one subtitle group or TV station, teach it to the program. Add an entry to `CLEANUP` in `src/avoc/stages/captions.py`, or widen one of the patterns above it, and add the example line to `tests/test_captions.py`. Nothing else in the code needs to change. Then run the checks listed in [CONTRIBUTING.md](../CONTRIBUTING.md#python-side). A habit that other people will meet too is worth sending back to the project.
+When the habit will come up again, for example in every file of one subtitle group or TV station, teach it to the program. Add an entry to `CLEANUP` in `src/avoc/stages/captions.py`, or widen one of the patterns above it, and add the example line to `tests/test_captions.py`. Nothing else in the code needs to change. Then run the checks listed in [CONTRIBUTING.md](CONTRIBUTING.md#python-side). A habit that other people will meet too is worth sending back to the project.

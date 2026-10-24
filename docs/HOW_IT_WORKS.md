@@ -49,7 +49,7 @@ Labeling and export then happen in the [interface](#labeling-and-correction-inte
 
 ## Labeling and correction interface
 
-`avoc app` starts a web server that only listens on this machine. The front end's source is in `web/`. The server sends the built files in `src/avoc/app/static/`, which are committed, so running the app needs no Node. How to change the front end is in [CONTRIBUTING.md](../CONTRIBUTING.md).
+`avoc app` starts a web server that only listens on this machine. The front end's source is in `web/`. The server sends the built files in `src/avoc/app/static/`, which are committed, so running the app needs no Node. How to change the front end is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Target characters and "Other".** The user names only the characters they want to collect. These are the target characters. Everyone else is labeled "Other", using the Q key. A workspace can have several target characters, and you can add or remove them while labeling:
 - Each "Other" label records which target characters existed at that moment. It counts as "not this target" only for those characters.

@@ -133,7 +133,7 @@ Reports from Linux and macOS are welcome in the issues.
 
 ## Docs
 
-How it works, the words it uses, and what was tried and ruled out are in [docs/index.md](docs/index.md). To help, see [CONTRIBUTING.md](CONTRIBUTING.md).
+How it works, the words it uses, and what was tried and ruled out are in [docs/index.md](docs/index.md). To help, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Usage rules
 

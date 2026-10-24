@@ -26,7 +26,7 @@
 
 | What you want to know | Read | Main sections |
 | --- | --- | --- |
-| How to set up, check and send a change, and how to work on the web app | [CONTRIBUTING.md](../CONTRIBUTING.md) | [Python side](../CONTRIBUTING.md#python-side), [Web app](../CONTRIBUTING.md#web-app) |
+| How to set up, check and send a change, and how to work on the web app | [CONTRIBUTING.md](CONTRIBUTING.md) | [Python side](CONTRIBUTING.md#python-side), [Web app](CONTRIBUTING.md#web-app) |
 
 ## What each doc covers
 

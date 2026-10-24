@@ -133,7 +133,7 @@ exports/2026-10-24/
 
 ## 文档
 
-工作原理、用到的说法，以及试过并已放弃的方案，见 [docs/index.md](docs/index.md)（英文）。想参与的话，见 [CONTRIBUTING.md](CONTRIBUTING.md)（英文）。
+工作原理、用到的说法，以及试过并已放弃的方案，见 [docs/index.md](docs/index.md)（英文）。想参与的话，见 [CONTRIBUTING.md](docs/CONTRIBUTING.md)（英文）。
 
 ## 使用规则
 
