@@ -365,19 +365,32 @@ export function Stage({
               onClick={!isOther && hasVideo ? () => onAvatar(label) : null}
               title={tr("从画面里截一块当头像", "Crop an avatar from the picture")}
             />
-            <div>
-              <div className="font-semibold text-foreground">
-                {isOther ? labelText[label] : <RoleName role={roles[label]} name={label} />}
-                {clip.unusable && !labelText[label] && (
-                  <>
-                    {" "}
-                    <Tag look="unusable" tip={lowTip()}>
-                      {tr("质量低", "Low quality")}
-                    </Tag>
-                  </>
-                )}
+            {/* The name and "Clear label" share the top row, so the note below gets the full width. */}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <div className="font-semibold text-foreground">
+                  {isOther ? labelText[label] : <RoleName role={roles[label]} name={label} />}
+                  {clip.unusable && !labelText[label] && (
+                    <>
+                      {" "}
+                      <Tag look="unusable" tip={lowTip()}>
+                        {tr("质量低", "Low quality")}
+                      </Tag>
+                    </>
+                  )}
+                </div>
+                <Tip
+                  text={tr(
+                    "清掉这句的标签，回到机器的猜测",
+                    "Clear this line's label and go back to the machine's guess",
+                  )}
+                >
+                  <Button variant="ghost" size="sm" className="-mr-1.5 text-xs" onClick={onClear}>
+                    {tr("清掉标签", "Clear label")} <Kbd>Backspace</Kbd>
+                  </Button>
+                </Tip>
               </div>
-              <div className="text-xs">
+              <div className="mt-0.5 text-xs">
                 {withKeys(
                   tr(
                     "要改的话，直接按别的数字键或在下面选；[Shift] + 数字是质量低",
@@ -386,18 +399,6 @@ export function Stage({
                 )}
               </div>
             </div>
-            <span className="ml-auto flex flex-col gap-1.5">
-              <Tip
-                text={tr(
-                  "清掉这句的标签，回到机器的猜测",
-                  "Clear this line's label and go back to the machine's guess",
-                )}
-              >
-                <Button variant="ghost" size="sm" className="text-xs" onClick={onClear}>
-                  {tr("清掉标签", "Clear label")} <Kbd>Backspace</Kbd>
-                </Button>
-              </Tip>
-            </span>
           </div>
         </>
       ) : (
