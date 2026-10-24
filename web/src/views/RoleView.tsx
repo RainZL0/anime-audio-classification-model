@@ -42,7 +42,7 @@ function Counts({ info }: { info: RoleCounts }) {
 
 /* One row of the character list on the left. */
 const ITEM =
-  "grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-lg border border-transparent px-2 py-1.5 hover:bg-muted/60";
+  "grid grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-lg border border-transparent px-2 py-1.5 hover:bg-muted/60";
 const ITEM_ON = "border-primary/40 bg-accent hover:bg-accent";
 
 /* A short gray heading above a part of the list. */

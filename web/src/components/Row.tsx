@@ -53,7 +53,7 @@ export function Row({
     <div
       ref={ref}
       className={cn(
-        "relative isolate grid cursor-pointer grid-cols-[36px_1fr_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
+        "relative isolate grid grid-cols-[36px_1fr_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
         selected && SELECTED_ROW,
       )}
       onClick={onSelect}
