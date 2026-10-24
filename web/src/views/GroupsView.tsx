@@ -171,7 +171,7 @@ export function GroupsView({
           </Button>
         </Empty>
       )}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3.5 pt-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] gap-3.5 pt-3">
         {groups.map((g, gi) => {
           const ticked = picked[g.key] || new Set<string>();
           /* Labeled lines stay in the group for you to see, but can't be ticked. */
