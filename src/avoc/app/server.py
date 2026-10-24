@@ -1058,6 +1058,17 @@ def create_app(state: AppState) -> Any:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
+    @app.post("/api/show-folder")
+    def post_show_folder(body: SubtitleStylesBody) -> dict[str, Any]:
+        """Open a folder, such as the export just written, in the file manager on this machine."""
+        from avoc.app.picker import show_folder
+
+        try:
+            show_folder(clean_path(body.path))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {}
+
     @app.post("/api/add/stop")
     def post_add_stop() -> dict[str, Any]:
         return state.adding.stop()

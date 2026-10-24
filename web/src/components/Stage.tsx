@@ -432,17 +432,34 @@ export function Stage({
               )}
             </div>
           )}
+          {/* A character but no "Other" yet: the machine has no one to compare them with, so it waits. */}
+          {!clip.guess.length && clip.voiced && !clip.label && dock.length > 0 && (
+            <div className={cn(STRANGER, "border bg-muted text-muted-foreground")}>
+              {tr(
+                <>
+                  机器还没开始猜：它得先听过别人的声音，才分得出谁是 {dock.join("、")}
+                  。不是你要收集的人，就按 <Kbd>Q</Kbd> 标「其他」，标几句后它就开始猜。
+                </>,
+                <>
+                  The machine has not started guessing: it needs to hear other people first to tell{" "}
+                  {dock.join(", ")} apart. Label people you don't want to collect "Other" with{" "}
+                  <Kbd>Q</Kbd>; after a few it starts guessing.
+                </>,
+              )}
+            </div>
+          )}
           {clip.familiar === null && clip.guess.length > 0 && (
             <div className={cn(STRANGER, "border bg-muted text-muted-foreground")}>
               {tr(
                 <>
-                  机器现在只会在底部这几个角色里挑。都不是就按 <Kbd>N</Kbd> 新建；确认满 20
-                  句后，它会自己提醒你哪句像新面孔。
+                  机器现在只会在底部这几个角色里挑。都不是的话，要收集的人按 <Kbd>N</Kbd>{" "}
+                  新建，别人按 <Kbd>Q</Kbd> 标「其他」；确认满 20 句后，它会自己提醒你哪句像新面孔。
                 </>,
                 <>
                   For now the machine only picks among the characters at the bottom. If it is none
-                  of them, press <Kbd>N</Kbd>. After 20 confirmed lines it will point out lines that
-                  sound like someone new.
+                  of them, press <Kbd>N</Kbd> for someone you want to collect, or <Kbd>Q</Kbd> for
+                  "Other". After 20 confirmed lines it will point out lines that sound like someone
+                  new.
                 </>,
               )}
             </div>

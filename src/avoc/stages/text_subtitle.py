@@ -1,5 +1,5 @@
 """Give each clip its text in the language spoken. Clips are still cut by the subtitles they were
-cut with, but the text comes from lines in the spoken language: from the cutting subtitles when
+cut with, but the text comes from lines in the spoken language: from the main subtitles when
 they are in it (bilingual ones included), otherwise from separately supplied text subtitles.
 
 The usual case: Chinese subtitles are used to cut the clips, and Japanese subtitles supply the text,
@@ -174,7 +174,7 @@ def measure_offset(
     """How many seconds the separate subtitles must be shifted to line up with the audio. Returns
     (offset, overlap score).
 
-    `cut_lines` are the lines of the subtitles used for cutting, already converted to audio-track
+    `cut_lines` are the lines of the main subtitles, already converted to audio-track
     time. Both subtitle files carry the same dialogue, with roughly the same display times. So they
     are compared with each other, using the same method that `find_offset` uses to compare
     subtitles with speech detection.

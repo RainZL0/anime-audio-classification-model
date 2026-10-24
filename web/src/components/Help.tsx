@@ -61,7 +61,7 @@ export function Help({ onClose, onGuide }: { onClose: () => void; onGuide: () =>
     [
       tr("角色视图里 [Shift]+[Enter]", "[Shift]+[Enter] in Characters"),
       tr(
-        "确认机器归给这个角色、还没人确认的全部句子",
+        "确认机器归给这个角色、还没人确认的全部台词",
         "Confirm all lines the machine gave this character that no one has confirmed yet",
       ),
     ],

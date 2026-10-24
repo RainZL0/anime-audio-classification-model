@@ -114,7 +114,7 @@ function SpokenTexts({
                 </>
               ) : s.source === "cut" ? (
                 <span className="text-muted-foreground tabular-nums">
-                  {tr("文字取自切片段用的字幕", "text from the subtitles the clips were cut from")}
+                  {tr("文字取自主字幕", "text from the main subtitles")}
                 </span>
               ) : (
                 <span className="text-warning">{s.problem}</span>
@@ -292,7 +292,7 @@ export function ExportView({
                 'Sound only, no text. While labeling, notes such as "No text to export" are left out too. This choice is remembered.',
               )
             : tr(
-                "连同每句台词的原声语言文本一起导出。标注时会标出没有文本、导不出来的句子。这个选择会记住。",
+                "连同每句台词的原声语言文本一起导出。标注时会标出没有文本、导不出来的台词。这个选择会记住。",
                 "Exports each line with its text in the original language. While labeling, lines without that text, which cannot be exported, are marked. This choice is remembered.",
               )}
         </Note>
@@ -301,7 +301,7 @@ export function ExportView({
         <Section title={tr("台词文字", "Text of each line")}>
           <Note>
             {tr(
-              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。主字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的句子不导出，原因写在导出目录的 rejected.tsv 里。",
+              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。主字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的台词不导出，原因写在导出目录的 rejected.tsv 里。",
               "Each line needs the words the character actually said, in the language the episode speaks (usually Japanese). If the subtitles the lines were cut from are in that language, they are used; if they are a translation, attach subtitles in the original language below. Lines without their words are not exported; the reasons are in rejected.tsv in the export folder.",
             )}
           </Note>
@@ -342,7 +342,20 @@ export function ExportView({
               <br />
             </span>
           )}
-          <span className="text-xs text-muted-foreground">{result.out}</span>
+          <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {result.out}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                call("/api/show-folder", { path: result.out }).catch((e: Error) =>
+                  toast(e.message, true),
+                )
+              }
+            >
+              {tr("打开文件夹", "Open the folder")}
+            </Button>
+          </span>
         </div>
       )}
     </div>

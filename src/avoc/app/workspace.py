@@ -83,7 +83,7 @@ class SpokenText:
     assumed: bool
     """True when no tag or person said what is spoken, and Japanese was taken."""
     source: str | None
-    """`text` (separate text subtitles), `cut` (the cutting subtitles are in that language), or
+    """`text` (separate text subtitles), `cut` (the main subtitles are in that language), or
     None when there is no such text."""
     problem: Words | None = None
     """Why there is no text, for the person. None when there is."""
@@ -93,7 +93,7 @@ class SpokenText:
 
 def spoken_text(episode: dict[str, Any]) -> SpokenText:
     """Pick the source of the spoken-language text: separate text subtitles first, as the person
-    chose them, then the cutting subtitles if they are in that language. A missing or unreadable
+    chose them, then the main subtitles if they are in that language. A missing or unreadable
     file is reported, not raised, so the interface still opens."""
     from avoc.pipeline import spoken_language
     from avoc.stages.text_subtitle import load_text_lines, shifted, subtitle_languages, turn_lines

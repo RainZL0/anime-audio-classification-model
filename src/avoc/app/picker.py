@@ -31,6 +31,18 @@ _open = threading.Lock()
 """Only one window at a time: a second one would hide behind the first."""
 
 
+def show_folder(folder: Path) -> None:
+    """Open a folder, such as an export just written, in this machine's file manager."""
+    if not folder.is_dir():
+        raise ValueError(say(f"找不到文件夹：{folder}", f"cannot find the folder: {folder}"))
+    if sys.platform == "win32":
+        import os
+
+        os.startfile(folder)
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(folder)])
+
+
 def start_folder(current: str, launched: Path) -> Path:
     """Where the window opens: the nearest folder on the path already in the box that exists, so a
     default export folder not made yet opens in the workspace; else the folder `avoc app` was

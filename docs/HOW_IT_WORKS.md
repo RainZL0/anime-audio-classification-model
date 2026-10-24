@@ -65,7 +65,7 @@ Labeling and export then happen in the [interface](#labeling-and-correction-inte
 - Negative examples are clips labeled with another name, plus clips labeled "Other" while that target already existed. A wrong guess is simply corrected to the right person or to "Other". No separate "not the target" label is recorded.
 - Clips labeled "low quality" are not used for training. We have not measured whether noisy clips help the machine find the target inside the noise, or whether they teach it the wrong thing. For now they are kept out.
 
-The probability of "Other" is recorded as 1 minus the probability of the top target character. So the numbers do not always add up to 1. A training set has a few hundred to a few thousand clips. All target characters together take one or two seconds to train. So every label change retrains everything.
+The probability of "Other" is recorded as 1 minus the probability of the top target character. So the numbers do not always add up to 1. A training set has a few hundred to a few thousand clips. All target characters together take one or two seconds to train. So every label change retrains everything. A target character with no negative example yet (only them labeled, no "Other") gets no guess at all: with no one to compare against, every line would come out as theirs. The page asks for a few "Other" labels instead.
 
 **When a clip counts as confident.** A clip skips the line-by-line check by a person only when both of these hold:
 

@@ -17,7 +17,7 @@ export const statusText = (status: Status) =>
     auto: tr("机器有把握", "Confident"),
     review: tr("待确认", "Check"),
     novoice: tr("特征不够", "Too little voice"),
-    unlabeled: tr("还没有模型", "No model yet"),
+    unlabeled: tr("机器还没猜", "Not guessed yet"),
     skipped: tr("已跳过", "Skipped"),
   })[status];
 

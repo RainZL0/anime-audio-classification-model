@@ -122,6 +122,7 @@ def train_and_predict(
     nearest = np.full((len(features), len(targets)), -1.0)
     positive_rows: list[int] = []
     positive_names: list[str] = []
+    guessed: list[int] = []
     for k, target in enumerate(targets):
         positives, negatives = examples[target]
         if not positives:
@@ -129,21 +130,24 @@ def train_and_predict(
         positive_rows += positives
         positive_names += [target] * len(positives)
         if not negatives:
-            # There are no negative examples yet, so it cannot tell who is not the target. Everyone
-            # counts as similar.
-            chances[:, k] = 1.0
-        else:
-            from sklearn.linear_model import LogisticRegression
+            # No one is known not to be them yet, so there is nothing to compare against: it
+            # makes no guess for them rather than calling every line theirs. The page asks for a
+            # few "Other" labels.
+            continue
+        from sklearn.linear_model import LogisticRegression
 
-            model = LogisticRegression(C=STRENGTH, max_iter=3000)
-            model.fit(features[positives + negatives], [1] * len(positives) + [0] * len(negatives))
-            chances[:, k] = model.predict_proba(features)[:, 1]
+        model = LogisticRegression(C=STRENGTH, max_iter=3000)
+        model.fit(features[positives + negatives], [1] * len(positives) + [0] * len(negatives))
+        chances[:, k] = model.predict_proba(features)[:, 1]
+        guessed.append(k)
         # Similarity of each row to the most similar confirmed clip of this character. A confirmed
         # clip is not compared with itself.
         similarity = features @ features[positives].T
         similarity[positives, np.arange(len(positives))] = -np.inf
         nearest[:, k] = np.maximum(similarity.max(axis=1), -1.0)
     threshold = familiar_threshold(features, positive_rows, positive_names)
+    if not guessed:
+        return Trained({}, threshold)
 
     guesses = {}
     for row in range(len(features)):

@@ -79,7 +79,7 @@ export interface Spoken {
   language: string;
   /* No audio track tag or person said it, so Japanese is taken. */
   assumed: boolean;
-  /* "text": separate text subtitles; "cut": the cutting subtitles are in that language; null: none. */
+  /* "text": separate text subtitles; "cut": the main subtitles are in that language; null: none. */
   source: "text" | "cut" | null;
   problem: string | null;
   /* Clips of target characters that cannot be exported with text. */

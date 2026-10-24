@@ -34,13 +34,13 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
       key: "G",
       scope: oneEpisode,
       what: tr(
-        "机器把听起来像同一个人的句子放成一组。",
+        "机器把听起来像同一个人的台词分成一组。",
         "The machine puts lines that sound like the same person into one group.",
       ),
       when: (
         <>
           {tr(
-            "找到你要的角色的一组，勾上这些句子，点「新角色」（",
+            "找到你要的角色的一组，勾上这些台词，点「新角色」（",
             'Find a group of the character you want, tick those lines, and press "New character" (',
           )}
           <Kbd>N</Kbd>
@@ -84,7 +84,7 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
       key: "O",
       scope: allEpisodes,
       what: tr(
-        "机器归给一个角色的所有句子，最没把握的排在前面；下面还有可能漏掉的。",
+        "机器归给一个角色的所有台词，最没把握的排在前面；下面还有可能漏掉的。",
         "Everything the machine gave one character, least sure first, and below it the lines it may have missed.",
       ),
       when: (
@@ -106,7 +106,7 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
       key: "E",
       scope: allEpisodes,
       what: tr(
-        "把角色的句子写成 GPT-SoVITS 或 RVC 用的数据集。",
+        "把角色的台词写成 GPT-SoVITS 或 RVC 用的数据集。",
         "Writes a character's lines as a dataset for GPT-SoVITS or RVC.",
       ),
       when: tr(
@@ -125,7 +125,7 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
           <DialogTitle className="font-semibold">{tr("上手指南", "Getting started")}</DialogTitle>
           <DialogDescription className="text-[13px]">
             {tr(
-              "你只需要给想收集的角色（目标角色）起名，其他人一律标「其他」。每标一句，机器马上重新学一次，再去猜剩下的句子。",
+              "你只需要给想收集的角色（目标角色）起名，其他人一律标「其他」。每标一句，机器马上重新学一次，再去猜剩下的台词。",
               'You only name the characters you want to collect (the target characters); everyone else is "Other". After every label the machine retrains and guesses the rest again.',
             )}
           </DialogDescription>

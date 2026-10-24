@@ -882,7 +882,7 @@ export function AddEpisode({
             !found.languages.includes(heard) && (
               <Note warn>
                 {tr(
-                  `主字幕是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份改填到下面的「次字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
+                  `主字幕是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。朗读文字用的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份改填到下面的「次字幕」；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少台词会导不出文字。`,
                   `The main subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for reading text aloud need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and move these to "Second subtitles" below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
                 )}
               </Note>

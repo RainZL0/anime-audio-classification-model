@@ -414,7 +414,7 @@ def attach_text_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]:
     taken from it; see stages/text_subtitle.py. Only its lines in that language are used, so a
     bilingual file works too.
 
-    The time offset is found by comparing it with the subtitles used for cutting. The file is
+    The time offset is found by comparing it with the main subtitles. The file is
     refused and not written to episode.json when it has no lines in the spoken language, when after
     lining up the overlap is below `MIN_AGREEMENT`, or when fewer than `MIN_MATCHED` of the clips
     touch a line.
@@ -483,7 +483,7 @@ def attach_display_subtitles(directory: Path, subtitles: Path) -> dict[str, Any]
     """Attach subtitles in a language the person reads, usually a translation, to an episode cut
     from subtitles in the spoken language. They are only shown while labeling; export never takes
     text from them. The dialogue styles are picked as for cutting, and the time offset is found by
-    comparing them with the subtitles used for cutting. Refused when after lining up the overlap
+    comparing them with the main subtitles. Refused when after lining up the overlap
     is below `MIN_AGREEMENT`."""
     from avoc.app.workspace import subtitle_lines
     from avoc.stages.subtitle import find_offset, load_dialogue, pick_styles, read_subtitles
@@ -547,7 +547,7 @@ def check_text_language(subtitles: Path, spoken: str) -> None:
 
 
 def missing_text_note(episode: dict[str, Any]) -> str | None:
-    """A warning when the cutting subtitles are not in the language spoken and nothing else gives
+    """A warning when the main subtitles are not in the language spoken and nothing else gives
     that text. None when they are."""
     from avoc.stages.text_language import languages_note
     from avoc.stages.text_subtitle import subtitle_languages

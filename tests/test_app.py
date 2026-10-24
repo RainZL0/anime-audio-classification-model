@@ -222,6 +222,14 @@ def test_a_voice_unlike_any_known_role_is_not_trusted() -> None:
     assert trained.guesses[40].familiar is False
 
 
+def test_no_guess_before_anyone_is_known_not_to_be_the_target() -> None:
+    # Only one character labeled and no "other" yet: nothing to compare against, so no line is
+    # called theirs at 100%.
+    features = np.eye(3)[[0, 0, 1, 2]]
+    assert train_and_predict(features, {"A": ([0, 1], [])}, {}).guesses == {}
+    assert train_and_predict(features, {"A": ([0, 1], [2])}, {}).guesses
+
+
 def test_other_only_counts_against_the_targets_of_its_time() -> None:
     # A and C have different voices. C's clips were labeled "other" while C was not yet a target.
     # C was made a target later, so those clips should not count as C's negative examples.
