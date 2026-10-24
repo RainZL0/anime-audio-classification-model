@@ -21,7 +21,7 @@ import { withKeys } from "../components/Keys";
 import { PathInput } from "../components/PathInput";
 import { Tip } from "../components/Tip";
 import { minutes } from "../format";
-import { languageName, languageNames, lines, many, SPOKEN, tr } from "../language";
+import { currentLanguage, languageName, languageNames, lines, many, SPOKEN, tr } from "../language";
 import { needsText, type Purpose } from "../purpose";
 import type { Toast } from "../toast";
 
@@ -31,33 +31,43 @@ import type { Toast } from "../toast";
 const LOG =
   "m-0 max-h-[180px] overflow-y-auto rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap";
 
-/* What `avoc doctor` finds wrong on this machine, if anything; nothing is shown while checking or when all is
-   well. The token is left out: its steps are shown by the offset box, the one place it is needed. */
-function MachineProblems({ list }: { list: Check[] | null }) {
-  const problems = (list ?? []).filter((c) => !c.ok && c.topic !== "token");
-  if (!problems.length) return null;
+/* What `avoc doctor` finds on this machine. On the first page (`all`) every check is listed with a tick, so the
+   person sees the machine is ready before adding anything; in the dialog only problems are shown, and nothing while
+   checking or when all is well. A missing token only points to the offset box, where its steps are. */
+function MachineChecks({ list, all }: { list: Check[] | null; all: boolean }) {
+  if (!list && !all) return null;
+  const shown = (list ?? []).filter((c) => all || (!c.ok && c.topic !== "token"));
+  if (list && !shown.length) return null;
+  const fixOf = (c: Check) =>
+    c.topic === "token"
+      ? tr(
+          "只有自动测字幕偏移时才要，步骤见下面「字幕偏移」",
+          'Only needed to measure the subtitle offset; the steps are under "Subtitle offset" below',
+        )
+      : c.fix;
   return (
     <Section title={tr("这台机器", "This machine")}>
+      {!list && <Note>{tr("正在检查这台机器…", "Checking this machine…")}</Note>}
       <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
-        {problems.map((c) => (
+        {shown.map((c) => (
           <li
             key={c.text}
-            className={cn("flex items-baseline gap-2", c.required && "text-destructive")}
+            className={cn("flex items-baseline gap-2", !c.ok && c.required && "text-destructive")}
           >
             <span
               className={cn(
                 "w-3.5 flex-none font-semibold",
-                c.required ? "text-destructive" : "text-muted-foreground",
+                c.ok ? "text-success" : c.required ? "text-destructive" : "text-muted-foreground",
               )}
             >
-              {c.required ? "✗" : "–"}
+              {c.ok ? "✓" : c.required ? "✗" : "–"}
             </span>
             <span>
               {c.text}
-              {c.fix && (
+              {!c.ok && fixOf(c) && (
                 <>
                   <br />
-                  <span className="text-muted-foreground">{c.fix}</span>
+                  <span className="text-muted-foreground">{fixOf(c)}</span>
                 </>
               )}
             </span>
@@ -371,6 +381,8 @@ export interface AddEpisodeProps {
   onOpen: (episode: string) => void;
   toast: Toast;
   onPurpose: (purpose: Purpose) => void;
+  /* On the first page: list every machine check, not only the problems. */
+  allChecks?: boolean;
 }
 
 /* The form for one episode, and the progress of the `avoc add` the server runs for it. `adding` is the server's job
@@ -383,6 +395,7 @@ export function AddEpisode({
   onOpen,
   toast,
   onPurpose,
+  allChecks = false,
 }: AddEpisodeProps) {
   const text = needsText();
   const last = [...state.episodes].reverse().find((e) => e.offset != null);
@@ -401,7 +414,9 @@ export function AddEpisode({
       .catch(() => setChecks([]))
       .finally(() => setChecking(false));
   };
-  useEffect(check, []);
+  /* The server writes the checks in the page language, so they are fetched again when it changes. */
+  const language = currentLanguage();
+  useEffect(check, [language]);
   const noToken = !!checks?.some((c) => c.topic === "token" && !c.ok);
   /* "" lets the audio track's tag decide. */
   const [spoken, setSpoken] = useState("");
@@ -635,7 +650,7 @@ export function AddEpisode({
           ))}
         </Section>
       )}
-      <MachineProblems list={checks} />
+      <MachineChecks list={checks} all={allChecks} />
       <form className="flex flex-col gap-6" onSubmit={start}>
         <Section title={tr("收集声音做什么用", "What the voices are for")}>
           <Choice<Purpose>

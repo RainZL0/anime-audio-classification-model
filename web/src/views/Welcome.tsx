@@ -4,7 +4,7 @@ import { AddEpisode, type AddEpisodeProps } from "./AddEpisode";
 /* ───────────── An empty workspace ───────────── */
 
 /* With no episode yet, the page is the same "Add an episode" form as the dialog, with one line on what the tool
-   is for. How to label is told in the getting-started guide, which opens by itself once the episode is in. */
+   is for and every machine check ticked off. How to label is told in the getting-started guide, which opens by itself once the episode is in. */
 export function Welcome(props: AddEpisodeProps) {
   return (
     <div className="mx-auto flex max-w-[720px] flex-col gap-6 pt-6 pb-15">
@@ -17,7 +17,7 @@ export function Welcome(props: AddEpisodeProps) {
           )}
         </p>
       </div>
-      <AddEpisode {...props} />
+      <AddEpisode {...props} allChecks />
     </div>
   );
 }
