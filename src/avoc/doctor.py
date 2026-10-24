@@ -8,10 +8,26 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from avoc.language import say
+from avoc.language import Words, say
 
 FREE_GB = 5
 """Warn below this much free disk space. One processed episode takes about 0.5 GB."""
+
+FFMPEG_HOWTO = Words(
+    "装上 FFmpeg。推荐用 Scoop：在 PowerShell 里运行 scoop install ffmpeg；"
+    "还没有 Scoop 的话，先运行 "
+    "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser 和 "
+    "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression 装上它（见 https://scoop.sh）。"
+    "也可以从 https://ffmpeg.org/download.html 下载 Windows 版，解压后把里面的 bin 文件夹加进 PATH "
+    "环境变量。装好后关掉终端、新开一个，再启动 avoc",
+    "Install FFmpeg. Scoop is the easiest: run scoop install ffmpeg in PowerShell. Without Scoop, "
+    "first install it by running Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope "
+    "CurrentUser and Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression (see "
+    "https://scoop.sh). Or download the Windows build from https://ffmpeg.org/download.html, unzip "
+    "it and add its bin folder to the PATH environment variable. Then close the terminal, open a "
+    "new one, and start avoc again",
+)
+"""What to do when FFmpeg is missing. Also said when the add form or `avoc add` finds no FFmpeg."""
 
 
 @dataclass(frozen=True)
@@ -23,7 +39,7 @@ class Check:
     required: bool = True
     """False means the tool still works without it, only slower or with one feature less."""
     topic: str = ""
-    """A fixed name for checks the interface shows in a place of their own: "token"."""
+    """A fixed name for checks the interface shows its own steps for: "token", "ffmpeg"."""
 
 
 def checks(where: Path) -> list[Check]:
@@ -52,18 +68,18 @@ def checks(where: Path) -> list[Check]:
             required=False,
         )
     ]
+    ffmpeg = shutil.which("ffmpeg")
     for tool in ("ffmpeg", "ffprobe"):
         path = shutil.which(tool)
         found.append(
             Check(
                 bool(path),
                 f"{tool}: {path or say('没找到', 'not found')}",
-                say(
-                    "装上 FFmpeg：在 PowerShell 里运行 winget install Gyan.FFmpeg，"
-                    "然后关掉终端、新开一个，再启动 avoc",
-                    "Install FFmpeg: run winget install Gyan.FFmpeg in PowerShell, then close the "
-                    "terminal, open a new one, and start avoc again",
-                ),
+                # The steps once, on ffmpeg; ffprobe comes with it.
+                str(FFMPEG_HOWTO)
+                if tool == "ffmpeg" or ffmpeg
+                else say("它跟 ffmpeg 一起装好", "It comes with ffmpeg"),
+                topic="ffmpeg" if tool == "ffmpeg" else "",
             )
         )
     model = Path("models") / SEPARATION_MODEL

@@ -38,12 +38,15 @@
 
 需要 Windows、[uv](https://docs.astral.sh/uv/)（它会自动装好合适的 Python）和 [FFmpeg](https://ffmpeg.org/)。强烈建议用 NVIDIA 显卡；没有的话，去掉一集的音乐要慢得多。
 
-还没装 uv 和 FFmpeg 的话，打开 PowerShell 运行：
+还没装 uv 和 FFmpeg 的话，最省事的是用 [Scoop](https://scoop.sh)。打开 PowerShell（不用管理员身份）运行：
 
 ```powershell
-winget install astral-sh.uv
-winget install Gyan.FFmpeg
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+scoop install uv ffmpeg
 ```
+
+前两行是装 Scoop，已经有了就跳过。也可以自己装 FFmpeg：从 [ffmpeg.org](https://ffmpeg.org/download.html) 下载 Windows 版，解压后把里面的 `bin` 文件夹加进 `PATH` 环境变量。
 
 然后新开一个终端，让它找到刚装的程序，再运行：
 

@@ -38,12 +38,15 @@ Here you label a few lines while watching the scene. A small model learns your c
 
 You need Windows, [uv](https://docs.astral.sh/uv/) (it installs the right Python for you) and [FFmpeg](https://ffmpeg.org/). An NVIDIA graphics card is strongly recommended; without one, removing the music from one episode takes much longer.
 
-If you don't have uv and FFmpeg yet, open PowerShell and run:
+If you don't have uv and FFmpeg yet, the easiest way is [Scoop](https://scoop.sh). Open PowerShell (not as administrator) and run:
 
 ```powershell
-winget install astral-sh.uv
-winget install Gyan.FFmpeg
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+scoop install uv ffmpeg
 ```
+
+The first two lines install Scoop; skip them if you have it. You can also install FFmpeg yourself: download the Windows build from [ffmpeg.org](https://ffmpeg.org/download.html), unzip it, and add its `bin` folder to the `PATH` environment variable.
 
 Then open a new terminal, so it finds them, and run:
 

@@ -12,7 +12,7 @@ The checks to run before sending a change are in [CONTRIBUTING.md](../CONTRIBUTI
 
 ## Set up
 
-You need FFmpeg on your `PATH`. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
+You need FFmpeg on your `PATH`; how to install it, with Scoop or by hand, is in the [README](../README.md#install), and `avoc doctor` says the same when it is missing. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
 
 ```powershell
 uv sync --locked

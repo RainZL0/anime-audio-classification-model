@@ -73,6 +73,8 @@ function MachineChecks({
               {!c.ok &&
                 (c.topic === "token" ? (
                   <TokenSteps />
+                ) : c.topic === "ffmpeg" ? (
+                  <FfmpegSteps />
                 ) : (
                   c.fix && <span className="text-muted-foreground">{c.fix}</span>
                 ))}
@@ -96,18 +98,70 @@ function MachineChecks({
 /* The id of the machine checks, which the offset box links up to. */
 const MACHINE = "machine-checks";
 
+const link = (href: string, text: string) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noreferrer"
+    className="text-primary underline underline-offset-2"
+  >
+    {text}
+  </a>
+);
+
+const shell = (text: string) => (
+  <pre className="mt-1 mb-0 rounded-md bg-background px-2.5 py-1.5 font-mono text-xs whitespace-pre-wrap">
+    {text}
+  </pre>
+);
+
+/* How to install FFmpeg, step by step: Scoop first, by hand second. The same as `avoc doctor` says. */
+function FfmpegSteps() {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-[13px] text-foreground">
+      <div className="font-semibold">
+        {tr(
+          "avoc 靠它读视频、切音频，必须装。最简单的是用 Scoop：",
+          "avoc needs it to read videos and cut audio. The easiest way is Scoop:",
+        )}
+      </div>
+      <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
+        <li>
+          {tr(
+            "还没有 Scoop 的话，在 PowerShell 里运行这两行装上它（",
+            "If you have no Scoop yet, install it by running these two lines in PowerShell (",
+          )}
+          {link("https://scoop.sh", tr("Scoop 官网", "the Scoop site"))}
+          {tr("）：", "):")}
+          {shell(
+            "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser\nInvoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression",
+          )}
+        </li>
+        <li>
+          {tr("再运行：", "Then run:")}
+          {shell("scoop install ffmpeg")}
+        </li>
+        <li>
+          {tr(
+            "关掉终端、新开一个，再启动 avoc，然后点下面的「再检查一次」。",
+            'Close the terminal, open a new one, start avoc again, then click "check again" below.',
+          )}
+        </li>
+      </ol>
+      <div className="text-muted-foreground">
+        {tr("不想用 Scoop 的话，也可以从 ", "Or, without Scoop, download the Windows build from ")}
+        {link("https://ffmpeg.org/download.html", tr("FFmpeg 官网", "the FFmpeg site"))}
+        {tr(
+          " 下载 Windows 版，解压后把里面的 bin 文件夹加进 PATH 环境变量，再同样重启终端和 avoc。",
+          ", unzip it and add its bin folder to the PATH environment variable, then restart the terminal and avoc the same way.",
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* How to get the Hugging Face token that measuring the offset needs, step by step. */
 function TokenSteps() {
-  const link = (href: string, text: string) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="text-primary underline underline-offset-2"
-    >
-      {text}
-    </a>
-  );
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-[13px] text-foreground">
       <div className="font-semibold">
@@ -143,9 +197,7 @@ function TokenSteps() {
             "在启动 avoc 的文件夹里打开终端，运行下面这条命令，按提示粘贴令牌：",
             "Open a terminal in the folder you started avoc in, run this command, and paste the token when asked:",
           )}
-          <pre className="mt-1 mb-0 rounded-md bg-background px-2.5 py-1.5 font-mono text-xs">
-            uv run hf auth login
-          </pre>
+          {shell("uv run hf auth login")}
         </li>
       </ol>
       <div className="text-muted-foreground">

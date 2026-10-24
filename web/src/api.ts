@@ -150,7 +150,7 @@ export interface Check {
   text: string;
   fix: string;
   required: boolean;
-  /* "token" for the Hugging Face token, shown by the offset box instead of in the list. */
+  /* "token" or "ffmpeg": checks the page shows its own steps for, instead of `fix`. */
   topic: string;
 }
 
