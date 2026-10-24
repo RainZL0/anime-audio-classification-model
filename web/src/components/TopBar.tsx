@@ -66,9 +66,7 @@ function TabBox({ children }: { children: ReactNode }) {
   );
 }
 
-/* The bar at the top. Each item stays on one line, so the bar is the same height in every view. A note cut down
-   to "Tr…" says nothing, so as the window narrows, the least needed parts are left out whole: first the training
-   note (it still shows while retraining), then the progress text (the bar stays), then the "All episodes" label. */
+/* The bar at the top. What is left out as the window narrows follows docs/UI_DESIGN.md#layout. */
 export function TopBar(p: TopBarProps) {
   const perEpisode = EPISODE_VIEWS().some(([v]) => v === p.view);
   const tabs = (list: [View, string, string][]) =>

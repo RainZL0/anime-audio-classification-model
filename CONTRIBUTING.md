@@ -17,7 +17,7 @@ Changing only Python needs no Node.
 
 ## Web app
 
-The labeling app is React and TypeScript, built with Vite. The source is in `web/`. The built files in `src/avoc/app/static/` are committed, so people who only install the tool never need Node. Do not edit the built files by hand.
+The labeling app is React and TypeScript, built with Vite, styled with Tailwind CSS and shadcn/ui components ([why](docs/DECISIONS.md#settled)). The source is in `web/`. The built files in `src/avoc/app/static/` are committed, so people who only install the tool never need Node. Do not edit the built files by hand.
 
 Set up once: install Node (the current long-term-support version), then
 
@@ -47,6 +47,20 @@ npm --prefix web run build
 `check` runs oxlint (finds likely mistakes), Prettier (code layout; `npm --prefix web run format` fixes it), the type check and the tests. `build` writes `src/avoc/app/static/`; commit those files with your change. CI builds again and fails if they differ from the source.
 
 If two branches both changed the built files, git shows a conflict there. Take either side, run `npm --prefix web run build`, and commit the result.
+
+Browser tests open the real page in your installed Chrome, against a small made-up workspace, and click through it (Playwright). They need uv too, which starts the server for them. Run them after a change to how the page looks or works:
+
+```bash
+npm --prefix web run e2e
+```
+
+Style with Tailwind classes in the markup; there is no hand-written stylesheet. Use only the theme's color names (`bg-muted`, `text-success` and so on, set in `web/src/index.css`), never fixed colors. Before writing a new widget, look in `web/src/components/` for a shared one (`Choice`, `Chip`, `Tip`, `Note`…). To add a shadcn component:
+
+```bash
+npx --prefix web shadcn@latest add COMPONENT -c web
+```
+
+It is copied into `web/src/components/ui/`, where it can be changed like any other file; say so in a comment at the top when you do.
 
 ## Pictures and videos
 

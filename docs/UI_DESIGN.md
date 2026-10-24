@@ -28,8 +28,10 @@ Two words used below:
 
 ## Color
 
-- **Filled purple** is the step the app suggests next: accept the machine's top guess (Enter), confirm the rest (Shift+Enter), save in a dialog, start an export. No button is purple only to stand out.
-- **Light purple background** marks the machine's top guess among the choices (on the left, and under a group) or the item that is selected now.
+The colors below are the theme's color names (set in `web/src/index.css`), not fixed colors; see [DECISIONS.md](DECISIONS.md#settled).
+
+- **A filled button in the main color** (`primary`) is the step the app suggests next: accept the machine's top guess (Enter), confirm the rest (Shift+Enter), save in a dialog, start an export. No button is filled only to stand out.
+- **The accent background with a stronger border** marks the machine's top guess among the choices (on the left, and under a group), the item that is selected now, and the button that is on in a row of joined buttons.
 - Green means confirmed, orange means waiting to be checked, red means low quality. A dashed outline means a hint that may be wrong ("Maybe someone new", "Maybe missed").
 
 ## Typing
@@ -40,7 +42,7 @@ Two words used below:
 
 ## Layout
 
-- The top bar stays on one line and inside the window. When there is not enough room, the progress bar and the training note get shorter; the buttons do not move off screen.
+- The top bar stays on one line and inside the window. As the window narrows, the least needed parts are left out whole rather than cut short: first the training note (it still shows while retraining), then the progress text (the bar stays), then the "All episodes" label. The buttons do not move off screen.
 - Choices of the same kind sit together in one row.
 - A button that cannot be used yet is shown grayed out, not hidden, so nothing jumps when it becomes usable. For example, the chips under a group stay gray until a line is ticked.
 - A count is shown once, next to what it counts, not repeated on every button.

@@ -26,8 +26,10 @@ The actual versions are in `pyproject.toml` and `uv.lock`. Which model was chose
 
 - **FastAPI + uvicorn**: the web server for `avoc app`. It listens only on 127.0.0.1.
 - **React + TypeScript, built with Vite**: the front end. TypeScript is JavaScript with types written in the code, so mistakes such as a wrong field name show up before the page runs. Vite turns the source in `web/` into the plain JavaScript and CSS in `src/avoc/app/static/`. The versions are in `web/package.json` and `web/package-lock.json`. Only people who change the front end need Node; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **Tailwind CSS**: the styling. Small ready-made classes such as `flex` or `text-muted-foreground` are written in the markup, and only the ones used end up in the built CSS. Prettier's Tailwind plugin keeps them in a fixed order.
+- **shadcn/ui on Base UI**: the buttons, menus, dialogs, hints, tick boxes and other parts of the page. shadcn/ui is not installed as a package: its command copies each component's source into `web/src/components/ui/`. Base UI, which those files use, handles the keyboard, focus and screen readers. Also used with them: lucide-react (icons), Sonner (the short messages at the bottom), the Geist font and tw-animate-css (the open and close movements).
 - **tkinter**: comes with Python. The "Browse…" buttons ask the server to open the system's file window with it, in a separate process (`src/avoc/app/picker.py`).
-- **oxlint, Prettier, Vitest**: checks for the front end. oxlint finds likely mistakes, Prettier fixes the layout of the code, and Vitest runs the tests.
+- **oxlint, Prettier, Vitest, Playwright**: checks for the front end. oxlint finds likely mistakes, Prettier fixes the layout of the code, Vitest runs the tests, and Playwright opens the page in the installed Chrome and clicks through it.
 - The tests drive the FastAPI test client through httpx.
 
 ## Runtime environment

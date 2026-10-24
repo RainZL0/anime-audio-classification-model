@@ -143,6 +143,10 @@ web/src/
   api.ts                   calls to the server and the shapes of its answers
   language.ts              Chinese or English: tr(Chinese, English)
   clips.ts                 who a line belongs to, and the lists of the Characters view
-  components/              the stage, one line, avatars, the avatar cropper, help
+  index.css                Tailwind, and the theme's colors and fonts
+  components/              the top and bottom bars, the stage, one line, avatars, the avatar cropper, help,
+                           and small shared parts (chips, pills, hints, rows of joined buttons)
+  components/ui/           shadcn/ui components, copied in by its command
   views/                   Groups, Scenes, Characters, Export, adding an episode, welcome page
+web/e2e/                   browser tests, and the script that serves a small made-up workspace for them
 ```
