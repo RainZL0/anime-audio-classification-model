@@ -50,6 +50,10 @@ This page lists only the conclusions. Each one has a one-sentence reason. To ove
 - **The built front-end files are committed to git, and CI checks that they match the source.** Users install with `git clone` and `uv sync`, and must not need Node.
 - **Paths are picked with a "Browse…" button: the local server opens the system's file window. Files cannot be dragged into the page.** A browser gives a page the content of a dropped or chosen file but never where it is, and a video of several gigabytes must not be copied just to learn that.
 
+**Low quality**
+
+- **The "low quality" hint uses WavLM-large, not a ready-made quality score.** WavLM-large is a general speech model, trained on a large amount of unlabeled speech. The input is the separated vocals. For each clip, the mean and the spread over time of WavLM-large's layers 4, 6 and 8 go into a logistic regression, trained on the person's own "target" and "target, low quality" labels. On Teio's labels it beat every quality-score model and the voiceprints, and torchaudio, which is already a dependency, ships the model. It is only a hint, and the person decides (see "Audio" above).
+
 **Export**
 
 - **Exported text is always in the language spoken in the video.** Voice training needs the words that are actually said, so a translation is never written as training text. The cutting subtitles may be in any language, though the spoken language is best (see "Cutting clips"). The text comes from them when they are in the spoken language (bilingual files included), and otherwise from a separate subtitle file in that language attached to the episode. Still no speech-to-text.
@@ -75,4 +79,8 @@ All of these were tried. Do not reopen them.
 | Cleaning caption marks with an existing tool (Subtitle Edit, subtitle-filter), checked 2026-10 | They only know half-width brackets and English habits, and they throw away speaker names, which export needs |
 | Using a model to judge whether anyone is speaking | Dropped 40% of the dialogue lines |
 | Keeping the top half by audio quality ranking | Still let through interjections and sound effects, and also dropped usable clips |
+| Predicting "low quality" from ready-made speech quality scores (DNSMOS, NISQA, UTMOSv2, SQUIM, Audiobox Aesthetics), checked 2026-10 | They were built for phone calls, noise removal or synthetic speech. Alone or all together, they were clearly weaker than WavLM-large trained on our labels |
+| Finding lines with two voices by pyannote's overlapped-speech detection | Barely better than a coin toss on our "low quality" labels |
+| Fine-tuning the speech model for "low quality" | With a few hundred labels, it did worse than the model's frozen features |
+| Judging quality on the original mix instead of the separated vocals | Clearly worse |
 | Holding out one episode for blind labeling as a test | Blind labeling a whole episode takes too much effort. The machine's mistakes are corrected in the interface instead, and those labels are also training data |
