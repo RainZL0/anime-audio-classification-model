@@ -404,7 +404,7 @@ export function Stage({
         <>
           <div className={ASK}>
             {clip.guess.length ? (
-              tr("这是谁？机器的猜测", "Who is this? The machine's guesses")
+              tr("这是谁？机器的猜测概率", "Who is this? The machine's guessed probabilities")
             ) : clip.voiced ? (
               tr("这是谁？", "Who is this?")
             ) : (
