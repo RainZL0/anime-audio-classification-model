@@ -12,7 +12,7 @@ The checks to run before sending a change are in [CONTRIBUTING.md](../CONTRIBUTI
 
 ## Set up
 
-You need FFmpeg on your `PATH`; how to install it, with Scoop or by hand, is in the [README](../README.md#install), and `avoc doctor` says the same when it is missing. On Windows, the app's first page also has an "Install it for me in one click" button: it runs [install_ffmpeg.ps1](../src/avoc/install_ffmpeg.ps1), which installs Scoop if you have none and then FFmpeg with it, all without administrator rights, and avoc can use it at once without a restart. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
+You need FFmpeg on your `PATH`. On Windows, the app's first page has an "Install it for me in one click" button: it runs [install_ffmpeg.ps1](../src/avoc/install_ffmpeg.ps1), which installs [Scoop](https://scoop.sh) if you have none and then FFmpeg with it, all without administrator rights, and avoc can use it at once without a restart. To install it yourself, run `scoop install ffmpeg` if you have Scoop, or download the Windows build from [ffmpeg.org](https://ffmpeg.org/download.html), unzip it, and add its `bin` folder to the `PATH` environment variable. `avoc doctor` says the same when FFmpeg is missing. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
 
 ```powershell
 uv sync --locked

@@ -48,19 +48,15 @@
 
 ## 安装
 
-需要 Windows、[uv](https://docs.astral.sh/uv/)（它会自动装好合适的 Python）和 [FFmpeg](https://ffmpeg.org/)。强烈建议用 NVIDIA 显卡；没有的话，去掉一集的音乐要慢得多。
+需要 Windows 和 [uv](https://docs.astral.sh/uv/)（它会自动装好合适的 Python）。强烈建议用 NVIDIA 显卡；没有的话，去掉一集的音乐要慢得多。
 
-还没装 uv 和 FFmpeg 的话，最省事的是用 [Scoop](https://scoop.sh)。打开 PowerShell（不用管理员身份）运行：
+还没装 uv 的话，打开 PowerShell 运行：
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-scoop install uv ffmpeg
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-前两行是装 Scoop，已经有了就跳过。也可以自己装 FFmpeg：从 [ffmpeg.org](https://ffmpeg.org/download.html) 下载 Windows 版，解压后把里面的 `bin` 文件夹加进 `PATH` 环境变量。
-
-然后新开一个终端，让它找到刚装的程序，再运行：
+然后新开一个终端，让它找到 uv，再运行：
 
 ```bash
 git clone https://github.com/RainZL0/anime-voice-collector.git
@@ -69,6 +65,8 @@ uv sync --locked
 ```
 
 `uv sync` 会下载所需的全部东西，大约 5 GB。想检查这台机器，运行 `uv run avoc doctor`：它会看显卡、FFmpeg 和剩余磁盘空间，缺什么会告诉你怎么补。
+
+另外还需要 [FFmpeg](https://ffmpeg.org/)。没有的话，界面的第一页可以一键帮你装好，不需要管理员权限。想自己装的话，见 [Set up](docs/USAGE.md#set-up)（英文）。
 
 ## 加第一集
 
