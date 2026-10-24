@@ -1,5 +1,6 @@
 import { cn } from "cn";
 import type { ReactNode } from "react";
+import { Kbd } from "@/components/ui/kbd";
 import { tr } from "../language";
 import { Tip } from "./Tip";
 
@@ -28,7 +29,7 @@ export function LowButton({
         className="ml-0.5 inline-flex items-center gap-1 rounded-full border border-destructive/20 px-1.5 text-[11px] whitespace-nowrap text-destructive transition-colors hover:border-destructive disabled:opacity-45 disabled:hover:border-destructive/20"
       >
         {tr("质量低", "Low quality")}
-        {hotkey != null && <span className="font-mono text-muted-foreground">⇧{hotkey}</span>}
+        {hotkey != null && <Kbd className="h-4 min-w-4 text-[10px]">⇧{hotkey}</Kbd>}
       </button>
     </Tip>
   );
@@ -75,7 +76,7 @@ export function Chip({
       >
         {picture}
         {children}
-        {hotkey && <span className="font-mono text-[11px] text-muted-foreground">{hotkey}</span>}
+        {hotkey && <Kbd>{hotkey}</Kbd>}
         {extra}
       </div>
     </Tip>

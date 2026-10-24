@@ -20,6 +20,8 @@ interface RowProps {
   maybeOf?: string;
   /* Show the target character the machine finds closest, for lines of "other". */
   showTarget?: boolean;
+  /* Show which episode the line is from, in lists that cover all episodes. */
+  showEpisode?: boolean;
 }
 
 /* ───────────── One line ───────────── */
@@ -33,6 +35,7 @@ export function Row({
   flash,
   maybeOf,
   showTarget,
+  showEpisode,
 }: RowProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -122,6 +125,7 @@ export function Row({
         )}
       </div>
       <div className="text-right text-[11px] whitespace-nowrap text-muted-foreground tabular-nums">
+        {showEpisode && `${clip.episode} `}
         {stamp(clip.start)}
         <br />
         {clip.duration.toFixed(2)}s

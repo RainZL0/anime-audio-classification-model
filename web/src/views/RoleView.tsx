@@ -105,6 +105,7 @@ export function RoleView({
       selected={clip.id === focus}
       flash={flashes.has(clip.id)}
       onSelect={() => setFocus(clip.id)}
+      showEpisode
       {...extra}
     />
   );
