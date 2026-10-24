@@ -137,9 +137,12 @@ export function GroupsView({
           </ol>
         </Welcome>
       )}
-      {/* Says why there is nothing to do here, then where the work goes on. */}
+      {/* Says why there is nothing to do here, then where the work goes on. Wider than usual, so each step fits on one line when there is room. */}
       {groups.length === 0 && (
-        <Empty title={tr("「起步分组」里没有要做的了", "No more work to do in Groups")}>
+        <Empty
+          title={tr("「起步分组」里没有要做的了", "No more work to do in Groups")}
+          className="max-w-4xl"
+        >
           <p>
             {progress.auto > 0
               ? tr(

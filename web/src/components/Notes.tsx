@@ -21,9 +21,17 @@ export function Note({
 }
 
 /* What a view shows when it has nothing to list, or while it loads. */
-export function Empty({ title, children }: { title?: ReactNode; children?: ReactNode }) {
+export function Empty({
+  title,
+  className,
+  children,
+}: {
+  title?: ReactNode;
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
-    <div className="mx-auto my-15 max-w-[560px] text-center text-muted-foreground">
+    <div className={cn("mx-auto my-15 max-w-[560px] text-center text-muted-foreground", className)}>
       {title && <h2 className="mb-2 text-xl font-semibold text-foreground">{title}</h2>}
       {children}
     </div>
