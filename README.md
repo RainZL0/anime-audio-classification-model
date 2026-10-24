@@ -62,9 +62,7 @@ cd anime-voice-collector
 uv sync --locked
 ```
 
-`uv sync` downloads everything, about 5 GB.
-
-You also need [FFmpeg](https://ffmpeg.org/). If you don't have it, the app's first page installs it for you in one click, without administrator rights. To install it yourself instead, see [Set up](docs/USAGE.md#set-up).
+You also need [FFmpeg](https://ffmpeg.org/). If you don't have it, the app's first page installs it for you in one click. To install it yourself instead, see [Set up](docs/USAGE.md#set-up).
 
 ## Your first episode
 

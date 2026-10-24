@@ -62,9 +62,7 @@ cd anime-voice-collector
 uv sync --locked
 ```
 
-`uv sync` 会下载所需的全部东西，大约 5 GB。
-
-另外还需要 [FFmpeg](https://ffmpeg.org/)。没有的话，界面的第一页可以一键帮你装好，不需要管理员权限。想自己装的话，见 [Set up](docs/USAGE.md#set-up)（英文）。
+另外还需要 [FFmpeg](https://ffmpeg.org/)。没有的话，界面的第一页可以一键帮你装好。想自己装的话，见 [Set up](docs/USAGE.md#set-up)（英文）。
 
 ## 加第一集
 
