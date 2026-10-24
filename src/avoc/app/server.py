@@ -983,6 +983,21 @@ def create_app(state: AppState) -> Any:
 
         return [asdict(c) for c in checks(state.workspace.root.resolve())]
 
+    installing = threading.Lock()
+
+    @app.post("/api/install-ffmpeg")
+    def post_install_ffmpeg() -> dict[str, Any]:
+        """Install FFmpeg with Scoop, and Scoop first when missing; takes a few minutes."""
+        from avoc.doctor import install_ffmpeg
+
+        if not installing.acquire(blocking=False):
+            raise HTTPException(409, say("已经在装了", "already installing"))
+        try:
+            ok, output = install_ffmpeg()
+        finally:
+            installing.release()
+        return {"ok": ok, "output": output}
+
     @app.get("/api/add")
     def read_adding() -> dict[str, Any]:
         return state.adding.status()

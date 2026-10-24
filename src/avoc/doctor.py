@@ -5,6 +5,7 @@ shows the same list."""
 from __future__ import annotations
 
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,6 +41,40 @@ class Check:
     """False means the tool still works without it, only slower or with one feature less."""
     topic: str = ""
     """A fixed name for checks the interface shows its own steps for: "token", "ffmpeg"."""
+    can_install: bool = False
+    """The interface can fix it with one click: FFmpeg on Windows, through install_ffmpeg.ps1."""
+
+
+def install_ffmpeg() -> tuple[bool, str]:
+    """Run install_ffmpeg.ps1, Windows only. On success its folder goes on this process's PATH, so
+    FFmpeg works at once without restarting avoc. Returns whether it worked and what it printed."""
+    import os
+    import subprocess
+
+    script = Path(__file__).with_name("install_ffmpeg.ps1")
+    try:
+        done = subprocess.run(
+            [
+                *("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"),
+                *("-File", str(script)),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30 * 60,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, str(exc)
+    output = (done.stdout + done.stderr).strip()
+    shims = next(
+        (line[6:] for line in reversed(output.splitlines()) if line.startswith("SHIMS=")), None
+    )
+    if done.returncode or not shims:
+        return False, output
+    os.environ["PATH"] = shims + os.pathsep + os.environ.get("PATH", "")
+    return bool(shutil.which("ffmpeg")), output
 
 
 def checks(where: Path) -> list[Check]:
@@ -68,20 +103,22 @@ def checks(where: Path) -> list[Check]:
             required=False,
         )
     ]
-    ffmpeg = shutil.which("ffmpeg")
-    for tool in ("ffmpeg", "ffprobe"):
-        path = shutil.which(tool)
-        found.append(
-            Check(
-                bool(path),
-                f"{tool}: {path or say('没找到', 'not found')}",
-                # The steps once, on ffmpeg; ffprobe comes with it.
-                str(FFMPEG_HOWTO)
-                if tool == "ffmpeg" or ffmpeg
-                else say("它跟 ffmpeg 一起装好", "It comes with ffmpeg"),
-                topic="ffmpeg" if tool == "ffmpeg" else "",
+    # One line for both: ffprobe always comes with ffmpeg.
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    found.append(
+        Check(
+            not missing,
+            say(
+                f"FFmpeg：没找到 {' 和 '.join(missing)}",
+                f"FFmpeg: {' and '.join(missing)} not found",
             )
+            if missing
+            else f"FFmpeg: {Path(shutil.which('ffmpeg') or '').parent}",
+            str(FFMPEG_HOWTO),
+            topic="ffmpeg",
+            can_install=sys.platform == "win32",
         )
+    )
     model = Path("models") / SEPARATION_MODEL
     found.append(
         Check(

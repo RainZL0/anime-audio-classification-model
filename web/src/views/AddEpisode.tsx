@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Spinner } from "@/components/ui/spinner";
 import { Note } from "../components/Notes";
 import { Section } from "../components/Section";
 import { Choice } from "../components/Choice";
@@ -74,7 +75,7 @@ function MachineChecks({
                 (c.topic === "token" ? (
                   <TokenSteps />
                 ) : c.topic === "ffmpeg" ? (
-                  <FfmpegSteps />
+                  <FfmpegSteps canInstall={c.can_install} onDone={onCheck} />
                 ) : (
                   c.fix && <span className="text-muted-foreground">{c.fix}</span>
                 ))}
@@ -115,15 +116,68 @@ const shell = (text: string) => (
   </pre>
 );
 
-/* How to install FFmpeg, step by step: Scoop first, by hand second. The same as `avoc doctor` says. */
-function FfmpegSteps() {
+/* How to install FFmpeg: one click where the server can do it (Windows), then the same steps as `avoc doctor`
+   says, Scoop first and by hand second, for those who would rather do it themselves. */
+function FfmpegSteps({ canInstall, onDone }: { canInstall: boolean; onDone: () => void }) {
+  const [installing, setInstalling] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const install = async () => {
+    setInstalling(true);
+    setFailed(null);
+    try {
+      const done = await call<{ ok: boolean; output: string }>("/api/install-ffmpeg", {});
+      if (done.ok) onDone();
+      else
+        setFailed(
+          done.output || tr("没装上，原因不明。", "It did not install, for no clear reason."),
+        );
+    } catch (error) {
+      setFailed((error as Error).message);
+    } finally {
+      setInstalling(false);
+    }
+  };
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-[13px] text-foreground">
       <div className="font-semibold">
-        {tr(
-          "avoc 靠它读视频、切音频，必须装。最简单的是用 Scoop：",
-          "avoc needs it to read videos and cut audio. The easiest way is Scoop:",
-        )}
+        {tr("avoc 靠它读视频、切音频，必须装。", "avoc needs it to read videos and cut audio.")}
+      </div>
+      {canInstall && (
+        <div className="flex flex-col items-start gap-1.5">
+          <Button type="button" size="sm" disabled={installing} onClick={install}>
+            {installing && <Spinner />}
+            {installing
+              ? tr("正在安装…（约 1–3 分钟）", "Installing… (about 1–3 minutes)")
+              : tr("帮我装好 FFmpeg", "Install FFmpeg for me")}
+          </Button>
+          <span className="text-muted-foreground">
+            {tr(
+              "会用 Scoop 装 FFmpeg；没有 Scoop 就先装上它。都装在你的用户文件夹里，不用管理员权限，装好不用重启 avoc。",
+              "It installs FFmpeg with Scoop, installing Scoop first if you have none. Both go in your user folder, need no administrator rights, and avoc needs no restart.",
+            )}
+          </span>
+          {failed && (
+            <>
+              <span className="text-destructive">
+                {tr(
+                  "没装上，下面是安装时的输出。也可以照下面的步骤自己装：",
+                  "It did not install; here is what it printed. You can also install it yourself with the steps below:",
+                )}
+              </span>
+              <pre className="m-0 max-h-40 w-full overflow-auto rounded-md bg-background px-2.5 py-1.5 font-mono text-xs whitespace-pre-wrap">
+                {failed}
+              </pre>
+            </>
+          )}
+        </div>
+      )}
+      <div className={cn(canInstall && "mt-1 font-semibold")}>
+        {canInstall
+          ? tr(
+              "想自己装的话，最简单的是用 Scoop：",
+              "To install it yourself, Scoop is the easiest:",
+            )
+          : tr("最简单的是用 Scoop：", "The easiest way is Scoop:")}
       </div>
       <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
         <li>

@@ -152,6 +152,8 @@ export interface Check {
   required: boolean;
   /* "token" or "ffmpeg": checks the page shows its own steps for, instead of `fix`. */
   topic: string;
+  /* The page can fix it with one click: FFmpeg on Windows. */
+  can_install: boolean;
 }
 
 export interface SubtitleStyle {
