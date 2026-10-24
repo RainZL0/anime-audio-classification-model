@@ -87,6 +87,15 @@ def audio_tracks(video: Path) -> list[AudioTrack]:
     ]
 
 
+def can_read(path: Path) -> bool:
+    """Whether ffprobe can open the file as audio or video at all."""
+    probe = shutil.which("ffprobe")
+    if probe is None:
+        raise RuntimeError("ffprobe not found. It is installed together with ffmpeg")
+    proc = subprocess.run([probe, "-v", "error", str(path)], capture_output=True, check=False)
+    return proc.returncode == 0
+
+
 def extract_audio(video: Path, dst: Path, track: int = 0) -> None:
     """Take one audio track (the first by default) out of the video and save it losslessly as
     FLAC. The sample rate and channels are not changed."""

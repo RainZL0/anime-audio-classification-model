@@ -156,6 +156,7 @@ def prepare(
     from avoc.audio import (
         audio_info,
         audio_tracks,
+        can_read,
         diarize,
         extract_audio,
         make_analysis_copy,
@@ -194,6 +195,13 @@ def prepare(
     track, how = None, "person" if spoken else "assumed"
     if audio is None:
         tracks = audio_tracks(video)
+        if not tracks and not can_read(video):
+            raise ValueError(
+                say(
+                    f"FFmpeg 读不了这个文件，它是视频吗：{video}",
+                    f"FFmpeg cannot read this file. Is it a video? {video}",
+                )
+            )
         if not tracks:
             raise ValueError(
                 say(f"视频里没有音轨：{video}", f"the video has no audio track: {video}")
@@ -629,6 +637,16 @@ def add_episode(
     """
     from avoc.app.workspace import DEFAULT_MODELS, GROUPING_MODEL
 
+    # Say a mistyped path before anything else is printed or loaded.
+    for path, zh, en in (
+        (video, "视频", "Video"),
+        (subtitles, "字幕", "Subtitles"),
+        (text_subtitles, "文本字幕", "Text subtitles"),
+        (display_subtitles, "显示用字幕", "Display subtitles"),
+        (audio, "音轨", "Audio track"),
+    ):
+        if path is not None and not path.is_file():
+            raise ValueError(say(f"找不到{zh}：{path}", f"{en} not found: {path}"))
     if name is None:
         name = find_episode_by_video(workspace, video) or next_episode_name(workspace)
     validate_name(name)

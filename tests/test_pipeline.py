@@ -141,6 +141,38 @@ def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: 
         pipeline.prepare(tmp_path / "none.mp4", subtitles, tmp_path / "y", "new")
 
 
+def test_prepare_says_when_the_video_cannot_be_read(tmp_path: Path, monkeypatch: Any) -> None:
+    import avoc.audio
+
+    subtitles = tmp_path / "test.srt"
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
+    video = tmp_path / "ep1.mkv"
+    video.write_bytes(b"not a video")
+    monkeypatch.setattr(avoc.audio, "audio_tracks", lambda path: [])
+    monkeypatch.setattr(avoc.audio, "can_read", lambda path: False)
+    with pytest.raises(ValueError, match="Is it a video"):
+        pipeline.prepare(video, subtitles, tmp_path / "x", "new", offset=0.0)
+    monkeypatch.setattr(avoc.audio, "can_read", lambda path: True)
+    with pytest.raises(ValueError, match="no audio track"):
+        pipeline.prepare(video, subtitles, tmp_path / "x", "new", offset=0.0)
+    assert not (tmp_path / "x").exists()
+
+
+def test_add_refuses_a_missing_file_before_starting(tmp_path: Path) -> None:
+    subtitles = tmp_path / "test.srt"
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
+    video = tmp_path / "ep1.mp4"
+    video.write_bytes(b"video")
+    lines: list[str] = []
+    with pytest.raises(ValueError, match="Display subtitles not found"):
+        pipeline.add_episode(
+            tmp_path / "ws", video, subtitles, display_subtitles=tmp_path / "none.ass",
+            report=lines.append,
+        )  # fmt: skip
+    assert lines == []
+    assert not (tmp_path / "ws").exists()
+
+
 def test_prepare_without_offset_or_token_stops_before_writing(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
@@ -170,8 +202,9 @@ def test_add_names_the_next_episode_and_resumes_after_a_failure(
 ) -> None:
     workspace = tmp_path / "ws"
     (workspace / "episodes" / "ep03").mkdir(parents=True)
-    video, subtitles = tmp_path / "a.mp4", tmp_path / "a.ass"
+    video, subtitles = tmp_path / "a.mp4", tmp_path / "a.srt"
     video.write_bytes(b"video")
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
     prepared: list[str] = []
     monkeypatch.setattr(pipeline, "prepare", _fake_prepare(prepared))
     embedded: list[str] = []
@@ -203,8 +236,10 @@ def test_text_subtitles_are_kept_for_a_run_that_carries_on(
     on, even if --text-subs is not given again (as the interface's Carry on does)."""
     workspace = tmp_path / "ws"
     (workspace / "episodes").mkdir(parents=True)
-    video, subtitles, japanese = tmp_path / "a.mp4", tmp_path / "a.ass", tmp_path / "a.ja.srt"
+    video, subtitles, japanese = tmp_path / "a.mp4", tmp_path / "a.srt", tmp_path / "a.ja.srt"
     video.write_bytes(b"video")
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
+    japanese.write_text("1\n00:00:01,000 --> 00:00:03,000\nこんにちは\n", encoding="utf-8")
     monkeypatch.setattr(pipeline, "prepare", _fake_prepare([]))
     attached: list[Path] = []
     monkeypatch.setattr(
@@ -236,8 +271,11 @@ def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -
 
     monkeypatch.setattr(pipeline, "prepare", broken)
     workspace = tmp_path / "ws"
+    video, subtitles = tmp_path / "a.mp4", tmp_path / "a.srt"
+    video.write_bytes(b"video")
+    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
     with pytest.raises(ValueError, match="overlap is too low"):
-        pipeline.add_episode(workspace, tmp_path / "a.mp4", tmp_path / "a.ass", device="cpu")
+        pipeline.add_episode(workspace, video, subtitles, device="cpu")
     assert not (workspace / "episodes" / "ep01").exists()
 
 
