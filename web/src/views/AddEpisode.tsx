@@ -795,37 +795,45 @@ export function AddEpisode({
               </Note>
             </>
           ) : (
-            <Choice<Purpose>
-              value={text ? "tts" : "audio"}
-              options={[
-                ["tts", purposeNames().tts],
-                ["audio", purposeNames().audio],
-              ]}
-              onPick={onPurpose}
-            />
-          )}
-          {state.purpose ? null : text ? (
-            <Note>
-              {tr(
-                "要让角色的声音朗读文字，还得采集角色每句台词的文本，所以主字幕要用原声语言（一般是日语）。这样收集的声音也能只导出声音给 RVC 用。",
-                "To have the voice read text aloud, the text of each line the character says is collected too, so the main subtitles must be in the original language (usually Japanese). Voices collected this way can still be exported as sound only, for RVC.",
-              )}
-            </Note>
-          ) : (
-            /* The one choice that cannot be undone later: an episode cut from subtitles in another language never has
-               the text. So it is said plainly, before anything is picked. */
-            <Note warn>
-              <b className="mb-1 block text-base">
+            <>
+              <Choice<Purpose>
+                value={text ? "tts" : "audio"}
+                options={[
+                  ["audio", purposeNames().audio],
+                  ["tts", purposeNames().tts],
+                ]}
+                onPick={onPurpose}
+              />
+              <ul className="flex list-disc flex-col gap-1 pl-5 text-[13px] text-muted-foreground">
+                <li>
+                  <b className="font-semibold text-foreground">{purposeNames().audio}</b>
+                  {tr(
+                    "：只收集角色的声音，用来训练变声模型，也就是把别人说的话换成这个角色的音色。字幕用什么语言都行。",
+                    ": collects only the character's voice, to train a voice-changing model, which turns someone else's speech into this character's voice. Subtitles in any language will do.",
+                  )}
+                </li>
+                <li>
+                  <b className="font-semibold text-foreground">{purposeNames().tts}</b>
+                  {tr(
+                    "：连同每句台词的原话一起收集，用来训练朗读模型，让这个角色念出你给的任何文字。主字幕必须是视频原来的语言：日语动画就要日语字幕。",
+                    ": collects each line together with the words actually said, to train a text-to-speech model that has this character read any text you give it. The main subtitles must be in the video's original language: Japanese subtitles for a Japanese anime.",
+                  )}
+                </li>
+              </ul>
+              {/* The one choice that cannot be undone later, so it is said plainly before anything is picked. */}
+              <Note warn={!text}>
+                <b className="mb-1 block text-base">
+                  {tr(
+                    "想好再选：拿不准就选「朗读文字」。",
+                    'Decide first: if unsure, choose "Read text aloud".',
+                  )}
+                </b>
                 {tr(
-                  "想好再选：拿不准就选「朗读文字」。",
-                  'Decide first: if unsure, choose "Read text aloud".',
+                  "选了「朗读文字」，导出时还能退回只导出声音，给 RVC 用；选了「只要声音」，导出时不能升级成朗读文字，因为没有收集原话。开始加第一集后就不能再改。",
+                  'With "Read text aloud", Export can still fall back to sound only, for RVC. With "Sound only", Export cannot move up to reading text aloud, because the words were never collected. Once the first episode starts, this cannot be changed.',
                 )}
-              </b>
-              {tr(
-                "只要声音的话，什么语言的主字幕都能用；但用译文字幕切的集，以后永远导不出台词文字，想换成朗读文字只能删掉重加。用原声语言的字幕切，两种用法都行。",
-                "For sound only, main subtitles in any language will do; but an episode cut from translated subtitles can never give the text later, and switching to reading text aloud means deleting it and adding it again. Cut from subtitles in the original language, it works for both.",
-              )}
-            </Note>
+              </Note>
+            </>
           )}
         </Section>
         <Section title={tr("视频文件", "Video file")}>
