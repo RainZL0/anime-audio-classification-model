@@ -20,6 +20,7 @@ web/playwright-report/
 data/
 workspace/
 out/
+output/
 models/
 *.wav
 *.flac
