@@ -77,26 +77,38 @@ export function SceneView({
                 )}
               </span>
             </Tip>
-            {!onlyWork && (
-              <Tip
-                text={tr(
-                  "在「整集」里显示跳过的短句，想标也可以标",
-                  "Show the skipped short lines under Whole episode; you can still label them",
-                )}
-              >
+            {/* Grayed out under "Only to do", not hidden: skipped short lines are not work to do. The span
+                holds the hint, since a disabled button gets no mouse events. */}
+            <Tip
+              text={
+                onlyWork
+                  ? tr(
+                      "只在「整集」里能显示：跳过的短句不算要处理的",
+                      "Only under Whole episode: skipped short lines are not work to do",
+                    )
+                  : tr(
+                      "在「整集」里显示跳过的短句，想标也可以标",
+                      "Show the skipped short lines under Whole episode; you can still label them",
+                    )
+              }
+            >
+              <span>
                 <Button
                   variant="outline"
                   size="xs"
-                  aria-pressed={showShort}
-                  className={cn(showShort && "border-primary/40 bg-accent hover:bg-accent")}
+                  disabled={onlyWork}
+                  aria-pressed={showShort && !onlyWork}
+                  className={cn(
+                    showShort && !onlyWork && "border-primary/40 bg-accent hover:bg-accent",
+                  )}
                   onClick={() => setShowShort(!showShort)}
                 >
-                  {showShort
+                  {showShort && !onlyWork
                     ? tr("隐藏短句", "Hide short lines")
                     : tr("显示短句", "Show short lines")}
                 </Button>
-              </Tip>
-            )}
+              </span>
+            </Tip>
           </>
         )}
         <span className="flex-1"></span>
