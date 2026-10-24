@@ -24,6 +24,10 @@ interface RowProps {
   showEpisode?: boolean;
 }
 
+/* The look of the selected line, the same in every list. The line needs `border border-transparent` so it
+   doesn't move when selected. */
+export const SELECTED_ROW = "border-primary/40 bg-accent shadow-sm hover:bg-accent";
+
 /* ───────────── One line ───────────── */
 
 export function Row({
@@ -50,7 +54,7 @@ export function Row({
       ref={ref}
       className={cn(
         "relative isolate grid cursor-pointer grid-cols-[36px_1fr_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
-        selected && "border-primary/40 bg-accent shadow-sm hover:bg-accent",
+        selected && SELECTED_ROW,
       )}
       onClick={onSelect}
     >

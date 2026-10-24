@@ -28,6 +28,7 @@ Two words used below:
 - **A hover hint says only what the screen does not already say.** It is for: what a short label means or why it is there ("Low quality", "No text to export"); what a button does when its words or icon alone do not say it (a button with only an icon, "Reference", "Cut again"); an action that cannot be seen (Shift+click, double-click); and the full text of something cut short, such as a long file name. There is no hint that repeats the label in other words ("Undo" → "Undo the last step"), shows the name already written next to an avatar, or says "Press 1" next to a key cap that already shows it.
 - **Everything that can be clicked reacts under the mouse**, so a person can tell it does something before clicking.
 - **A choice that labels the line shows it most clearly on hover**: under the mouse, a "who is it" chip or a guess on the left gets a solid border in the main color and a light shadow. The machine's top guess keeps its accent background (see [Color](#color)), so the hover look tells which one a click will pick.
+- **The selected line looks the same in every list**: a border in a light main color, the accent background and a light shadow. Only the line is marked, not the box around it, such as a group's card.
 - **Selecting and playing are kept apart.** In a list with tick boxes, the box selects and the rest of the row plays the line.
 
 ## Color

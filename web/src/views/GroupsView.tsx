@@ -11,6 +11,7 @@ import { Chip, LowButton } from "../components/Chip";
 import { EpisodeProgress, type Progress } from "../components/EpisodeProgress";
 import { Empty, Welcome } from "../components/Notes";
 import { Closest, Tag } from "../components/Pills";
+import { SELECTED_ROW } from "../components/Row";
 import { RoleName } from "../components/RoleName";
 import { withKeys } from "../components/Keys";
 import { Tip } from "../components/Tip";
@@ -80,9 +81,16 @@ export function GroupsView({
       <div className="sticky -top-2 z-[3] flex flex-wrap items-center gap-2.5 border-b bg-background px-1 pt-3 pb-2">
         <h2 className="text-base font-semibold">{episode}</h2>
         <EpisodeProgress progress={progress} />
-        <span className="text-xs text-muted-foreground">
-          {tr(`${groups.length} 组`, many(groups.length, "group"))}
-        </span>
+        <Tip
+          text={tr(
+            "只给要处理的台词分组，跟「场景」里「只看要处理的」是同一批。机器有把握的在「角色」里核对",
+            'Only lines still to do are grouped, the same lines as "Only to do" in Scenes. Lines the machine is confident about are checked in Characters',
+          )}
+        >
+          <span className="text-xs text-muted-foreground">
+            {tr(`${groups.length} 组`, many(groups.length, "group"))}
+          </span>
+        </Tip>
       </div>
       {firstRun && (
         <Welcome
@@ -164,14 +172,7 @@ export function GroupsView({
             setPicked((p) => ({ ...p, [g.key]: new Set(all ? [] : open.map((c) => c.id)) }));
           const ids = keep.map((c) => c.id);
           return (
-            <Card
-              key={g.key}
-              className={cn(
-                "gap-2.5 p-3.5",
-                g.clips.some((c) => c.id === focus) && "shadow-md ring-primary/40",
-                done && "opacity-60",
-              )}
-            >
+            <Card key={g.key} className={cn("gap-2.5 p-3.5", done && "opacity-60")}>
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 {tr(`第 ${gi + 1} 组`, `Group ${gi + 1}`)}
                 <span className="text-xs font-normal text-muted-foreground">
@@ -186,8 +187,8 @@ export function GroupsView({
                   <div
                     key={c.id}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[16px_1fr_auto_auto] items-center gap-2 rounded-md px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
-                      c.id === focus && "bg-accent",
+                      "grid cursor-pointer grid-cols-[16px_1fr_auto_auto] items-center gap-2 rounded-md border border-transparent px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
+                      c.id === focus && SELECTED_ROW,
                     )}
                     onClick={() => setFocus(c.id)}
                   >
