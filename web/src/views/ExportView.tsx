@@ -290,8 +290,8 @@ export function ExportView({
                 'Sound only, no text. While labeling, notes such as "No text to export" are left out too. This choice is remembered.',
               )
             : tr(
-                "要每句说的话，用这一集说的语言。标注时会标出导不出文字的句子。这个选择会记住。",
-                "Needs the words of each line, in the language spoken. While labeling, lines that cannot be exported with text are marked. This choice is remembered.",
+                "连同每句台词的原声语言文本一起导出。标注时会标出没有文本、导不出来的句子。这个选择会记住。",
+                "Exports each line with its text in the original language. While labeling, lines without that text, which cannot be exported, are marked. This choice is remembered.",
               )}
         </Note>
       </Section>

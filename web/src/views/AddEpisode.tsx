@@ -574,8 +574,8 @@ export function AddEpisode({
           <Note>
             {text
               ? tr(
-                  "要让角色的声音朗读文字，就要每句说的话，用这一集说的语言（一般是日语），所以要有这种语言的字幕。",
-                  "To have the voice read text aloud, each line needs its words in the language spoken (usually Japanese), so subtitles in that language are needed.",
+                  "要让角色的声音朗读文字，还得采集角色每句台词的文本，所以要有原声语言（一般是日语）的字幕。",
+                  "To have the voice read text aloud, the text of each line the character says is collected too, so subtitles in the original language (usually Japanese) are needed.",
                 )
               : tr(
                   "只要声音就不用管台词文字，什么语言的字幕都行。以后在导出页也能改。",
