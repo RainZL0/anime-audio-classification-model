@@ -12,14 +12,14 @@ The checks to run before sending a change are in [CONTRIBUTING.md](../CONTRIBUTI
 
 ## Set up
 
-You need FFmpeg on your `PATH`; how to install it, with Scoop or by hand, is in the [README](../README.md#install), and `avoc doctor` says the same when it is missing. On Windows, the app's first page also has an "Install FFmpeg for me" button: it runs [install_ffmpeg.ps1](../src/avoc/install_ffmpeg.ps1), which installs Scoop if you have none and then FFmpeg with it, all without administrator rights, and avoc can use it at once without a restart. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
+You need FFmpeg on your `PATH`; how to install it, with Scoop or by hand, is in the [README](../README.md#install), and `avoc doctor` says the same when it is missing. On Windows, the app's first page also has an "Install it for me in one click" button: it runs [install_ffmpeg.ps1](../src/avoc/install_ffmpeg.ps1), which installs Scoop if you have none and then FFmpeg with it, all without administrator rights, and avoc can use it at once without a restart. For the GPU setup and notes on each model, see [TOOLS.md](TOOLS.md).
 
 ```powershell
 uv sync --locked
 uv run avoc doctor
 ```
 
-`doctor` lists each item in turn: the graphics card, FFmpeg, the voice separation model, the Hugging Face token, and the free disk space. Items marked "missing" must be fixed first. Items marked "optional" can be left alone and the tool still works.
+`doctor` lists each item in turn: the operating system, the graphics card, FFmpeg, the voice separation model, the Hugging Face token, and the free disk space. Items marked "missing" must be fixed first. Items marked "optional" can be left alone and the tool still works. "Untested" means a system other than Windows: avoc mostly works there, but it is tested on Windows only.
 
 ## Processing a new episode
 

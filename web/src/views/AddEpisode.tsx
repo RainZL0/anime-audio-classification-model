@@ -66,8 +66,8 @@ function MachineChecks({
               )}
             >
               {/* A cross for every failed check; red when the tool cannot work without it, orange when only one
-                  feature needs it. */}
-              {c.ok ? "✓" : "✗"}
+                  feature needs it. A system other than Windows gets a question mark: untested, not broken. */}
+              {c.ok ? "✓" : c.topic === "system" ? "?" : "✗"}
             </span>
             <span className="flex min-w-0 flex-col gap-1">
               {c.text}
@@ -148,7 +148,7 @@ function FfmpegSteps({ canInstall, onDone }: { canInstall: boolean; onDone: () =
             {installing && <Spinner />}
             {installing
               ? tr("正在安装…（约 1–3 分钟）", "Installing… (about 1–3 minutes)")
-              : tr("帮我装好 FFmpeg", "Install FFmpeg for me")}
+              : tr("一键帮我装好", "Install it for me in one click")}
           </Button>
           <span className="text-muted-foreground">
             {tr(

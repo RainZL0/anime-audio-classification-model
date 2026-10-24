@@ -57,7 +57,15 @@ def doctor() -> None:
     problems = 0
     for check in checks(Path.cwd()):
         problems += check.required and not check.ok
-        mark = "[ok]" if check.ok else "[missing]" if check.required else "[optional]"
+        mark = (
+            "[ok]"
+            if check.ok
+            else "[untested]"
+            if check.topic == "system"
+            else "[missing]"
+            if check.required
+            else "[optional]"
+        )
         fix = f"\n     {check.fix}" if check.fix and not check.ok else ""
         typer.echo(f"{mark} {check.text}{fix}")
     typer.echo(

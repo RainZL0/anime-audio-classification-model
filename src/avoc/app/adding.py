@@ -230,9 +230,9 @@ class Adding:
         if offset is None and not has_hf_token():
             raise ValueError(str(NO_TOKEN_HINT))
         if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
-            from avoc.doctor import FFMPEG_HOWTO
+            from avoc.doctor import ffmpeg_howto
 
-            raise ValueError(say("没找到 FFmpeg。", "FFmpeg was not found. ") + str(FFMPEG_HOWTO))
+            raise ValueError(say("没找到 FFmpeg。", "FFmpeg was not found. ") + ffmpeg_howto())
         records = self._records()
         recorded = next((n for n, r in records.items() if r["video"] == str(video.resolve())), None)
         name = (

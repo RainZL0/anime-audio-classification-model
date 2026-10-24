@@ -1,6 +1,6 @@
-"""Check the machine before the first episode: GPU, FFmpeg, the voice separation model, the
-Hugging Face token and free disk space. `avoc doctor` prints these, and the interface's welcome page
-shows the same list."""
+"""Check the machine before the first episode: the operating system, GPU, FFmpeg, the voice
+separation model, the Hugging Face token and free disk space. `avoc doctor` prints these, and the
+interface's welcome page shows the same list."""
 
 from __future__ import annotations
 
@@ -28,7 +28,45 @@ FFMPEG_HOWTO = Words(
     "it and add its bin folder to the PATH environment variable. Then close the terminal, open a "
     "new one, and start avoc again",
 )
-"""What to do when FFmpeg is missing. Also said when the add form or `avoc add` finds no FFmpeg."""
+"""What to do when FFmpeg is missing on Windows."""
+
+FFMPEG_HOWTO_MAC = Words(
+    "装上 FFmpeg：用 Homebrew 运行 brew install ffmpeg。还没有 Homebrew 的话，先按 https://brew.sh "
+    "上的那一行命令装上它",
+    "Install FFmpeg with Homebrew: brew install ffmpeg. Without Homebrew, first install it with "
+    "the one command on https://brew.sh",
+)
+
+FFMPEG_HOWTO_LINUX = Words(
+    "用系统的包管理器装上 FFmpeg，比如 Ubuntu 或 Debian：sudo apt install ffmpeg；"
+    "Fedora：sudo dnf install ffmpeg-free；Arch：sudo pacman -S ffmpeg",
+    "Install FFmpeg with your system's package manager, for example on Ubuntu or Debian: "
+    "sudo apt install ffmpeg; Fedora: sudo dnf install ffmpeg-free; Arch: sudo pacman -S ffmpeg",
+)
+
+
+def ffmpeg_howto() -> str:
+    """What to do when FFmpeg is missing, on this system. Also said when the add form or `avoc add`
+    finds no FFmpeg."""
+    if sys.platform == "darwin":
+        return str(FFMPEG_HOWTO_MAC)
+    if sys.platform.startswith("linux"):
+        return str(FFMPEG_HOWTO_LINUX)
+    return str(FFMPEG_HOWTO)
+
+
+def system_name() -> str:
+    """The operating system and its version, as people know it: "Windows 11 (10.0.26100)"."""
+    import platform
+
+    if sys.platform == "win32":
+        return f"Windows {platform.release()} ({platform.version()})"
+    if sys.platform == "darwin":
+        return f"macOS {platform.mac_ver()[0]}"
+    try:
+        return platform.freedesktop_os_release().get("PRETTY_NAME", "Linux")
+    except OSError:
+        return f"{platform.system()} {platform.release()}"
 
 
 @dataclass(frozen=True)
@@ -40,7 +78,8 @@ class Check:
     required: bool = True
     """False means the tool still works without it, only slower or with one feature less."""
     topic: str = ""
-    """A fixed name for checks the interface shows its own steps for: "token", "ffmpeg"."""
+    """A fixed name for checks the interface shows in their own way: "system" (a question mark
+    rather than a cross, as other systems are untested, not broken), "token", "ffmpeg"."""
     can_install: bool = False
     """The interface can fix it with one click: FFmpeg on Windows, through install_ffmpeg.ps1."""
 
@@ -86,7 +125,19 @@ def checks(where: Path) -> list[Check]:
 
     cuda = torch.cuda.is_available()
     gpu = f", {torch.cuda.get_device_name(0)}" if cuda else ""
+    windows = sys.platform == "win32"
     found = [
+        Check(
+            windows,
+            say(f"系统：{system_name()}", f"System: {system_name()}"),
+            say(
+                "avoc 主要在 Windows 上测试。在这个系统上大多也能用，但可能遇到没测到的问题",
+                "avoc is mainly tested on Windows. It mostly works on this system too, but you "
+                "may meet problems no one has tested",
+            ),
+            required=False,
+            topic="system",
+        ),
         Check(
             cuda,
             say(
@@ -101,7 +152,7 @@ def checks(where: Path) -> list[Check]:
                 "https://www.nvidia.com/drivers and restart avoc",
             ),
             required=False,
-        )
+        ),
     ]
     # One line for both: ffprobe always comes with ffmpeg.
     missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
@@ -114,8 +165,10 @@ def checks(where: Path) -> list[Check]:
             )
             if missing
             else f"FFmpeg: {Path(shutil.which('ffmpeg') or '').parent}",
-            str(FFMPEG_HOWTO),
-            topic="ffmpeg",
+            ffmpeg_howto(),
+            # The page shows the Windows steps, with the one-click button, in its own box; on other
+            # systems the plain text above is enough.
+            topic="ffmpeg" if sys.platform == "win32" else "",
             can_install=sys.platform == "win32",
         )
     )

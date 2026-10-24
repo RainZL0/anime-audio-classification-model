@@ -1,6 +1,6 @@
 # Installs FFmpeg with Scoop, and Scoop itself first when it is missing. Both go into the user's
 # own folder, so no administrator rights are needed. The app runs this when the person clicks
-# "Install FFmpeg for me"; it can also be run by hand:
+# "Install it for me in one click"; it can also be run by hand:
 #   powershell -ExecutionPolicy Bypass -File install_ffmpeg.ps1
 # The last line it prints is SHIMS=<folder>: the folder to add to PATH, where ffmpeg now is.
 
