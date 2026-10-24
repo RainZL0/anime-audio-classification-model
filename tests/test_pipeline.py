@@ -136,7 +136,9 @@ def test_prepare_refuses_audio_from_another_source(tmp_path: Path, monkeypatch: 
     video.write_bytes(b"video")
     monkeypatch.setattr(pipeline, "video_seconds", lambda path: 999.0)
     with pytest.raises(ValueError, match="different durations"):
-        pipeline.prepare(video, subtitles, tmp_path / "x", "new", audio=directory / "ep1.wav")
+        pipeline.prepare(
+            video, subtitles, tmp_path / "x", "new", offset=0.0, audio=directory / "ep1.wav"
+        )
     with pytest.raises(ValueError, match="Video does not exist"):
         pipeline.prepare(tmp_path / "none.mp4", subtitles, tmp_path / "y", "new")
 
