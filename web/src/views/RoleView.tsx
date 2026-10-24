@@ -282,13 +282,15 @@ export function RoleView({
                   <p className="text-[13px] text-muted-foreground">
                     {tr(
                       <>
-                        从最没把握的开始排。听到不对的，直接标成对的人或「其他」<Kbd>Q</Kbd>
+                        百分比是机器猜这句是{other ? "「其他」" : ` ${role} `}
+                        的概率，从最没把握的开始排。听到不对的，直接标成对的人或「其他」<Kbd>Q</Kbd>
                         ，它就离开这里；听完一键确认其余的。
                       </>,
                       <>
-                        Least sure first. When one is wrong, label it with the right character or
-                        "Other" <Kbd>Q</Kbd> and it leaves this list; when you're done listening,
-                        confirm the rest at once.
+                        The percentage is the machine's chance that the line is {them}; least sure
+                        first. When one is wrong, label it with the right character or "Other"{" "}
+                        <Kbd>Q</Kbd> and it leaves this list; when you're done listening, confirm
+                        the rest at once.
                       </>,
                     )}
                   </p>
@@ -310,8 +312,8 @@ export function RoleView({
                 </div>
                 <Note className="mb-2">
                   {tr(
-                    `机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
-                    `The machine didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`,
+                    `百分比是机器猜这句是 ${role} 的概率。机器没归给 ${role}，但有可能是，概率高的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
+                    `The percentage is the machine's chance that the line is ${role}. It didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`,
                   )}
                 </Note>
                 {maybe.map((clip) => row(clip, { maybeOf: role }))}

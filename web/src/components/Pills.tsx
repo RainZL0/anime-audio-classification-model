@@ -103,7 +103,13 @@ export function Pill({ clip }: { clip: Clip }) {
   }
   if (clip.status === "auto" || clip.status === "review") {
     return (
-      <Tag look={clip.status}>
+      <Tag
+        look={clip.status}
+        tip={tr(
+          "机器猜这句是前面这个名字的概率",
+          "The machine's chance that this line is the name before it",
+        )}
+      >
         {clip.status === "review" ? tr("待确认 ", "Check ") : ""}
         {pct(clip.guess[0].p)}
       </Tag>

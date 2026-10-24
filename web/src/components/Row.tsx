@@ -85,7 +85,13 @@ export function Row({
               tr("未知", "Unknown")
             )}
           </span>
-          <Pill clip={clip} />
+          {/* In "Maybe missed" the chance for the current owner is left out: with two people it is just 100% minus
+              the chance shown on the maybe pill. */}
+          {!(
+            clip.maybe &&
+            clip.familiar !== false &&
+            (clip.status === "auto" || clip.status === "review")
+          ) && <Pill clip={clip} />}
           {/* No chance here: it is among the known characters only, so it can be high for someone new. */}
           {stranger && best && <Closest roles={roles} name={best.name} />}
           {clip.unusable && !(clip.label && labelText[clip.label]) && (
@@ -100,8 +106,8 @@ export function Row({
             <Tag
               look="maybe"
               tip={tr(
-                "机器没归给这个角色，但听起来有可能是",
-                "The machine didn't give it to this character, but it might be",
+                `机器猜这句是 ${maybeOf} 的概率。它没归给 ${maybeOf}，但有可能是`,
+                `The machine's chance that this line is ${maybeOf}. It didn't give it to them, but it might be`,
               )}
             >
               {tr("可能漏掉", "Maybe missed")} {pct(chanceOf(clip, maybeOf))}
