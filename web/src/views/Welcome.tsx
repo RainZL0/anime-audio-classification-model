@@ -1,4 +1,3 @@
-import { Field, FieldLabel } from "@/components/ui/field";
 import { currentLanguage, tr } from "../language";
 import { AddEpisode, Checks, type AddEpisodeProps } from "./AddEpisode";
 
@@ -7,7 +6,7 @@ import { AddEpisode, Checks, type AddEpisodeProps } from "./AddEpisode";
 /* The page for a workspace with no usable episode yet: what the tool does, the machine checks, and the form. */
 export function Welcome(props: AddEpisodeProps) {
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col gap-[18px] pt-6 pb-15">
+    <div className="mx-auto flex max-w-[720px] flex-col gap-8 pt-6 pb-15">
       <div>
         <h2 className="mb-1.5 text-xl font-semibold">{tr("欢迎", "Welcome")}</h2>
         <p className="text-muted-foreground">
@@ -43,18 +42,14 @@ export function Welcome(props: AddEpisodeProps) {
           </li>
         </ol>
       </div>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr("这台机器", "This machine")}
-        </FieldLabel>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-base font-semibold">{tr("这台机器", "This machine")}</h3>
         <Checks key={currentLanguage()} />
-      </Field>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr("加第一集", "Add the first episode")}
-        </FieldLabel>
+      </section>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-base font-semibold">{tr("加第一集", "Add the first episode")}</h3>
         <AddEpisode {...props} />
-      </Field>
+      </section>
       <p className="text-xs text-muted-foreground">
         {tr(
           <>

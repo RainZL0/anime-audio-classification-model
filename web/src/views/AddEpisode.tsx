@@ -11,10 +11,10 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Note } from "../components/Notes";
+import { Section } from "../components/Section";
 import { Choice } from "../components/Choice";
 import { withKeys } from "../components/Keys";
 import { PathInput } from "../components/PathInput";
@@ -410,7 +410,7 @@ export function AddEpisode({
       stopped: tr(`${adding.episode} 已停下`, `${adding.episode} was stopped`),
     }[adding.state];
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="flex flex-col gap-6">
       {adding && adding.state !== "idle" && (
         <div
           className={cn(
@@ -479,10 +479,7 @@ export function AddEpisode({
         </div>
       )}
       {unfinished.length > 0 && (
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("没做完的集", "Unfinished episodes")}
-          </FieldLabel>
+        <Section title={tr("没做完的集", "Unfinished episodes")}>
           {unfinished.map(([name, why]) => (
             <div className="mt-1 flex items-center gap-2.5" key={name}>
               <b>{name}</b>
@@ -514,13 +511,10 @@ export function AddEpisode({
               )}
             </div>
           ))}
-        </Field>
+        </Section>
       )}
-      <form className="flex flex-col gap-3" onSubmit={start}>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("收集声音做什么用", "What the voices are for")}
-          </FieldLabel>
+      <form className="flex flex-col gap-6" onSubmit={start}>
+        <Section title={tr("收集声音做什么用", "What the voices are for")}>
           <Choice<Purpose>
             value={text ? "tts" : "audio"}
             options={[
@@ -540,11 +534,8 @@ export function AddEpisode({
                   "Sound only needs no text, so subtitles in any language will do. You can change this later on the Export page.",
                 )}
           </Note>
-        </Field>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("视频文件", "Video file")}
-          </FieldLabel>
+        </Section>
+        <Section title={tr("视频文件", "Video file")}>
           <PathInput
             kind="video"
             value={video}
@@ -558,11 +549,8 @@ export function AddEpisode({
             ) : (
               tracks.tracks && <TrackNote tracks={tracks as AudioTracks} spoken={heard} />
             ))}
-        </Field>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("角色说哪种语言", "Language the characters speak")}
-          </FieldLabel>
+        </Section>
+        <Section title={tr("角色说哪种语言", "Language the characters speak")}>
           <NativeSelect
             className="max-w-fit"
             value={spoken}
@@ -588,19 +576,8 @@ export function AddEpisode({
               "Usually leave it as is. If the video has both the original voices and a dub, pick the language of the voices you want.",
             )}
           </Note>
-        </Field>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {text
-              ? tr(
-                  "对白字幕（ASS 或 SRT，按它切台词。最好用说的语言的字幕）",
-                  "Dialogue subtitles (ASS or SRT; lines are cut from it. Best in the language spoken)",
-                )
-              : tr(
-                  "对白字幕（ASS 或 SRT，按它切台词）",
-                  "Dialogue subtitles (ASS or SRT; lines are cut from it)",
-                )}
-          </FieldLabel>
+        </Section>
+        <Section title={tr("对白字幕", "Dialogue subtitles")} aside="ASS / SRT">
           <PathInput
             kind="subtitles"
             value={subtitles}
@@ -608,6 +585,16 @@ export function AddEpisode({
             placeholder="D:\anime\Episode 01.ja.srt"
             toast={toast}
           />
+          {!found && (
+            <Note>
+              {text
+                ? tr(
+                    "按它切台词。最好用这一集说的语言的字幕。",
+                    "The lines are cut along it. Best in the language spoken.",
+                  )
+                : tr("按它切台词。", "The lines are cut along it.")}
+            </Note>
+          )}
           {found && (
             <SubtitleStyles key={subtitles} found={found} chosen={chosen} setChosen={setChosen} />
           )}
@@ -636,14 +623,8 @@ export function AddEpisode({
                 )}
               </Note>
             )}
-        </Field>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr(
-              "显示用字幕（可以不填。对白字幕是你看不懂的语言时，配一份译文，标注时显示在台词上面；导出不用它）",
-              "Display subtitles (optional. If you don't read the dialogue subtitles' language, add a translation; it is shown above each line while labeling, and never exported)",
-            )}
-          </FieldLabel>
+        </Section>
+        <Section title={tr("显示用字幕", "Display subtitles")} aside={tr("可以不填", "optional")}>
           <PathInput
             kind="subtitles"
             value={displaySubtitles}
@@ -651,12 +632,15 @@ export function AddEpisode({
             placeholder="D:\anime\Episode 01.zh.ass"
             toast={toast}
           />
+          <Note>
+            {tr(
+              "对白字幕是你看不懂的语言时，配一份译文，标注时显示在台词上面。导出不用它。",
+              "If you don't read the dialogue subtitles' language, add a translation here. It is shown above each line while labeling, and never exported.",
+            )}
+          </Note>
           <DisplayNote path={displaySubtitles} />
-        </Field>
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("字幕偏移（秒）", "Subtitle offset (seconds)")}
-          </FieldLabel>
+        </Section>
+        <Section title={tr("字幕偏移（秒）", "Subtitle offset (seconds)")}>
           <Input
             className="max-w-[120px]"
             value={offset}
@@ -674,7 +658,7 @@ export function AddEpisode({
                   "How many seconds to add to the subtitle times so they line up with the sound. Leave it empty to measure it (needs a Hugging Face token); later episodes from the same source and subtitle group get this value filled in. Without a token, try 0.",
                 )}
           </Note>
-        </Field>
+        </Section>
         <Note>
           {withKeys(
             tr(

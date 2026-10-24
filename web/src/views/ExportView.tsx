@@ -3,13 +3,13 @@ import { call, type ExportResult, type Summary } from "../api";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Avatar } from "../components/Avatar";
 import { Note } from "../components/Notes";
 import { Choice } from "../components/Choice";
 import { PathInput } from "../components/PathInput";
 import { RoleName } from "../components/RoleName";
+import { Section } from "../components/Section";
 import { Tip } from "../components/Tip";
 import { pct } from "../format";
 import { languageName, lines, many, SPOKEN, tr } from "../language";
@@ -72,7 +72,7 @@ function SpokenTexts({
           <div
             /* When the page is narrow, the path box and its button go to a second line, so the text in the middle
                is not squeezed into a thin column. */
-            className="grid grid-cols-[40px_auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-xs @max-5xl:grid-cols-[40px_auto_minmax(0,1fr)_auto]"
+            className="grid grid-cols-[40px_auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-[13px] @max-5xl:grid-cols-[40px_auto_minmax(0,1fr)_auto]"
             key={e.name}
           >
             <span className="text-muted-foreground tabular-nums">{e.name}</span>
@@ -229,20 +229,17 @@ export function ExportView({
     ["folder", tr("只要音频（RVC）", "Audio only (RVC)")],
   ];
   return (
-    <div className="mx-auto flex max-w-[860px] flex-col gap-[18px] pt-3">
-      <div className="flex flex-wrap items-center gap-2.5 pt-3 pb-1">
-        <h2 className="text-base font-semibold">{tr("导出训练数据", "Export training data")}</h2>
-        <span className="text-xs text-muted-foreground">
+    <div className="mx-auto flex max-w-[860px] flex-col gap-6 pt-3 pb-10">
+      <div className="flex flex-col gap-1 pt-3">
+        <h2 className="text-lg font-semibold">{tr("导出训练数据", "Export training data")}</h2>
+        <span className="text-[13px] text-muted-foreground">
           {tr(
             "从原采样率的人声轨上切，统一响度，一个角色一个文件夹",
             "Cut from the vocals at the original sample rate, loudness evened out, one folder per character",
           )}
         </span>
       </div>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr("导出哪些角色", "Characters to export")}
-        </FieldLabel>
+      <Section title={tr("导出哪些角色", "Characters to export")}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-1.5">
           {trainable.map((r) => (
             <label
@@ -262,11 +259,8 @@ export function ExportView({
             </label>
           ))}
         </div>
-      </Field>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr("包括哪些台词", "Lines to include")}
-        </FieldLabel>
+      </Section>
+      <Section title={tr("包括哪些台词", "Lines to include")}>
         <Choice
           value={includeAuto ? "auto" : "confirmed"}
           options={[
@@ -286,11 +280,8 @@ export function ExportView({
                 "The cleanest. Add the machine's confident ones only if you don't have enough.",
               )}
         </Note>
-      </Field>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr("格式", "Format")}
-        </FieldLabel>
+      </Section>
+      <Section title={tr("格式", "Format")}>
         <Choice value={form} options={forms} onPick={setForm} />
         <Note>
           {form === "folder"
@@ -303,12 +294,9 @@ export function ExportView({
                 "Needs the words of each line, in the language spoken. While labeling, lines that cannot be exported with text are marked. This choice is remembered.",
               )}
         </Note>
-      </Field>
+      </Section>
       {form !== "folder" && (
-        <Field className="gap-1.5">
-          <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("台词文字", "Text of each line")}
-          </FieldLabel>
+        <Section title={tr("台词文字", "Text of each line")}>
           <Note>
             {tr(
               "训练要的是真正说出口的话，所以文字用每集说的语言：切片段用的字幕就是这种语言时直接用，不是的话（比如中文译文）就用下面另配的字幕。没有这种文字的片段不导出，原因写进导出目录的 rejected.tsv。",
@@ -316,17 +304,17 @@ export function ExportView({
             )}
           </Note>
           <SpokenTexts state={state} setState={setState} toast={toast} />
-        </Field>
+        </Section>
       )}
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">
-          {tr(
-            "输出到（相对路径从启动目录算起）",
-            "Output folder (relative paths start from where you launched avoc)",
-          )}
-        </FieldLabel>
+      <Section title={tr("输出到", "Output folder")}>
         <PathInput kind="folder" value={out} onChange={setOut} toast={toast} />
-      </Field>
+        <Note>
+          {tr(
+            "相对路径从启动 avoc 的目录算起。",
+            "A relative path starts from the folder you launched avoc in.",
+          )}
+        </Note>
+      </Section>
       <div>
         <Button disabled={busy || picked.size === 0} onClick={run}>
           {busy

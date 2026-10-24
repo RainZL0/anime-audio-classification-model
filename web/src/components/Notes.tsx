@@ -14,7 +14,13 @@ export function Note({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("text-xs text-muted-foreground", warn && "text-warning", className)}>
+    <div
+      className={cn(
+        "text-[13px] leading-relaxed text-muted-foreground",
+        warn && "text-warning",
+        className,
+      )}
+    >
       {children}
     </div>
   );

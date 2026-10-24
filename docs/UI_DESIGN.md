@@ -29,7 +29,7 @@ Two words used below:
 - **Everything that can be clicked reacts under the mouse**, so a person can tell it does something before clicking.
 - **A choice that labels the line shows it most clearly on hover**: under the mouse, a "who is it" chip or a guess on the left gets a solid border in the main color and a light shadow. The machine's top guess keeps its accent background (see [Color](#color)), so the hover look tells which one a click will pick.
 - **The selected line looks the same in every list**: a border in a light main color, the accent background and a light shadow. Only the line is marked, not the box around it, such as a group's card.
-- **Selecting and playing are kept apart.** In a list with tick boxes, the box selects and the rest of the row plays the line. The box takes the whole left end of the row, top to bottom, so it is easy to hit.
+- **Selecting and playing are kept apart.** In a list with tick boxes, the box selects and the rest of the row plays the line. The box takes the whole left end of the row, top to bottom, so it is easy to hit; only that part shows the hand and has its own hover color, so it is clear where it ends.
 
 ## Color
 
@@ -51,6 +51,7 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 - **A box is as wide as what it holds needs**, so there is no wide empty gap, for example between a name and its numbers.
 - **The summary at the top of a list stays on screen while scrolling**, as in Groups and Scenes, where the episode, its progress, its counts and the filters stay at the top; in Scenes the stuck scene header sits right below them.
 - **A list that covers all episodes shows which episode each line is from.**
+- **A form is split into parts, each with a title**, as in Export and Add an episode. The title is short, dark and bold, with at most a few gray words after it ("optional", "ASS / SRT"). Under it come the box or buttons, then any explanation in gray, one size smaller. Longer reasons go in that gray text, never in brackets in the title. The space between parts is clearly bigger than the space inside one.
 - Choices of the same kind sit together in one row.
 - A button that cannot be used yet is shown grayed out, not hidden, so nothing jumps when it becomes usable. For example, the chips under a group stay gray until a line is ticked.
 - A count is shown once, next to what it counts, not repeated on every button.

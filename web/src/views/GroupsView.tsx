@@ -233,7 +233,7 @@ export function GroupsView({
                   <div
                     key={c.id}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[28px_1fr_auto_auto] items-center gap-2 rounded-md border border-transparent px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
+                      "grid grid-cols-[28px_1fr_auto_auto] items-center gap-2 rounded-md border border-transparent px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
                       c.id === focus && SELECTED_ROW,
                     )}
                     onClick={() => setFocus(c.id)}
@@ -242,9 +242,10 @@ export function GroupsView({
                       <span></span>
                     ) : (
                       /* The tick box only selects; the rest of the row plays the line. The whole left end
-                         of the row, top to bottom, counts as the box, so it is easy to hit. */
+                         of the row, top to bottom, counts as the box, so it is easy to hit; only this part
+                         shows the hand and its own hover color, so it is clear where it ends. */
                       <span
-                        className="-my-[3px] -ml-1.5 flex cursor-pointer items-center justify-center self-stretch pl-1.5"
+                        className="-my-[3px] -ml-1.5 flex cursor-pointer items-center justify-center self-stretch rounded-l-md pl-1.5 hover:bg-muted"
                         onClick={(e) => tick(c, e)}
                         onMouseDown={(e) => e.preventDefault()}
                       >
