@@ -15,32 +15,13 @@ export function Welcome(props: AddEpisodeProps) {
             "This tool collects every line one anime character speaks as clean single-speaker audio with its text, ready for training a voice model.",
           )}
         </p>
-        <ol className="mt-2.5 flex list-decimal flex-col gap-1 pl-5 text-muted-foreground">
-          <li>
-            {tr(
-              "加一集：给出视频和对白字幕。机器按字幕切台词，再把人声和音乐分开。",
-              "Add an episode: give its video and dialogue subtitles. The machine cuts the lines along the subtitles and separates the voices from the music.",
-            )}
-          </li>
-          <li>
-            {tr(
-              "在「起步分组」里给你要的角色起名，其他人都标「其他」。",
-              'In Groups, name the character you want, and label everyone else "Other".',
-            )}
-          </li>
-          <li>
-            {tr(
-              "在「场景」和「角色」里改机器猜错的。每改一次，机器马上重学。",
-              "In Scenes and Characters, fix the machine's wrong guesses. It retrains after every fix.",
-            )}
-          </li>
-          <li>
-            {tr(
-              "在「导出」里导出成 GPT-SoVITS、Style-Bert-VITS2 或 RVC 用的格式。",
-              "In Export, export for GPT-SoVITS, Style-Bert-VITS2 or RVC.",
-            )}
-          </li>
-        </ol>
+        {/* How to label is told once, in the getting-started guide, which opens by itself after this. */}
+        <p className="mt-1.5 text-muted-foreground">
+          {tr(
+            "先加一集：给出视频和对白字幕。加好以后，顶栏的「指南」讲怎么一步步标到导出，第一次会自己打开。",
+            "First add an episode: give its video and dialogue subtitles. Once it is in, Guide in the top bar shows how to go from labeling to export; it opens by itself the first time.",
+          )}
+        </p>
       </div>
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-semibold">{tr("这台机器", "This machine")}</h3>
