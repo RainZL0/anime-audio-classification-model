@@ -19,7 +19,7 @@
 
 ## Why
 
-To train a voice model of one character (GPT-SoVITS, Style-Bert-VITS2, RVC), you need minutes of that character speaking alone, each clip with its line. Doing it by hand means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
+To train a voice model of one character (GPT-SoVITS, Style-Bert-VITS2, RVC), you need minutes or hours of that character speaking alone, each clip with its line. Doing it by hand means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
 
 Here you label a few clips while watching the scene. A small model learns your character, sorts the rest, and **retrains in a few seconds every time you correct it**, so its other guesses update right away.
 
