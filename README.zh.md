@@ -1,15 +1,17 @@
 <div align="center">
 
+<img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" width="96" alt="">
+
 # anime-voice-collector
 
 [English](README.md) · **简体中文**
 
-**从整集动画里收集一个角色的声音：只有这个角色在说话的干净片段，每段都带着这句说的原话。可以直接拿去训练 GPT-SoVITS 或 RVC。**
+**把整集动画变成一个角色的干净语音数据集，可以直接训练 GPT-SoVITS 或 RVC。<br>你标出这个角色的 10 句台词，它就开始帮你分剩下的。**
 
 [![CI](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white)](#支持的平台)
+[![平台：Windows · Linux/macOS 未测试](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20%C2%B7%20Linux%2FmacOS%20%E6%9C%AA%E6%B5%8B%E8%AF%95-0078D6.svg)](#支持的平台)
 
 [安装](#安装) · [加第一集](#加第一集) · [怎么标注](#怎么标注) · [得到什么](#得到什么) · [常见问题](#常见问题) · [文档（英文）](docs/index.md)
 
@@ -19,9 +21,19 @@
 
 ## 为什么做这个
 
+<p align="center"><img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="一集里的台词排在时间轴上，按是谁说的分进 Mio、Rin 和「其他」三个文件夹"></p>
+
 想训练某个角色的声音模型，需要这个角色单独说话的几分钟音频，每段还要配上台词。手工做就得把每一集从头拖到尾。多数工具只做到说话人分离（按声音像谁把台词分成几组），给每组起名字、逐条检查还是要你自己来。
 
 在这里，你一边看画面一边标几句。一个小模型学会你的角色，把剩下的分好类，而且**每次你纠正它，几秒内就重新训练**，其他的猜测马上跟着变好。你只需要检查它的结果，不用全部自己做。
+
+| | 手工 | 按声音分组（说话人分离，比如 pyannote） | anime-voice-collector |
+| --- | --- | --- | --- |
+| 这句是哪个角色？ | 每句都由你判断 | 只给出「说话人 3」，每集都要你自己对应到角色 | 你标几句，剩下的它来认 |
+| 它弄错的时候 | 要你再过一遍才发现 | 你手动改，它学不到什么 | 你一改，它就重新训练，其他猜测跟着变好 |
+| 音乐和音效 | 要另外去掉 | 要另外去掉 | 已经去掉 |
+| 每句的原话 | 你自己打字或对齐 | 没有 | 从字幕里取，用原声语言 |
+| 能直接训练 GPT-SoVITS 或 RVC | 还要再整理 | 还要再整理 | 能，导出一次即可 |
 
 ## 功能
 
@@ -127,11 +139,11 @@ exports/2026-10-24/
 
 ## 使用规则
 
-代码以 [MIT 许可证](LICENSE)发布。用它提取出的音频和文字属于原作品的权利人，不在 MIT 许可证的范围内。使用本工具即表示你同意：
+代码以 [MIT 许可证](LICENSE)发布。用它提取出的音频和文字属于原作品的权利人，不在 MIT 许可证的范围内。请在下面的规则内使用本工具：
 
-- 提取的素材只用于个人研究或学习；
-- 不把提取的音频、文字或用它们训练的模型用于任何商业用途；
-- 不用提取的声音冒充角色或声优。
+- ✅ 提取的素材用于个人研究或学习。
+- ❌ 不把提取的音频、文字或用它们训练的模型用于任何商业用途。
+- ❌ 不用提取的声音冒充角色或声优。
 
 本节如与英文版有出入，以英文版为准。
 

@@ -1,15 +1,17 @@
 <div align="center">
 
+<img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" width="96" alt="">
+
 # anime-voice-collector
 
 **English** · [简体中文](README.zh.md)
 
-**Collect one anime character's voice from whole episodes: clean clips of only them speaking, each with the words they said. Ready to train GPT-SoVITS or RVC.**
+**Turn anime episodes into a clean voice dataset of one character, ready for GPT-SoVITS or RVC.<br>Label 10 of their lines, and it starts sorting the rest for you.**
 
 [![CI](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white)](#platforms)
+[![Platform: Windows · Linux/macOS untested](https://img.shields.io/badge/platform-Windows%20%C2%B7%20Linux%2FmacOS%20untested-0078D6.svg)](#platforms)
 
 [Install](#install) · [Your first episode](#your-first-episode) · [Labeling](#labeling) · [What you get](#what-you-get) · [Questions](#questions) · [Docs](docs/index.md)
 
@@ -19,9 +21,19 @@
 
 ## Why
 
+<p align="center"><img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="Lines from an episode on a timeline, each sorted into a folder by who said it: Mio, Rin or Other"></p>
+
 To train a voice model of one character, you need minutes of that character speaking alone, each clip with its line. By hand, that means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
 
 Here you label a few lines while watching the scene. A small model learns your character, sorts the rest, and **retrains in a few seconds every time you correct it**, so its other guesses improve right away. You check its work instead of doing all of it.
+
+| | By hand | Grouping by voice (speaker diarization, such as pyannote) | anime-voice-collector |
+| --- | --- | --- | --- |
+| Which character is it? | You decide every line | You get "speaker 3" and match it to a character yourself, every episode | You label a few lines; it names the rest |
+| When it is wrong | You find it on a second pass | You fix it by hand, and it learns nothing | Your fix retrains it, and its other guesses improve |
+| Music and sound effects | You remove them separately | You remove them separately | Removed |
+| The words of each line | You type or match them | Not included | Taken from the subtitles, in the language spoken |
+| Ready to train GPT-SoVITS or RVC | After more work | After more work | Yes, one export |
 
 ## Features
 
@@ -127,11 +139,11 @@ How it works, the words it uses, and what was tried and ruled out are in [docs/i
 
 ## Usage rules
 
-The code is released under the [MIT License](LICENSE). The audio and text you extract with it belong to the rights holders of the original work. The MIT License does not cover them. By using this tool you agree:
+The code is released under the [MIT License](LICENSE). The audio and text you extract with it belong to the rights holders of the original work, and the MIT License does not cover them. Please use this tool only within these rules:
 
-- to use extracted material only for personal research or study;
-- not to use extracted audio or text, or models trained on them, for any commercial purpose;
-- not to use extracted voices to impersonate a character or voice actor.
+- ✅ Use extracted material for personal research or study.
+- ❌ Do not use extracted audio or text, or models trained on them, for any commercial purpose.
+- ❌ Do not use extracted voices to pass yourself off as a character or voice actor.
 
 ## Acknowledgements
 
