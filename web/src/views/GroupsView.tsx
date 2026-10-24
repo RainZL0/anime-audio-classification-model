@@ -233,7 +233,7 @@ export function GroupsView({
                   <div
                     key={c.id}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[16px_1fr_auto_auto] items-center gap-2 rounded-md border border-transparent px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
+                      "grid cursor-pointer grid-cols-[28px_1fr_auto_auto] items-center gap-2 rounded-md border border-transparent px-1.5 py-[3px] text-[13px] hover:bg-muted/60",
                       c.id === focus && SELECTED_ROW,
                     )}
                     onClick={() => setFocus(c.id)}
@@ -241,22 +241,19 @@ export function GroupsView({
                     {c.label ? (
                       <span></span>
                     ) : (
-                      <Tip
-                        text={withKeys(
-                          tr(
-                            "勾上，下面的按钮就标这一句；按住 [Shift] 点，勾上中间的几句",
-                            "Tick it for the buttons below to label it; [Shift]+click ticks the lines in between",
-                          ),
-                        )}
+                      /* The tick box only selects; the rest of the row plays the line. The whole left end
+                         of the row, top to bottom, counts as the box, so it is easy to hit. */
+                      <span
+                        className="-my-[3px] -ml-1.5 flex cursor-pointer items-center justify-center self-stretch pl-1.5"
+                        onClick={(e) => tick(c, e)}
+                        onMouseDown={(e) => e.preventDefault()}
                       >
-                        {/* The tick box only selects; the rest of the row plays the line. */}
                         <Checkbox
                           aria-label={c.text}
                           checked={ticked.has(c.id)}
-                          onClick={(e) => tick(c, e)}
-                          onMouseDown={(e) => e.preventDefault()}
+                          className="pointer-events-none"
                         />
-                      </Tip>
+                      </span>
                     )}
                     <span
                       className={cn(
