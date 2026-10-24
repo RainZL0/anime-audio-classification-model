@@ -168,8 +168,8 @@ export function GroupsView({
                         "One line can't make a group: a group needs at least two lines that sound like the same person",
                       )
                     : tr(
-                        "它们分不成组：彼此听起来不像，或者太短没有声纹",
-                        "They can't be grouped: they don't sound alike, or are too short for a voiceprint",
+                        "它们分不成组：彼此听起来不像，或者特征不够",
+                        "They can't be grouped: they don't sound alike, or have too little voice to tell",
                       )}
                 </div>
               </li>

@@ -21,7 +21,7 @@ This page explains how things work. For how to type the commands, see [USAGE.md]
 | Distance | The cosine distance between two voiceprints. 0 means the same direction exactly. A larger number means less alike. It is not "the chance that these are the same person". |
 | Distance threshold | In the Groups view, two groups merge only if their distance is smaller than this value. |
 | Average linkage | A merge rule for hierarchical clustering: two groups merge only if the average distance between all their clips is within the threshold. |
-| Too short for a voiceprint | A clip shorter than 0.5 seconds. It stays in the clip table, but it has no voiceprint, so the machine makes no guess for it. |
+| Too little voice | A clip shorter than 0.5 seconds. It stays in the clip table, but it is too short for a voiceprint, so the machine makes no guess for it and a person picks the character. |
 | Skipped line | A clip shorter than 1 second with no other line within 0.5 seconds before or after it. It is hidden in Scenes by default and is not work to do. A short clip with other lines close by is not skipped. |
 | Target character | A character the user wants to collect. Only target characters get names. Everyone else is labeled "Other". |
 | Small classifier | A logistic regression trained on the manual labels, with voiceprints as input. There is one per target character. Its output is the probability that a clip is that target. |
@@ -73,7 +73,7 @@ The probability of "Other" is recorded as 1 minus the probability of the top tar
 
 The small classifier only picks among the characters it already knows, so the second condition is required.
 
-**Starting groups.** Only clips still to do are grouped: not labeled yet, not skipped, with a voiceprint, and without a guess the machine is confident about. These are the lines "Only to do" lists in Scenes, apart from those too short for a voiceprint. They are grouped with `anime-va`, average linkage and a threshold of 0.70. A person then names each whole group.
+**Starting groups.** Only clips still to do are grouped: not labeled yet, not skipped, with a voiceprint, and without a guess the machine is confident about. These are the lines "Only to do" lists in Scenes, apart from those with too little voice. They are grouped with `anime-va`, average linkage and a threshold of 0.70. A person then names each whole group.
 
 **Text of a line.** A subtitle line counts as the text of a clip when their times overlap by at least half of the shorter of the two. Two clips that are more than 3 seconds apart start a new scene.
 

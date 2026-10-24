@@ -72,8 +72,8 @@ export function TopBar(p: TopBarProps) {
   const workHint =
     p.work > 0
       ? tr(
-          `。${p.episode} 还有 ${p.work} 句要你处理：机器没把握、太短没有声纹，或还没有猜测。「只看要处理的」列的就是这些`,
-          `. ${lines(p.work)} in ${p.episode} still to do: the machine isn't sure, too short for a voiceprint, or no guess yet. "Only to do" lists them`,
+          `。${p.episode} 还有 ${p.work} 句要你处理：机器没把握、特征不够认不出，或还没有猜测。「只看要处理的」列的就是这些`,
+          `. ${lines(p.work)} in ${p.episode} still to do: the machine isn't sure, too little voice to tell, or no guess yet. "Only to do" lists them`,
         )
       : "";
   const tabs = (list: [View, string, string][]) =>

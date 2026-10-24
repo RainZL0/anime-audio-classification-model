@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { media, mediaProblem, type Clip, type Roles } from "../api";
-import { lowTip, OTHER, type LabelText } from "../clips";
+import { lowTip, novoiceTip, OTHER, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
 import { tr } from "../language";
 import { needsText } from "../purpose";
@@ -404,14 +404,20 @@ export function Stage({
       ) : (
         <>
           <div className={ASK}>
-            {clip.guess.length
-              ? tr("这是谁？机器的猜测", "Who is this? The machine's guesses")
-              : clip.voiced
-                ? tr("这是谁？", "Who is this?")
-                : tr(
-                    "太短，没有声纹，请直接选人",
-                    "Too short for a voiceprint. Pick the character yourself",
+            {clip.guess.length ? (
+              tr("这是谁？机器的猜测", "Who is this? The machine's guesses")
+            ) : clip.voiced ? (
+              tr("这是谁？", "Who is this?")
+            ) : (
+              <Tip text={novoiceTip()}>
+                <span>
+                  {tr(
+                    "这句的特征不够，机器认不出是谁，请直接选人",
+                    "This line has too little voice for the machine to tell who it is. Pick the character yourself",
                   )}
+                </span>
+              </Tip>
+            )}
           </div>
           {clip.familiar === false && (
             <div className={cn(STRANGER, "bg-warning/15 text-warning")}>
