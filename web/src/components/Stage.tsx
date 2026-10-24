@@ -17,7 +17,8 @@ import { Tag } from "./Pills";
 import { RoleName } from "./RoleName";
 import { Tip } from "./Tip";
 
-const STAGE = "overflow-y-auto bg-background p-4";
+/* @container: parts inside can follow the stage's own width, which the divider changes. */
+const STAGE = "@container overflow-y-auto bg-background p-4";
 /* The picture's frame is always dark, in both themes. */
 const SCREEN = "relative aspect-video overflow-hidden rounded-lg bg-neutral-950";
 /* A message or the spinner in the middle of the screen. */
@@ -446,14 +447,14 @@ export function Stage({
                   <div
                     key={g.name}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-lg border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary/40",
+                      "grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-lg border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary/40",
                       i === 0 && "border-primary/40 bg-accent",
                     )}
                     onClick={() => onAssign(g.name)}
                   >
                     {/* The avatar takes two rows. The probability bar has its own row, running from under the
                         name to the far right, so it does not compete with the buttons for width. */}
-                    <div className="row-span-2">
+                    <div className="row-span-2 @max-sm:row-span-3">
                       <Avatar
                         role={roles[g.name]}
                         name={g.name}
@@ -461,56 +462,58 @@ export function Stage({
                         size="md"
                       />
                     </div>
-                    <div className="font-[560]">
+                    <div className="truncate font-[560]">
                       {g.name === OTHER ? (
                         labelText[OTHER]
                       ) : (
                         <RoleName role={roles[g.name]} name={g.name} />
                       )}
                     </div>
+                    {/* When the stage is narrow, the two buttons move to a line of their own under the
+                        name, so the name keeps its room and the row never gets wider than the stage. */}
                     {g.name !== OTHER && (
-                      <Tip
-                        text={tr(
-                          "听这个角色确认过的一句",
-                          "Hear a confirmed line of this character",
-                        )}
-                      >
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onPlayRef(g.name);
-                          }}
-                        >
-                          {tr("参考音", "Reference")}
-                          {i === 0 ? (
-                            <>
-                              {" "}
-                              <Kbd>R</Kbd>
-                            </>
-                          ) : (
-                            ""
+                      <div className="flex justify-end gap-1.5 @max-sm:col-[2/-1] @max-sm:row-start-2 @max-sm:justify-start">
+                        <Tip
+                          text={tr(
+                            "听这个角色确认过的一句",
+                            "Hear a confirmed line of this character",
                           )}
-                        </Button>
-                      </Tip>
-                    )}
-                    {g.name !== OTHER && (
-                      <LowButton
-                        hotkey={k ?? undefined}
-                        tip={
-                          tr(`标成 ${g.name}·质量低：`, `Label as ${g.name}, low quality: `) +
-                          lowTip()
-                        }
-                        onClick={() => onAssign(g.name, true)}
-                      />
+                        >
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPlayRef(g.name);
+                            }}
+                          >
+                            {tr("参考音", "Reference")}
+                            {i === 0 ? (
+                              <>
+                                {" "}
+                                <Kbd>R</Kbd>
+                              </>
+                            ) : (
+                              ""
+                            )}
+                          </Button>
+                        </Tip>
+                        <LowButton
+                          hotkey={k ?? undefined}
+                          tip={
+                            tr(`标成 ${g.name}·质量低：`, `Label as ${g.name}, low quality: `) +
+                            lowTip()
+                          }
+                          onClick={() => onAssign(g.name, true)}
+                        />
+                      </div>
                     )}
                     {/* The percentage is fixed in the last column. "Other" rows, which have no button, are also
                         pushed right, so the rows line up. */}
                     <span className="col-start-[-2] min-w-[34px] text-right text-xs text-muted-foreground tabular-nums">
                       {pct(g.p)}
                     </span>
-                    <div className="col-[2/-1] h-1 overflow-hidden rounded-xs bg-border">
+                    <div className="col-[2/-1] h-1 overflow-hidden rounded-xs bg-border @max-sm:row-start-3">
                       <i className="block h-full bg-primary" style={{ width: pct(g.p) }}></i>
                     </div>
                   </div>

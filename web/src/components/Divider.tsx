@@ -62,8 +62,8 @@ export function Divider({ width, setWidth }: { width: number; setWidth: (width: 
       >
         <div
           className={cn(
-            "h-full w-px bg-border transition-colors group-hover:w-[3px] group-hover:bg-primary",
-            dragging && "w-[3px] bg-primary",
+            "h-full w-px bg-border transition-colors group-hover:w-[3px] group-hover:bg-ring",
+            dragging && "w-[3px] bg-ring",
           )}
         />
       </div>

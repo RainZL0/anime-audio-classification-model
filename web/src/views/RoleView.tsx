@@ -42,7 +42,7 @@ function Counts({ info }: { info: RoleCounts }) {
 
 /* One row of the character list on the left. */
 const ITEM =
-  "grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-[9px] rounded-lg border border-transparent px-2 py-1.5 hover:bg-muted/60";
+  "grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-lg border border-transparent px-2 py-1.5 hover:bg-muted/60";
 const ITEM_ON = "border-primary/40 bg-accent hover:bg-accent";
 
 /* A short gray heading above a part of the list. */
@@ -108,11 +108,13 @@ export function RoleView({
       {...extra}
     />
   );
+  /* The list on the left is as wide as its longest row, up to 230px. When the list side of the page is narrow
+     (the divider can make it so), the list goes on top as a row of characters instead. */
   return (
-    <div className="grid grid-cols-[230px_1fr] gap-[18px] pt-2.5">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-[18px] pt-2.5 @max-xl:grid-cols-1">
       {/* Characters that are not targets are listed under the target characters, with a lighter name. "Other"
           goes at the very bottom, with a divider line above it. */}
-      <div className="sticky top-2 flex max-h-[calc(100vh-170px)] flex-col gap-0.5 self-start overflow-y-auto">
+      <div className="sticky top-2 flex max-h-[calc(100vh-170px)] w-max max-w-[230px] min-w-40 flex-col gap-0.5 self-start overflow-y-auto @max-xl:static @max-xl:max-h-none @max-xl:w-auto @max-xl:max-w-none @max-xl:flex-row @max-xl:flex-wrap">
         {list.map((r) => (
           <Tip
             key={r.name}
@@ -136,7 +138,7 @@ export function RoleView({
             </div>
           </Tip>
         ))}
-        <Separator className="my-1" />
+        <Separator className="my-1 @max-xl:hidden" />
         <Tip text={tr("不是任何一个目标角色", "Not any of the target characters")}>
           <div className={cn(ITEM, other && ITEM_ON)} onClick={() => setRole(OTHER)}>
             <Avatar blank={true} size="md" />
@@ -157,7 +159,7 @@ export function RoleView({
           </Empty>
         ) : (
           <>
-            <div className="flex items-center gap-3.5 pt-1.5 pb-3">
+            <div className="flex flex-wrap items-center gap-3.5 pt-1.5 pb-3">
               {other ? (
                 <Avatar blank={true} size="xl" />
               ) : (
@@ -179,7 +181,7 @@ export function RoleView({
                   }
                 />
               )}
-              <div>
+              <div className="min-w-48 flex-1">
                 <h2 className="text-xl font-semibold">
                   {other ? name : <RoleName role={current as Role} name={role} />}
                 </h2>
@@ -242,9 +244,10 @@ export function RoleView({
                 )}
               </div>
             </div>
+            {/* The button goes under the text when there is not room for both side by side. */}
             {pending.length > 0 && (
-              <div className="my-3 flex items-center gap-3.5 rounded-xl border bg-muted/50 px-4 py-3.5">
-                <div className="flex-1">
+              <div className="my-3 flex flex-wrap items-center gap-3.5 rounded-xl border bg-muted/50 px-4 py-3.5">
+                <div className="min-w-0 flex-[1_1_16rem]">
                   <h3 className="mb-1 text-sm font-semibold">
                     {tr(
                       `机器把这 ${pending.length} 句归给了${other ? "「其他」" : ` ${role}`}`,

@@ -1084,7 +1084,7 @@ export function App() {
           />
         )}
         {showStage && <Divider width={fitStage(stageWidth)} setWidth={setStageWidth} />}
-        <main className="min-h-0 scroll-pt-20 overflow-y-auto px-5 pt-2 pb-10">
+        <main className="@container min-h-0 scroll-pt-20 overflow-y-auto px-5 pt-2 pb-10">
           {view === "scene" && (
             <SceneView
               clips={clips}
