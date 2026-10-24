@@ -331,7 +331,8 @@ export function AddEpisode({
   /* "" lets the audio track's tag decide. */
   const [spoken, setSpoken] = useState("");
   const tracks = useAnswer<AudioTracks>("/api/audio-tracks", video);
-  const heard = spoken || tracks?.language || "ja";
+  const automatic = tracks?.language || "ja";
+  const heard = spoken || automatic;
   const [busy, setBusy] = useState(false);
   /* The server's answer, and the text of the box it answers. */
   const [answer, setAnswer] = useState<{ for: string; found: Found } | null>(null);
@@ -598,22 +599,20 @@ export function AddEpisode({
             ))}
         </Section>
         <Section title={tr("角色说哪种语言", "Language the characters speak")}>
+          {/* Each language once. The one the audio track gives (Japanese when it has no tag) is marked, and
+              picking it again goes back to letting the track decide. */}
           <NativeSelect
             className="max-w-fit"
-            value={spoken}
-            onChange={(e) => setSpoken(e.target.value)}
+            value={heard}
+            onChange={(e) => setSpoken(e.target.value === automatic ? "" : e.target.value)}
           >
-            <NativeSelectOption value="">
-              {tracks?.language
-                ? tr(
-                    `${languageName(tracks.language)}（音轨上标的）`,
-                    `${languageName(tracks.language)} (as the audio track says)`,
-                  )
-                : tr("日语（音轨没标语言时默认）", "Japanese (when the audio track doesn't say)")}
-            </NativeSelectOption>
-            {SPOKEN.map((code) => (
+            {[...new Set([automatic, ...SPOKEN])].map((code) => (
               <NativeSelectOption key={code} value={code}>
                 {languageName(code)}
+                {code === automatic &&
+                  (tracks?.language
+                    ? tr("（音轨上标的）", " (as the audio track says)")
+                    : tr("（音轨没标语言时默认）", " (when the audio track doesn't say)"))}
               </NativeSelectOption>
             ))}
           </NativeSelect>
