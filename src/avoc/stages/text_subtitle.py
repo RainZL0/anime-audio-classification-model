@@ -1,17 +1,11 @@
-"""Give each clip its text in the language spoken. Clips are still cut by the subtitles they were
-cut with, but the text comes from lines in the spoken language: from the main subtitles when
-they are in it (bilingual ones included), otherwise from separately supplied text subtitles.
-
-The usual case: Chinese subtitles are used to cut the clips, and Japanese subtitles supply the text,
-because training a Japanese model needs the original Japanese. The two subtitle files have
-different line breaks and times. So first measure how many seconds the separate subtitles must be
-shifted to line up with the audio. Then find the dialogue for each clip, one clip at a time. A clip
-whose dialogue cannot be found in full is not exported, and the reason is recorded.
+"""Give each clip its text in the language spoken, from the main subtitles it was cut from. When
+they are in that language alone, each clip is one person's part of an entry (see `turn_lines`), and
+its text is that part. Bilingual ones work too: only their lines in the spoken language are used,
+matched to each clip by time, and a clip whose line cannot be found in full is not exported, with
+the reason recorded.
 
 Several lines in one subtitle entry are often two people each saying one sentence. So the entry is
-split into lines, and its time is shared among the lines by character count. When the subtitles
-used for cutting are themselves in the spoken language, each clip is one person's part of an entry
-(see `turn_lines`), and its text is that part. Speaker names, sound
+split into lines, and its time is shared among the lines by character count. Speaker names, sound
 notes and other marks are removed by the rules in captions.py. A speaker name, where the subtitles
 give one, is used to spot other people's lines that got mixed in.
 """
@@ -32,12 +26,6 @@ at least this much. Otherwise they probably are not the subtitles for this episo
 
 In episodes 1 to 3, the four sources of Japanese subtitles scored between 0.67 and 0.78 against the
 Chinese subtitles. A wrong match to the next episode scored only about 0.50."""
-
-MIN_MATCHED = 0.95
-"""After matching, at least this share of clips must touch some dialogue. In episodes 1 to 3 it was
-99% or more. A wrong match to the next episode still got 83% to 88%, because where dialogue is
-dense, even a shifted match touches a few lines. So this check only catches obvious errors. The
-overlap score does most of the work."""
 
 TOUCH = 0.1
 """A line counts as touching a clip only if they overlap by more than this many seconds."""
@@ -166,25 +154,6 @@ def turn_lines(path: Path, styles: list[str] | None = None) -> list[TextLine]:
 
 def shifted(lines: list[TextLine], offset: float) -> list[TextLine]:
     return [TextLine(x.start + offset, x.end + offset, x.text, x.speaker) for x in lines]
-
-
-def measure_offset(
-    lines: list[TextLine], cut_lines: list[tuple[float, float]]
-) -> tuple[float, float]:
-    """How many seconds the separate subtitles must be shifted to line up with the audio. Returns
-    (offset, overlap score).
-
-    `cut_lines` are the lines of the main subtitles, already converted to audio-track
-    time. Both subtitle files carry the same dialogue, with roughly the same display times. So they
-    are compared with each other, using the same method that `find_offset` uses to compare
-    subtitles with speech detection.
-    """
-    from avoc.stages.subtitle import find_offset
-
-    if not lines or not cut_lines:
-        return 0.0, 0.0
-    duration = max(max(x.end for x in lines), max(end for _, end in cut_lines))
-    return find_offset([(x.start, x.end) for x in lines], cut_lines, duration)
 
 
 def _shared(line: TextLine, start: float, end: float) -> float:

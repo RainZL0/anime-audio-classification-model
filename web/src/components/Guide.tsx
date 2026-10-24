@@ -110,8 +110,8 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
         "Writes a character's lines as a dataset for GPT-SoVITS or RVC.",
       ),
       when: tr(
-        "标够了以后，选角色和格式导出。GPT-SoVITS 要的台词得是视频里说的语言，这里能给每集补配字幕。",
-        "When you have enough, pick the character and the format, and export. GPT-SoVITS needs the words in the language spoken; you can attach subtitles for each episode here.",
+        "标够了以后，选角色和格式导出。GPT-SoVITS 要的台词得是视频里说的语言，取自主字幕。",
+        "When you have enough, pick the character and the format, and export. GPT-SoVITS needs the words in the language spoken, taken from the main subtitles.",
       ),
     },
   ];

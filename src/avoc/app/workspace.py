@@ -86,8 +86,7 @@ class SpokenText:
     assumed: bool
     """True when no tag or person said what is spoken, and Japanese was taken."""
     source: str | None
-    """`text` (separate text subtitles), `cut` (the main subtitles are in that language), or
-    None when there is no such text."""
+    """`cut` when the main subtitles are in that language, or None when there is no such text."""
     problem: Words | None = None
     """Why there is no text, for the person. None when there is."""
     lines: tuple[TextLine, ...] = ()
@@ -95,9 +94,8 @@ class SpokenText:
 
 
 def spoken_text(episode: dict[str, Any]) -> SpokenText:
-    """Pick the source of the spoken-language text: separate text subtitles first, as the person
-    chose them, then the main subtitles if they are in that language. A missing or unreadable
-    file is reported, not raised, so the interface still opens."""
+    """The spoken-language text comes from the main subtitles, when they are in that language. A
+    missing or unreadable file is reported, not raised, so the interface still opens."""
     from avoc.pipeline import spoken_language
     from avoc.stages.text_subtitle import load_text_lines, shifted, subtitle_languages, turn_lines
 
@@ -108,22 +106,6 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
     def failed(zh: str, en: str) -> SpokenText:
         return SpokenText(spoken, assumed, None, Words(zh, en))
 
-    attached = episode.get("text_subtitles")
-    if attached:
-        path = Path(attached)
-        if not path.is_file():
-            return failed(f"配的台词字幕不见了：{path}", f"the text subtitles are missing: {path}")
-        try:
-            lines = load_text_lines(path, spoken=spoken)
-        except ValueError as exc:
-            return failed(str(exc), str(exc))
-        if not lines:
-            return failed(
-                f"配的台词字幕里没有{language.zh}台词：{path.name}",
-                f"the text subtitles have no {language.en} lines: {path.name}",
-            )
-        offset = float(episode.get("text_subtitle_offset") or 0.0)
-        return SpokenText(spoken, assumed, "text", None, tuple(shifted(lines, offset)))
     path = Path(episode.get("subtitles") or "")
     if not path.is_file():
         return failed("没记主字幕", "no main subtitles are recorded")
@@ -140,9 +122,8 @@ def spoken_text(episode: dict[str, Any]) -> SpokenText:
     except ValueError as exc:
         return failed(str(exc), str(exc))
     return failed(
-        f"没有{language.zh}字幕：主字幕不是{language.zh}，也没另配",
-        f"no {language.en} subtitles: the main subtitles are not in {language.en}, and none "
-        "are attached",
+        f"主字幕不是{language.zh}，这一集导不出文字",
+        f"the main subtitles are not in {language.en}, so this episode has no text to export",
     )
 
 

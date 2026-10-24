@@ -104,7 +104,7 @@ Each clip is one line of one character: voice only, mono, at the sample rate of 
 
 ## Questions
 
-**Can I use translated subtitles?** Yes. Lines are best cut from subtitles in the spoken language, but translated or bilingual ones work. For GPT-SoVITS you then also attach subtitles in the spoken language, on the Export page.
+**Can I use translated subtitles?** Yes. Lines are best cut from subtitles in the spoken language, but translated or bilingual ones work. But an episode cut from a translation can only be exported as sound (RVC and such), not with text for GPT-SoVITS. With a translation you read, give it as the secondary subtitles.
 
 **It stopped halfway, for example out of graphics memory.** Add the same episode again. It continues where it stopped.
 

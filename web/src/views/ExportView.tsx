@@ -18,8 +18,7 @@ import type { Toast } from "../toast";
 
 /* ───────────── Export ───────────── */
 
-/* For each episode: the language spoken and where the text in that language comes from. Text subtitles can be
-   attached here; the server measures the offset and refuses ones that don't fit or are in another language. */
+/* For each episode: the language spoken, and whether its main subtitles give the text in that language. */
 function SpokenTexts({
   state,
   setState,
@@ -29,7 +28,6 @@ function SpokenTexts({
   setState: (s: Summary) => void;
   toast: Toast;
 }) {
-  const [paths, setPaths] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const send = async (episode: string, url: string, body: object, done: string) => {
     setBusy(episode);
@@ -44,15 +42,6 @@ function SpokenTexts({
       setBusy(null);
     }
   };
-  const attach = async (episode: string) => {
-    const ok = await send(
-      episode,
-      "/api/text-subtitles",
-      { episode, path: paths[episode] || "" },
-      tr(`${episode} 的台词字幕配好了`, `Text subtitles attached to ${episode}`),
-    );
-    if (ok) setPaths((p) => ({ ...p, [episode]: "" }));
-  };
   const speak = (episode: string, language: string) =>
     send(
       episode,
@@ -66,13 +55,10 @@ function SpokenTexts({
   return (
     <div className="mt-2 flex flex-col gap-1.5">
       {state.episodes.map((e) => {
-        const t = e.text_subtitles;
         const s = e.spoken;
         return (
           <div
-            /* When the page is narrow, the path box and its button go to a second line, so the text in the middle
-               is not squeezed into a thin column. */
-            className="grid grid-cols-[40px_auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-[13px] @max-5xl:grid-cols-[40px_auto_minmax(0,1fr)_auto]"
+            className="grid grid-cols-[40px_auto_minmax(0,1fr)] items-center gap-2 text-[13px]"
             key={e.name}
           >
             <span className="text-muted-foreground tabular-nums">{e.name}</span>
@@ -99,20 +85,8 @@ function SpokenTexts({
                 ))}
               </NativeSelect>
             </Tip>
-            <span className="min-w-0 @max-5xl:col-span-2">
-              {s.source === "text" && t ? (
-                <>
-                  <Tip text={t.file}>
-                    <span className="block truncate">{t.file}</span>
-                  </Tip>
-                  <span className="text-muted-foreground tabular-nums">
-                    {tr(
-                      `偏移 ${t.offset} 秒，重合 ${pct(t.agreement ?? 0)}`,
-                      `offset ${t.offset} s, ${pct(t.agreement ?? 0)} overlap`,
-                    )}
-                  </span>
-                </>
-              ) : s.source === "cut" ? (
+            <span className="min-w-0">
+              {s.source === "cut" ? (
                 <span className="text-muted-foreground tabular-nums">
                   {tr("文字取自主字幕", "text from the main subtitles")}
                 </span>
@@ -125,37 +99,7 @@ function SpokenTexts({
                   {tr(`${s.blocked} 句对不上台词`, `${lines(s.blocked)} without matching text`)}
                 </span>
               )}
-              {t?.marked && <Note warn>{t.marked}</Note>}
             </span>
-            {/* Cut from subtitles in the spoken language, each clip already has its own line: nothing to attach. */}
-            {s.source !== "cut" && (
-              <>
-                <PathInput
-                  className="@max-5xl:col-span-2 @max-5xl:col-start-2"
-                  kind="subtitles"
-                  placeholder={
-                    t
-                      ? tr("换一份：字幕文件的路径", "Replace: path to a subtitle file")
-                      : tr(
-                          `${languageName(s.language)}字幕的路径（ASS 或 SRT）`,
-                          `Path to ${languageName(s.language)} subtitles (ASS or SRT)`,
-                        )
-                  }
-                  value={paths[e.name] || ""}
-                  onChange={(path) => setPaths((p) => ({ ...p, [e.name]: path }))}
-                  toast={toast}
-                />
-                <Button
-                  variant="outline"
-                  disabled={busy !== null || !(paths[e.name] || "").trim()}
-                  onClick={() => attach(e.name)}
-                >
-                  {busy === e.name
-                    ? tr("正在对…", "Aligning…")
-                    : tr("对齐并配上", "Align and attach")}
-                </Button>
-              </>
-            )}
           </div>
         );
       })}
@@ -301,8 +245,8 @@ export function ExportView({
         <Section title={tr("台词文字", "Text of each line")}>
           <Note>
             {tr(
-              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。主字幕就是这种语言时直接用；是译文时，在下面给这一集配上原语言的字幕。找不到原话的台词不导出，原因写在导出目录的 rejected.tsv 里。",
-              "Each line needs the words the character actually said, in the language the episode speaks (usually Japanese). If the subtitles the lines were cut from are in that language, they are used; if they are a translation, attach subtitles in the original language below. Lines without their words are not exported; the reasons are in rejected.tsv in the export folder.",
+              "每句要配上角色说出口的原话，也就是这一集说的语言（一般是日语）。文字取自切台词用的主字幕，所以主字幕得是这种语言；用译文切的集只能导出声音。找不到原话的台词不导出，原因写在导出目录的 rejected.tsv 里。",
+              "Each line needs the words the character actually said, in the language the episode speaks (usually Japanese). It comes from the main subtitles the lines were cut from, so they must be in that language; an episode cut from a translation can only be exported as sound. Lines without their words are not exported; the reasons are in rejected.tsv in the export folder.",
             )}
           </Note>
           <SpokenTexts state={state} setState={setState} toast={toast} />

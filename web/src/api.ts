@@ -61,19 +61,11 @@ export interface Role extends Counts {
 /* The characters by name. A name may be missing: a label can name a character that has just been renamed. */
 export type Roles = Record<string, Role | undefined>;
 
-export interface TextSubtitleInfo {
-  file: string;
-  offset: number | null;
-  agreement: number | null;
-  marked: string | null;
-}
-
 export interface Episode {
   name: string;
   video: boolean;
   offset: number | null;
   counts: Partial<Record<Status, number>>;
-  text_subtitles: TextSubtitleInfo | null;
   spoken: Spoken;
 }
 
@@ -82,8 +74,8 @@ export interface Spoken {
   language: string;
   /* No audio track tag or person said it, so Japanese is taken. */
   assumed: boolean;
-  /* "text": separate text subtitles; "cut": the main subtitles are in that language; null: none. */
-  source: "text" | "cut" | null;
+  /* "cut": the main subtitles are in that language; null: they are not, so there is no text. */
+  source: "cut" | null;
   problem: string | null;
   /* Clips of target characters that cannot be exported with text. */
   blocked: number;

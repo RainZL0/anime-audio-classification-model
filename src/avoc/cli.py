@@ -92,13 +92,6 @@ def add(
             help="Episode name, for example ep03; if omitted, the next unused epNN is used"
         ),
     ] = None,
-    text_subs: Annotated[
-        Path | None,
-        typer.Option(
-            help="Separate text subtitles (usually the Japanese original); export takes the text "
-            "from them. Only needed when --subs is a translation"
-        ),
-    ] = None,
     display_subs: Annotated[
         Path | None,
         typer.Option(
@@ -121,8 +114,8 @@ def add(
     styles: Annotated[str | None, typer.Option(help=STYLES_HELP)] = None,
     spoken: Annotated[str | None, typer.Option(help=SPOKEN_HELP)] = None,
 ) -> None:
-    """Add one episode: cut clips, compute the voiceprints the interface needs, and attach text
-    subtitles if given. If it stops partway, run the same command again to continue."""
+    """Add one episode: cut clips, compute the voiceprints the interface needs, and attach the
+    secondary subtitles if given. If it stops partway, run the same command again to continue."""
     import os
 
     # When the interface runs this command, it asks for our own lines to be marked, so it can
@@ -142,7 +135,6 @@ def add(
             video,
             subs,
             name,
-            text_subs,
             audio,
             offset,
             device,
@@ -268,28 +260,6 @@ def set_subtitles(
         f"{result['episode']}: offset {result['offset']} seconds, "
         f"{result['matched']:.1%} of clips matched"
     )
-
-
-@app.command("set-text-subtitles")
-def set_text_subtitles(
-    episode: Path,
-    subtitles: Annotated[
-        Path,
-        typer.Argument(
-            help="Subtitles that supply the dialogue text for export, usually the Japanese original"
-        ),
-    ],
-) -> None:
-    """Add a second subtitle file to an episode. Export takes the dialogue text from it. The offset
-    is measured automatically, and the command refuses if the two do not line up."""
-    result = pipeline.attach_text_subtitles(episode, subtitles)
-    typer.echo(
-        f"{result['episode']}: offset {result['text_subtitle_offset']} seconds, "
-        f"overlap with the clip subtitles {result['text_subtitle_agreement']:.0%}, "
-        f"{result['matched']:.1%} of clips match a dialogue line"
-    )
-    if result["text_subtitle_marked"]:
-        typer.echo(marked_note(result["text_subtitle_marked"]))
 
 
 @app.command("set-display-subtitles")

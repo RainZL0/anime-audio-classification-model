@@ -284,7 +284,6 @@ class AppState:
                     "video": bool(meta.get("video")),
                     "offset": meta.get("subtitle_offset"),
                     "counts": dict(per_episode[name]),
-                    "text_subtitles": _text_subtitles(meta),
                     "spoken": self._spoken_summary(name, blocked[name]),
                 }
                 for name, meta in self.workspace.episodes.items()
@@ -542,16 +541,6 @@ class AppState:
 
     # Export
 
-    def set_text_subtitles(self, episode: str, path: Path) -> dict[str, Any]:
-        from avoc.pipeline import attach_text_subtitles
-
-        meta = self.workspace.episodes.get(episode)
-        if meta is None:
-            raise ValueError(say(f"没有 {episode} 这一集", f"there is no episode {episode}"))
-        result = attach_text_subtitles(Path(meta["directory"]), path)
-        self.reload()  # Every clip's text changes.
-        return result
-
     def set_spoken(self, episode: str, code: str) -> dict[str, Any]:
         from avoc.pipeline import set_spoken_language
 
@@ -635,10 +624,11 @@ class AppState:
             if not any(assigned.values()):
                 raise ValueError(
                     say(
-                        f"一条也没导出：没有一条片段有{problems}台词。先给这些集配上台词字幕，"
-                        "或者改成只导出音频",
-                        f"nothing was exported: no clip has {problems} text. Attach subtitles "
-                        "in that language to these episodes first, or export audio only",
+                        f"一条也没导出：没有一条片段有{problems}台词。这些集是用别的语言的字幕切的，"
+                        "只能导出音频；要文字就用这种语言的字幕重新加这几集",
+                        f"nothing was exported: no clip has {problems} text. These episodes were "
+                        "cut from subtitles in another language, so only audio can be exported; "
+                        "for text, add them again with subtitles in that language",
                     )
                 )
         vocals = {name: Path(meta["vocals"]) for name, meta in self.workspace.episodes.items()}
@@ -709,7 +699,6 @@ class ExportBody(BaseModel):
 class AddBody(BaseModel):
     video: str = ""
     subtitles: str = ""
-    text_subtitles: str = ""
     display_subtitles: str = ""
     offset: float | None = None
     styles: list[str] | None = None
@@ -735,26 +724,9 @@ class PickBody(BaseModel):
     """What the box holds now; the window opens in its folder."""
 
 
-class TextSubtitlesBody(BaseModel):
-    episode: str
-    path: str
-
-
 class SpokenBody(BaseModel):
     episode: str
     language: str
-
-
-def _text_subtitles(meta: dict[str, Any]) -> dict[str, Any] | None:
-    """An episode's separately supplied dialogue subtitles, shown in the interface."""
-    if not meta.get("text_subtitles"):
-        return None
-    return {
-        "file": Path(meta["text_subtitles"]).name,
-        "offset": meta.get("text_subtitle_offset"),
-        "agreement": meta.get("text_subtitle_agreement"),
-        "marked": marked_note(found) if (found := meta.get("text_subtitle_marked")) else None,
-    }
 
 
 def free_export_folder(root: Path) -> Path:
@@ -769,12 +741,12 @@ def free_export_folder(root: Path) -> Path:
 
 
 def _write_rejected(path: Path, rejected: list[dict[str, Any]]) -> None:
-    """Clips that did not match the text subtitles and were not exported. One per line, so they can
-    be found again in the interface."""
+    """Clips whose text in the spoken language was not found in full, so they were not exported.
+    One per line, so they can be found again in the interface."""
     rows = [
         say(
-            "角色\t集\t开始\t结束\t原因\t原字幕\t台词字幕",
-            "character\tepisode\tstart\tend\treason\tsubtitles\ttext subtitles",
+            "角色\t集\t开始\t结束\t原因\t主字幕\t找到的台词",
+            "character\tepisode\tstart\tend\treason\tmain subtitles\ttext found",
         )
     ]
     for item in rejected:
@@ -974,15 +946,6 @@ def create_app(state: AppState) -> Any:
             "from": how,
         }
 
-    @app.post("/api/text-subtitles")
-    def post_text_subtitles(body: TextSubtitlesBody) -> dict[str, Any]:
-        try:
-            with state.lock:
-                state.set_text_subtitles(body.episode, Path(body.path.strip().strip('"')))
-                return state.summary()
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from exc
-
     @app.get("/api/doctor")
     def read_doctor() -> list[dict[str, Any]]:
         from dataclasses import asdict
@@ -1019,12 +982,10 @@ def create_app(state: AppState) -> Any:
                 raise ValueError(
                     say("视频和字幕都要填", "both the video and the subtitles are needed")
                 )
-            text = clean_path(body.text_subtitles) if body.text_subtitles.strip() else None
             shown = clean_path(body.display_subtitles) if body.display_subtitles.strip() else None
             return state.adding.start(
                 clean_path(body.video),
                 clean_path(body.subtitles),
-                text,
                 body.offset,
                 styles=body.styles,
                 spoken=body.spoken or None,

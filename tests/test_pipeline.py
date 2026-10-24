@@ -229,40 +229,6 @@ def test_add_names_the_next_episode_and_resumes_after_a_failure(
         pipeline.add_episode(workspace, other, subtitles, name="ep04", device="cpu")
 
 
-def test_text_subtitles_are_kept_for_a_run_that_carries_on(
-    tmp_path: Path, monkeypatch: Any
-) -> None:
-    """A run stopped before the text subtitles were attached still attaches them when it carries
-    on, even if --text-subs is not given again (as the interface's Carry on does)."""
-    workspace = tmp_path / "ws"
-    (workspace / "episodes").mkdir(parents=True)
-    video, subtitles, japanese = tmp_path / "a.mp4", tmp_path / "a.srt", tmp_path / "a.ja.srt"
-    video.write_bytes(b"video")
-    subtitles.write_text("1\n00:00:01,000 --> 00:00:03,000\nHi\n", encoding="utf-8")
-    japanese.write_text("1\n00:00:01,000 --> 00:00:03,000\nこんにちは\n", encoding="utf-8")
-    monkeypatch.setattr(pipeline, "prepare", _fake_prepare([]))
-    attached: list[Path] = []
-    monkeypatch.setattr(
-        pipeline,
-        "attach_text_subtitles",
-        lambda out, path: attached.append(path) or {"text_subtitle_offset": 0.0, "matched": 1.0},
-    )
-    stopped = []
-
-    def stop_once(directory: Path, model: str, device: str) -> None:
-        if not stopped:
-            stopped.append(model)
-            raise KeyboardInterrupt
-
-    monkeypatch.setattr(pipeline, "embed", stop_once)
-    with pytest.raises(KeyboardInterrupt):
-        pipeline.add_episode(workspace, video, subtitles, text_subtitles=japanese, device="cpu")
-    pipeline.add_episode(workspace, video, subtitles, device="cpu")
-    assert attached == [japanese.resolve()]
-    meta = read_json(workspace / "episodes" / "ep01" / "episode.json")
-    assert "pending_text_subtitles" not in meta
-
-
 def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -> None:
     def broken(video: Path, subtitles: Path, out: Path, *args: Any) -> Any:
         out.mkdir(parents=True)
@@ -282,7 +248,15 @@ def test_add_removes_a_half_prepared_episode(tmp_path: Path, monkeypatch: Any) -
 def test_cli_has_one_route() -> None:
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
-    for command in ("doctor", "add", "prepare", "embed", "set-text-subtitles", "app"):
+    for command in ("doctor", "add", "prepare", "embed", "set-display-subtitles", "app"):
         assert command in result.stdout
-    for old in ("group", "evaluate", "drift", "extend", "label-plan", "import-labels"):
+    for old in (
+        "group",
+        "evaluate",
+        "drift",
+        "extend",
+        "label-plan",
+        "import-labels",
+        "set-text-subtitles",
+    ):
         assert old not in result.stdout

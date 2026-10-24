@@ -651,14 +651,8 @@ export function AddEpisode({
         "切片段这一步没做完，没有留下什么。在下面「没做完的集」里点「接着做」，会从头切。",
         "Cutting the clips was not finished, so nothing is kept. Pressing Carry on under Unfinished episodes cuts them again from the start.",
       );
-  /* Failing on the text subtitles, the last step, still leaves a usable episode. */
-  const usable = state.episodes.some((e) => e.name === adding?.episode);
-  const after = usable
-    ? tr(
-        "这一集已经能用了，没做成的是最后一步，原因见上面。台词字幕可以以后在导出页再配。",
-        "The episode can already be used; only the last step failed, for the reason above. Text subtitles can be attached later on the Export page.",
-      )
-    : adding?.state === "failed"
+  const after =
+    adding?.state === "failed"
       ? tr(
           `改好问题以后再试：文件没问题就点「接着做」，要换文件就在下面重填再点「开始」。${kept}`,
           `Fix the problem, then try again: if the files are right, press Carry on; to use other files, fill in the form below and press Start. ${kept}`,
@@ -789,17 +783,29 @@ export function AddEpisode({
             ]}
             onPick={onPurpose}
           />
-          <Note>
-            {text
-              ? tr(
-                  "要让角色的声音朗读文字，还得采集角色每句台词的文本，所以要有原声语言（一般是日语）的字幕。",
-                  "To have the voice read text aloud, the text of each line the character says is collected too, so subtitles in the original language (usually Japanese) are needed.",
-                )
-              : tr(
-                  "只要声音就不用管台词文字，什么语言的字幕都行。以后在导出页也能改。",
-                  "Sound only needs no text, so subtitles in any language will do. You can change this later on the Export page.",
+          {text ? (
+            <Note>
+              {tr(
+                "要让角色的声音朗读文字，还得采集角色每句台词的文本，所以主字幕要用原声语言（一般是日语）。这样收集的声音也能只导出声音给 RVC 用。",
+                "To have the voice read text aloud, the text of each line the character says is collected too, so the main subtitles must be in the original language (usually Japanese). Voices collected this way can still be exported as sound only, for RVC.",
+              )}
+            </Note>
+          ) : (
+            /* The one choice that cannot be undone later: an episode cut from subtitles in another language never has
+               the text. So it is said plainly, before anything is picked. */
+            <Note warn>
+              <b className="mb-1 block text-base">
+                {tr(
+                  "想好再选：拿不准就选「朗读文字」。",
+                  'Decide first: if unsure, choose "Read text aloud".',
                 )}
-          </Note>
+              </b>
+              {tr(
+                "只要声音的话，什么语言的主字幕都能用；但用译文字幕切的集，以后永远导不出台词文字，想换成朗读文字只能删掉重加。用原声语言的字幕切，两种用法都行。",
+                "For sound only, main subtitles in any language will do; but an episode cut from translated subtitles can never give the text later, and switching to reading text aloud means deleting it and adding it again. Cut from subtitles in the original language, it works for both.",
+              )}
+            </Note>
+          )}
         </Section>
         <Section title={tr("视频文件", "Video file")}>
           <PathInput
@@ -883,6 +889,15 @@ export function AddEpisode({
               {tr(
                 `朗读文字要用角色说的语言做主字幕：这份是${languageNames(found.languages)}，这一集说的是${languageName(heard)}。换一份${languageName(heard)}字幕填在这里；这份可以填到下面的「辅助字幕」，标注时给你看。只要声音的话，在最上面选「只要声音」。`,
                 `Reading text aloud needs main subtitles in the language spoken: these are in ${languageNames(found.languages)}, and this episode speaks ${languageName(heard)}. Put ${languageName(heard)} subtitles here; these can go under "Secondary subtitles" below, to be shown while labeling. If you only want the sound, choose "Sound only" at the top.`,
+              )}
+            </Note>
+          )}
+          {/* Allowed for sound only, but said once more for this file: there is no way to add the text later. */}
+          {!text && !!found?.languages?.length && !found.languages.includes(heard) && (
+            <Note warn>
+              {tr(
+                `这份主字幕是${languageNames(found.languages)}，这一集说的是${languageName(heard)}：用它切，这一集永远导不出台词文字。有${languageName(heard)}字幕的话，用它当主字幕，这份填到下面的「辅助字幕」。`,
+                `These main subtitles are in ${languageNames(found.languages)}, and this episode speaks ${languageName(heard)}: cut from them, this episode can never give the text. If you have ${languageName(heard)} subtitles, use them as the main subtitles and put these under "Secondary subtitles" below.`,
               )}
             </Note>
           )}

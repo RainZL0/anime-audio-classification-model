@@ -14,7 +14,6 @@ from avoc.stages.text_subtitle import (
     TextLine,
     load_text_lines,
     match,
-    measure_offset,
     own_tag,
     subtitle_languages,
     turn_lines,
@@ -75,14 +74,6 @@ def test_the_role_name_is_the_tag_most_of_her_lines_carry() -> None:
     assert own_tag([tagged("")]) is None
 
 
-def test_offset_is_measured_against_the_cutting_subtitles() -> None:
-    cut = [(1.0, 2.5), (4.0, 4.6), (7.2, 9.0)]
-    lines = [TextLine(a + 2.0, b + 2.0, "x", "") for a, b in cut]
-    offset, agreement = measure_offset(lines, cut)
-    # The timeline is rounded to 10 ms, so the edges may differ by a step or two.
-    assert offset == -2.0 and agreement > 0.99
-
-
 JA = [
     (0.0, 0.9, "（テイオー）ボクだよ"),
     (1.0, 1.9, "（テイオー）いくよ"),
@@ -120,9 +111,7 @@ def _texts(listing: Path) -> list[str]:
     return [line.rsplit("|", 1)[1] for line in listing.read_text("utf-8").split("\n")[:-1]]
 
 
-def test_export_takes_text_from_the_attached_subtitles_and_reports_the_rest(
-    tmp_path: Path,
-) -> None:
+def test_an_episode_cut_from_a_translation_exports_sound_only(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     state = AppState(root, ("redimnet2-b6",), grouping="redimnet2-b6")
     client = TestClient(create_app(state))
@@ -130,54 +119,22 @@ def test_export_takes_text_from_the_attached_subtitles_and_reports_the_rest(
     client.post("/api/label", json={"clips": ids, "label": "A"})
     body = {"roles": ["A"], "form": "gpt-sovits"}
 
-    # The cutting subtitles are Chinese, and the episode speaks Japanese (assumed: no tag).
+    # The main subtitles are Chinese, and the episode speaks Japanese (assumed: no tag).
     spoken = client.get("/api/state").json()["episodes"][0]["spoken"]
     assert spoken["language"] == "ja" and spoken["assumed"] and spoken["source"] is None
     assert spoken["blocked"] == 6
     clip = client.get("/api/clips").json()[0]
-    assert clip["spoken"] == "" and "没有日语字幕" in clip["spoken_problem"]
-    early = client.post("/api/export", json={**body, "out": str(tmp_path / "early")})
-    assert early.status_code == 400 and "没有一条片段有日语台词" in early.json()["detail"]
-    # Audio only needs no text.
+    assert clip["spoken"] == "" and "主字幕不是日语" in clip["spoken_problem"]
+    refused = client.post("/api/export", json={**body, "out": str(tmp_path / "text")})
+    assert refused.status_code == 400 and "没有一条片段有日语台词" in refused.json()["detail"]
+    # Sound only needs no text.
     audio = client.post("/api/export", json={**body, "form": "folder", "out": str(tmp_path / "a")})
     assert audio.json()["files"] == 6
 
-    wrong = _srt(
-        tmp_path / "wrong.srt", [(20.0 + k * 0.5, 20.2 + k * 0.5, "えっと") for k in range(6)]
-    )
-    refused = client.post("/api/text-subtitles", json={"episode": "ep1", "path": str(wrong)})
-    assert refused.status_code == 400 and "不是这一集" in refused.json()["detail"]
-    chinese = _srt(tmp_path / "zh.srt", [(a, b, f"中文台词{a}") for a, b, _ in JA])
-    refused = client.post("/api/text-subtitles", json={"episode": "ep1", "path": str(chinese)})
-    assert refused.status_code == 400 and "是中文，这一集说的是日语" in refused.json()["detail"]
-
-    ja = _srt(tmp_path / "ja.srt", [(a + 2.0, b + 2.0, t) for a, b, t in JA])
-    summary = client.post("/api/text-subtitles", json={"episode": "ep1", "path": f'"{ja}"'}).json()
-    attached = summary["episodes"][0]["text_subtitles"]
-    assert attached["file"] == "ja.srt" and attached["offset"] == -2.0
-    assert attached["marked"] is None  # Every mark in it is known.
-    assert read_json(root / "episodes/ep1/episode.json")["text_subtitle_offset"] == -2.0
-    # The labeling views show the Japanese text, and which clips will not be exported.
-    assert summary["episodes"][0]["spoken"]["source"] == "text"
-    assert summary["episodes"][0]["spoken"]["blocked"] == 2
-    shown = client.get("/api/clips").json()
-    assert shown[0]["spoken"] == "ボクだよ" and shown[0]["spoken_problem"] is None
-    assert shown[4]["spoken_problem"] == "台词里有别人的话"
-
-    out = tmp_path / "out"
-    result = client.post("/api/export", json={**body, "out": str(out)}).json()
-    assert result["files"] == 4
-    assert result["rejected"] == {"台词里有别人的话": 1, "有一行台词只对上一部分": 1}
-    assert _texts(out / "train.list") == ["ボクだよ", "いくよ", "はちみー", "よし がんばる"]
-    assert (out / "train.list").read_text("utf-8").split("\n")[0].split("|")[2] == "ja"
-    report = (out / "rejected.tsv").read_text("utf-8").split("\n")
-    assert report[0].startswith("角色\t集\t开始") and len(report) == 4
-    assert "中文4" in report[1]
-
-    # Saying the episode speaks Chinese makes the attached Japanese file the wrong language.
+    # Saying the episode speaks Chinese makes the main subtitles its text.
     changed = client.post("/api/spoken-language", json={"episode": "ep1", "language": "zh"})
     spoken = changed.json()["episodes"][0]["spoken"]
-    assert spoken["language"] == "zh" and not spoken["assumed"] and spoken["source"] is None
+    assert spoken["language"] == "zh" and not spoken["assumed"] and spoken["source"] == "cut"
     bad = client.post("/api/spoken-language", json={"episode": "ep1", "language": "fr"})
     assert bad.status_code == 400
 

@@ -187,8 +187,8 @@ def test_bad_input_is_refused_before_starting(files: Path, monkeypatch: pytest.M
     job = adding(files, [])
     with pytest.raises(ValueError, match="cannot find the video"):
         job.start(files / "missing.mkv", files / "ep.ass", offset=0)
-    with pytest.raises(ValueError, match="cannot find the text subtitles"):
-        job.start(files / "good.mkv", files / "ep.ass", files / "missing.srt", offset=0)
+    with pytest.raises(ValueError, match="cannot find the secondary subtitles"):
+        job.start(files / "good.mkv", files / "ep.ass", offset=0, display_subtitles=files / "x.srt")
     with pytest.raises(ValueError, match="cannot read this subtitle file"):
         job.start(files / "good.mkv", files / "notes.ass", offset=0)
     monkeypatch.setattr("avoc.pipeline.has_hf_token", lambda: False)

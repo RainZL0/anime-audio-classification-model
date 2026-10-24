@@ -179,7 +179,6 @@ class Adding:
         self,
         video: Path,
         subtitles: Path,
-        text_subtitles: Path | None = None,
         offset: float | None = None,
         name: str | None = None,
         styles: list[str] | None = None,
@@ -207,13 +206,6 @@ class Adding:
                 raise ValueError(
                     say(f"找不到{what}文件：{path}", f"cannot find the {what}: {path}")
                 )
-        if text_subtitles is not None and not text_subtitles.is_file():
-            raise ValueError(
-                say(
-                    f"找不到台词字幕文件：{text_subtitles}",
-                    f"cannot find the text subtitles: {text_subtitles}",
-                )
-            )
         if display_subtitles is not None and not display_subtitles.is_file():
             raise ValueError(
                 say(
@@ -254,8 +246,6 @@ class Adding:
 
         command = [*self.program, "add", str(self.workspace), str(video),
                    "--subs", str(subtitles), "--name", name]  # fmt: skip
-        if text_subtitles is not None:
-            command += ["--text-subs", str(text_subtitles)]
         if display_subtitles is not None:
             command += ["--display-subs", str(display_subtitles)]
         if offset is not None:
@@ -283,7 +273,6 @@ class Adding:
             records[name] = {
                 "video": path(video),
                 "subtitles": path(subtitles),
-                "text_subtitles": path(text_subtitles),
                 "display_subtitles": path(display_subtitles),
                 "offset": offset,
                 "styles": styles,
@@ -400,8 +389,6 @@ class Adding:
             )
         if record is None:
             assert meta is not None
-            # Text subtitles not attached yet are noted in episode.json, and avoc add picks them
-            # up by itself.
             video, subtitles = Path(meta["video"]), Path(meta["subtitles"])
             return self.start(video, subtitles, offset=meta.get("subtitle_offset"), name=name)
 
@@ -411,7 +398,6 @@ class Adding:
         return self.start(
             Path(record["video"]),
             Path(record["subtitles"]),
-            path("text_subtitles"),
             # Once the clips are cut the offset is known, so no token is needed to measure it.
             meta.get("subtitle_offset") if meta else record.get("offset"),
             name,
