@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" width="96" alt="">
-
-# anime-voice-collector
+<h1><img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" height="48" align="center" alt=""> anime-voice-collector</h1>
 
 [English](README.md) · **简体中文**
 
@@ -15,13 +13,13 @@
 
 [安装](#安装) · [加第一集](#加第一集) · [怎么标注](#怎么标注) · [得到什么](#得到什么) · [常见问题](#常见问题) · [文档（英文）](docs/index.md)
 
+<img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="一集里的台词排在时间轴上，按是谁说的分进 Mio、Rin 和「其他」三个文件夹">
+
 <img src="https://github.com/user-attachments/assets/6ab51c85-c53a-444a-9fb6-24c4fe6eac7c" width="800" alt="演示：给一组台词起名当作一个角色，机器开始猜其余的台词，改掉一处猜错，检查这个角色的名单，再导出">
 
 </div>
 
 ## 为什么做这个
-
-<p align="center"><img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="一集里的台词排在时间轴上，按是谁说的分进 Mio、Rin 和「其他」三个文件夹"></p>
 
 想训练某个角色的声音模型，需要这个角色单独说话的几分钟音频，每段还要配上台词。手工做就得把每一集从头拖到尾。多数工具只做到说话人分离（按声音像谁把台词分成几组），给每组起名字、逐条检查还是要你自己来。
 

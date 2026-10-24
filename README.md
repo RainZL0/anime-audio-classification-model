@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" width="96" alt="">
-
-# anime-voice-collector
+<h1><img src="https://github.com/user-attachments/assets/4f02e810-30d3-4088-b161-a3e8287415d0" height="48" align="center" alt=""> anime-voice-collector</h1>
 
 **English** · [简体中文](README.zh.md)
 
@@ -15,13 +13,13 @@
 
 [Install](#install) · [Your first episode](#your-first-episode) · [Labeling](#labeling) · [What you get](#what-you-get) · [Questions](#questions) · [Docs](docs/index.md)
 
+<img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="Lines from an episode on a timeline, each sorted into a folder by who said it: Mio, Rin or Other">
+
 <img src="https://github.com/user-attachments/assets/6de411ae-34b0-4d17-b90a-2ac3ba3c170d" width="800" alt="Demo: name a group of lines as a character, the machine starts guessing the rest, fix a wrong guess, check the character's list, and export">
 
 </div>
 
 ## Why
-
-<p align="center"><img src="https://github.com/user-attachments/assets/cde6723f-d6dc-4597-8f5b-50cc6c84ccea" width="800" alt="Lines from an episode on a timeline, each sorted into a folder by who said it: Mio, Rin or Other"></p>
 
 To train a voice model of one character, you need minutes of that character speaking alone, each clip with its line. By hand, that means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
 
