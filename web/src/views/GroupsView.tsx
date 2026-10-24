@@ -157,6 +157,18 @@ export function GroupsView({
                     `In Scenes, press [F] for Only to do and confirm the ${lines(work)} left`,
                   ),
                 )}
+                {/* Why these lines are not here as a group. */}
+                <div className="text-xs">
+                  {work === 1
+                    ? tr(
+                        "一句成不了组：分组要至少两句听起来像同一个人",
+                        "One line can't make a group: a group needs at least two lines that sound like the same person",
+                      )
+                    : tr(
+                        "它们分不成组：彼此听起来不像，或者太短没有声纹",
+                        "They can't be grouped: they don't sound alike, or are too short for a voiceprint",
+                      )}
+                </div>
               </li>
             )}
             {progress.auto > 0 && (
