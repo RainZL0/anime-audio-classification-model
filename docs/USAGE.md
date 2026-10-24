@@ -7,7 +7,8 @@ All the commands are listed only here. For how each step works inside, see [HOW_
 | [Set up](#set-up) | Before the first run |
 | [Processing a new episode](#processing-a-new-episode) | Separate voices, cut clips, compute voiceprints |
 | [Labeling and correction interface](#labeling-and-correction-interface) | The daily main workflow: label a few lines, let the machine guess, fix its wrong guesses, export |
-| [Checks](#checks) | Checks to run before committing |
+
+The checks to run before sending a change are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Set up
 
@@ -89,7 +90,3 @@ uv run avoc set-spoken-language workspace/episodes/ep01 ja
 - `set-text-subtitles`: attaches a second subtitle file (ASS or SRT) in the spoken language to an episode. On export, the dialogue text is taken from it; for a bilingual file, only its lines in that language. The offset is measured automatically. If it does not line up with the subtitles used for cutting, or it has no lines in the spoken language, it is refused.
 - `set-display-subtitles`: attaches subtitles in a language you read to an episode cut from subtitles you don't. They are only shown while labeling. The offset is measured automatically; if it does not line up with the subtitles used for cutting, it is refused.
 - `set-spoken-language`: corrects the language an episode speaks when the audio track's tag was wrong or missing. The voices already cut stay as they are; to cut from another audio track, add the episode again with `--spoken`.
-
-## Checks
-
-The commands to run before committing are listed in [CLAUDE.md](../CLAUDE.md#checks). The type checker is [ty](https://github.com/astral-sh/ty). It is not in the project dependencies, and it is installed on this machine with `uv tool install ty`. CI pins it at version 0.0.91.

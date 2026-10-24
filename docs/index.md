@@ -22,6 +22,12 @@
 | --- | --- | --- |
 | Which approaches are settled, and which paths were ruled out | [DECISIONS.md](DECISIONS.md) | [Settled](DECISIONS.md#settled), [Ruled out](DECISIONS.md#ruled-out) |
 
+## Contributing
+
+| What you want to know | Read | Main sections |
+| --- | --- | --- |
+| How to set up, check and send a change, and how to work on the web app | [CONTRIBUTING.md](../CONTRIBUTING.md) | [Python side](../CONTRIBUTING.md#python-side), [Web app](../CONTRIBUTING.md#web-app) |
+
 ## What each doc covers
 
 One fact is written in one place only. Elsewhere, only a link.
@@ -35,10 +41,11 @@ One fact is written in one place only. Elsewhere, only a link.
 | SUBTITLES | The caption habits removed from subtitle text, the warning about unknown marks, the plain subtitle format | Reading encodings and picking styles (HOW_IT_WORKS), command options (USAGE) |
 | TOOLS | What each dependency and model is, and how it is connected | Which one is good or bad |
 | UI_DESIGN | Design rules of the web app: what looks the same, colors, when to type, layout | How to use each view (USAGE), how it works inside (HOW_IT_WORKS) |
+| CONTRIBUTING | Setting up for development, the checks, the web app workflow, rules for pictures, the README and page text | Commands for users (USAGE), which tools are used (TOOLS) |
 
 These pages are public: they hold only what every user and contributor should know. The maintainer's own progress, experiments, local paths and release plans are kept outside git.
 
-When maintaining: if the direction changes, change ROADMAP. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress CLAUDE.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
+When maintaining: if the direction changes, change ROADMAP. When it is settled, the conclusion goes into DECISIONS and the numbers are removed. An approach that is overturned is changed directly or moved into "Ruled out", and no running log is kept. When a new doc is added, add a line for it in the matching section of this page. When one kind of doc grows past 8 files, split it into its own index page. After changing docs, run `lychee --offline --no-progress AGENTS.md docs` and fix any broken links. Dropping `--offline` also checks the web links.
 
 ## How to write
 

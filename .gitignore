@@ -47,5 +47,8 @@ htmlcov/
 .DS_Store
 desktop.ini
 
+# Claude Code: the maintainer's local dev server settings
+.claude/launch.json
+
 # Personal notes: plans, labeling progress, local paths. Never committed
 private/

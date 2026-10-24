@@ -9,11 +9,10 @@ This page covers who the tool is for, the direction it takes, and what is planne
 
 ## Direction
 
-- **Input**: each episode must have both video and subtitles. If either is missing, processing is refused. The subtitles decide how to cut the clips, and the video lets the labeler identify people.
-- **Identifying people**: the voiceprint models stay as they are. A small classifier is trained on the manual labels, and it assigns clips directly to character names. The small classifier trains in a few seconds, so it can be retrained right away after every label change. Each prediction comes with a confidence. Confident predictions are accepted directly. Low-confidence ones go to "needs review". Clips that resemble nobody are marked as unknown or as a new character.
-- **Why it beats grouping**: grouping compares one clip with another clip, and both are noisy. It also relies on one global threshold, which drifts as more episodes are added. Classification compares one clip with dozens of clips of one character, and each character has its own boundary.
-- **Start**: use the existing groups (few wrong merges, but split into many small pieces) so that a person can name each whole group. A batch of clips is labeled in one go.
-- **Later**: use the order of neighboring lines, the subtitle text, and the lip movement in the picture. Once labels reach several thousand, consider fine-tuning the voiceprint model. At that point, the "do not fine-tune the models" item in [DECISIONS.md](DECISIONS.md#settled) must be changed first.
+The current approach (cut along subtitle lines, name a few lines, let a small classifier sort the rest and retrain after every correction) is settled in [DECISIONS.md](DECISIONS.md#settled). Beyond it:
+
+- Use the order of neighboring lines, the subtitle text, and the lip movement in the picture to tell people apart.
+- Once labels reach several thousand, consider fine-tuning the voiceprint model. At that point, the "do not fine-tune the models" item in [DECISIONS.md](DECISIONS.md#settled) must be changed first.
 
 ## Labeling interface
 

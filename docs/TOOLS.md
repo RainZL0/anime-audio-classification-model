@@ -34,7 +34,7 @@ The actual versions are in `pyproject.toml` and `uv.lock`. Which model was chose
 
 ## Runtime environment
 
-On Windows and Linux, torch and torchaudio are both installed as CUDA 12.8 wheels. Without an NVIDIA GPU, the same wheels run on the CPU. macOS uses the default wheels from PyPI and can only run on the CPU. The lock file makes this choice. CI also installs the CUDA wheels on Linux. The downloaded wheels are saved in the cache (`prune-cache: false`), so they do not have to be downloaded again each time. Only Windows with an RTX 4060 has been tested so far. Linux and macOS have not been tried yet.
+On Windows and Linux, torch and torchaudio are both installed as CUDA 12.8 wheels. Without an NVIDIA GPU, the same wheels run on the CPU. macOS uses the default wheels from PyPI and can only run on the CPU. The lock file makes this choice. CI also installs the CUDA wheels on Linux. The downloaded wheels are saved in the cache (`prune-cache: false`), so they do not have to be downloaded again each time. Which platforms have been tested is in [ROADMAP.md](ROADMAP.md#platforms).
 
 ## Leads for later
 

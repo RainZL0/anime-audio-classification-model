@@ -9,11 +9,11 @@ Install [uv](https://docs.astral.sh/uv/) and FFmpeg, then `uv sync --locked`. Be
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uvx ty check src
+uvx ty@0.0.91 check src
 uv run pytest -q
 ```
 
-Changing only Python needs no Node.
+The type checker is [ty](https://github.com/astral-sh/ty). It is not a project dependency, so `uvx` runs it on the fly, at the version CI uses. Changing only Python needs no Node.
 
 ## Web app
 
