@@ -91,7 +91,7 @@ export function GroupsView({
           )}
         >
           <span className="text-xs text-muted-foreground">
-            {tr(`${groups.length} 组`, many(groups.length, "group"))}
+            {tr(`还剩 ${groups.length} 组`, `${many(groups.length, "group")} left`)}
           </span>
         </Tip>
       </div>
