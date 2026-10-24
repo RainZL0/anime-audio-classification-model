@@ -9,7 +9,7 @@ import { lowTip, newTip, OTHER, type LabelText } from "../clips";
 import { Avatar } from "../components/Avatar";
 import { Chip, LowButton } from "../components/Chip";
 import { EpisodeProgress, type Progress } from "../components/EpisodeProgress";
-import { Empty, Welcome } from "../components/Notes";
+import { Empty } from "../components/Notes";
 import { Closest, Tag } from "../components/Pills";
 import { SELECTED_ROW } from "../components/Row";
 import { RoleName } from "../components/RoleName";
@@ -36,7 +36,6 @@ interface GroupsViewProps {
   onNew: (ids: string[]) => void;
   focus: string | null;
   setFocus: (id: string) => void;
-  firstRun: boolean;
   picked: Picked;
   setPicked: (next: Picked | ((p: Picked) => Picked)) => void;
   episode: string | null;
@@ -61,7 +60,6 @@ export function GroupsView({
   onNew,
   focus,
   setFocus,
-  firstRun,
   picked,
   setPicked,
   episode,
@@ -97,48 +95,6 @@ export function GroupsView({
           </span>
         </Tip>
       </div>
-      {firstRun && (
-        <Welcome
-          title={tr("第一步：给声音相近的一组起个名字", "Step one: name a group of similar voices")}
-        >
-          <p>
-            {tr(
-              "机器先把听起来像同一个人的台词放在一起。点一句听一听，勾上同一个人的台词，或者按「全选」。再在下面选是谁：是你要收集的新面孔，就按「新角色」把勾上的台词定成一个目标角色，接着可以起名字、从画面里截一张头像，都可以以后再做；不是你要的人，就按「其他」。",
-              'The machine puts lines that sound like the same person together. Click a line to hear it, then tick the lines of the same person, or press "Select all". Then pick who it is below: if it is a new face you want to collect, press "New character" to make the ticked lines a target character, then you can type a name and crop an avatar from the picture, or do both later. If it is not someone you want, press "Other".',
-            )}
-          </p>
-          <ol className="mt-1.5 list-decimal pl-[18px]">
-            <li>
-              {withKeys(
-                tr(
-                  "一组里混着几个人时，分几次勾、几次标。按住 [Shift] 点，能一下勾上中间的几句。",
-                  "When a group mixes several people, tick and label them in turns. [Shift]+click ticks all the lines in between.",
-                ),
-              )}
-            </li>
-            <li>
-              {withKeys(
-                tr(
-                  "有勾选时，[1]–[9]、[Q]、[N] 标勾上的台词；没勾选时，标正在播放的那一句。",
-                  "While lines are ticked, [1]–[9], [Q] and [N] label the ticked lines; with none ticked, they label the line playing.",
-                ),
-              )}
-            </li>
-            <li>
-              {tr(
-                "每命名一组，机器就会重新学一次，其余台词的猜测随之变准。",
-                "Each group you name retrains the machine, and its guesses for the other lines get better.",
-              )}
-            </li>
-            <li>
-              {tr(
-                "定下目标角色、再标几组「其他」以后，去「场景」视图逐句确认会快得多。",
-                'Once you have your target characters and a few groups of "Other", confirming line by line in the Scenes view goes much faster.',
-              )}
-            </li>
-          </ol>
-        </Welcome>
-      )}
       {/* Says why there is nothing to do here, then where the work goes on. Wider than usual, so each step fits on one line when there is room. */}
       {groups.length === 0 && (
         <Empty

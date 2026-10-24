@@ -37,9 +37,20 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
         "机器把听起来像同一个人的句子放成一组。",
         "The machine puts lines that sound like the same person into one group.",
       ),
-      when: tr(
-        "刚开始、什么都还没标的时候用：勾上同一个人的句子，一次给整组起名。",
-        "Use it first, while nothing is labeled: tick one person's lines and name the whole group at once.",
+      when: (
+        <>
+          {tr(
+            "找到你要的角色的一组，勾上这些句子，点「新角色」（",
+            'Find a group of the character you want, tick those lines, and press "New character" (',
+          )}
+          <Kbd>N</Kbd>
+          {tr("）；别人的按 ", "); label other people's with ")}
+          <Kbd>Q</Kbd>
+          {tr(
+            " 标「其他」。一组混着几个人时，分几次勾、几次标。这个角色标了二三十句、别人也标了一些以后，机器就开始猜了。",
+            ' ("Other"). When a group mixes several people, tick and label them in turns. Once the character has twenty or thirty lines and others have some, the machine starts guessing.',
+          )}
+        </>
       ),
     },
     {
@@ -56,7 +67,15 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
           <Kbd>Enter</Kbd>
           {tr("，不对就按数字选人，或者 ", ", otherwise pick the person with a number, or ")}
           <Kbd>Q</Kbd>
-          {tr("（其他）。", " (Other).")}
+          {tr(
+            "（其他）。背景太吵或者有人同时说话的，按 ",
+            " (Other). For loud background sound or two people at once, press ",
+          )}
+          <Kbd>Shift</Kbd>
+          {tr(
+            " + 数字标成「质量低」，不拿来训练，也不导出。",
+            " + the number to mark it low quality; it is not used for training or exported.",
+          )}
         </>
       ),
     },
@@ -71,11 +90,14 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
       when: (
         <>
           {tr(
-            "机器开始会猜以后用：听出错的改掉，剩下的按 ",
+            "机器开始猜以后：听出错的改掉，剩下的按 ",
             "Once the machine is guessing: fix the wrong ones, then press ",
           )}
           <Kbd>Shift+Enter</Kbd>
-          {tr(" 一起确认。", " to confirm the rest.")}
+          {tr(
+            " 一起确认。再看看下面「可能漏掉」的。",
+            ' to confirm the rest. Then look at "Maybe missed" below.',
+          )}
         </>
       ),
     },
@@ -88,8 +110,8 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
         "Writes a character's lines as a dataset for GPT-SoVITS, Style-Bert-VITS2 or RVC.",
       ),
       when: tr(
-        "标够了以后用。要带文字的格式，台词得是视频里说的语言，这里能给每集补配字幕。",
-        "When you have enough. Formats with text need the words in the language spoken; you can attach subtitles for each episode here.",
+        "标够了以后，选角色和格式导出。要带文字的格式，台词得是视频里说的语言，这里能给每集补配字幕。",
+        "When you have enough, pick the character and the format, and export. Formats with text need the words in the language spoken; you can attach subtitles for each episode here.",
       ),
     },
   ];
@@ -108,75 +130,22 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-2.5 text-[13px]">
-          {views.map((v) => (
-            <div className="flex flex-col gap-1 rounded-lg border px-3 py-2.5" key={v.key}>
+        {/* The four views in the order they are used, so the cards are also the steps. */}
+        <ol className="grid grid-cols-2 gap-2.5 text-[13px]">
+          {views.map((v, i) => (
+            <li className="flex flex-col gap-1 rounded-lg border px-3 py-2.5" key={v.key}>
               <div className="flex items-center gap-1.5">
-                <b className="font-semibold">{v.name}</b> <Kbd>{v.key}</Kbd>
+                <b className="font-semibold">
+                  {i + 1}. {v.name}
+                </b>{" "}
+                <Kbd>{v.key}</Kbd>
                 <Note className="ml-auto">{v.scope}</Note>
               </div>
               <div>{v.what}</div>
               <Note>{v.when}</Note>
-            </div>
+            </li>
           ))}
-        </div>
-        <div>
-          <h3 className="mb-1 text-sm font-semibold">{tr("五步上手", "Five steps")}</h3>
-          <ol className="list-decimal space-y-1 pl-5 text-[13px] text-muted-foreground">
-            <li>
-              {tr(
-                "在「起步分组」里找到你要的角色的一组，勾上这些句子，点「新角色」（",
-                'In Groups, find a group of the character you want, tick those lines, and press "New character" (',
-              )}
-              <Kbd>N</Kbd>
-              {tr(
-                "）起名。别人的句子按 ",
-                ") to name the character. Label other people's lines with ",
-              )}
-              <Kbd>Q</Kbd>
-              {tr(" 标「其他」。", ' ("Other").')}
-            </li>
-            <li>
-              {tr(
-                "先标二三十句这个角色的、再标一些别人的，机器就能开始猜了。右上角显示它学过几句。",
-                "Label twenty or thirty of the character's lines and some of other people's, and the machine starts guessing. The top right shows how many lines it has learned from.",
-              )}
-            </li>
-            <li>
-              {tr(
-                "到「场景」里一句句过。背景太吵或者有人同时说话的，按 ",
-                "Go through Scenes line by line. For lines with loud background sound or someone talking at the same time, press ",
-              )}
-              <Kbd>Shift</Kbd>
-              {tr(
-                " + 数字标成「质量低」，它们不拿来训练，也不导出。",
-                " + the number to mark them low quality; they are not used for training or exported.",
-              )}
-            </li>
-            <li>
-              {tr(
-                "到「角色」里看机器归给这个角色的句子，改掉错的，其余一起确认。再看看下面「可能漏掉」的。",
-                'In Characters, check the lines the machine gave the character, fix the wrong ones and confirm the rest. Then look at "Maybe missed" below.',
-              )}
-            </li>
-            <li>
-              {tr(
-                "到「导出」里选角色和格式，导出。",
-                "In Export, pick the character and the format, and export.",
-              )}
-            </li>
-          </ol>
-        </div>
-        <Note>
-          {tr("标错了按 ", "Made a mistake? ")}
-          <Kbd>Z</Kbd>
-          {tr(" 撤销，可以一直往回撤。按 ", " undoes, as far back as you like. ")}
-          <Kbd>?</Kbd>
-          {tr(
-            " 看全部快捷键。这份指南随时能从顶栏的「指南」再打开。",
-            " shows every shortcut. Open this guide again from Guide in the top bar.",
-          )}
-        </Note>
+        </ol>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             {tr("关掉", "Close")}

@@ -30,45 +30,46 @@ import type { Toast } from "../toast";
 const LOG =
   "m-0 max-h-[180px] overflow-y-auto rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap";
 
-/* The machine checks, the same list as `avoc doctor`. Fetched once; torch is loaded for the GPU check, so it can
-   take a few seconds. */
-export function Checks() {
+/* What `avoc doctor` finds wrong on this machine, if anything; nothing is shown while checking or when all is
+   well. Fetched once; torch is loaded for the GPU check, so it can take a few seconds. */
+function MachineProblems() {
   const [list, setList] = useState<Check[] | null>(null);
   useEffect(() => {
     call<Check[]>("/api/doctor")
       .then(setList)
       .catch(() => setList([]));
   }, []);
-  if (!list) return <Note>{tr("正在检查这台机器…", "Checking this machine…")}</Note>;
+  const problems = (list ?? []).filter((c) => !c.ok);
+  if (!problems.length) return null;
   return (
-    <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
-      {list.map((c) => (
-        <li
-          key={c.text}
-          className={cn("flex items-baseline gap-2", !c.ok && c.required && "text-destructive")}
-        >
-          <span
-            className={cn(
-              "w-3.5 flex-none font-semibold",
-              c.ok ? "text-success" : c.required ? "text-destructive" : "text-muted-foreground",
-            )}
+    <Section title={tr("这台机器", "This machine")}>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
+        {problems.map((c) => (
+          <li
+            key={c.text}
+            className={cn("flex items-baseline gap-2", c.required && "text-destructive")}
           >
-            {c.ok ? "✓" : c.required ? "✗" : "–"}
-          </span>
-          <span>
-            {c.text}
-            {!c.ok && c.fix ? (
-              <>
-                <br />
-                <span className="text-xs text-muted-foreground">{c.fix}</span>
-              </>
-            ) : (
-              ""
-            )}
-          </span>
-        </li>
-      ))}
-    </ul>
+            <span
+              className={cn(
+                "w-3.5 flex-none font-semibold",
+                c.required ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {c.required ? "✗" : "–"}
+            </span>
+            <span>
+              {c.text}
+              {c.fix && (
+                <>
+                  <br />
+                  <span className="text-muted-foreground">{c.fix}</span>
+                </>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 
@@ -513,6 +514,7 @@ export function AddEpisode({
           ))}
         </Section>
       )}
+      <MachineProblems />
       <form className="flex flex-col gap-6" onSubmit={start}>
         <Section title={tr("收集声音做什么用", "What the voices are for")}>
           <Choice<Purpose>
@@ -681,6 +683,12 @@ export function AddEpisode({
             {tr("开始", "Start")}
           </Button>
         </div>
+        <Note>
+          {tr("也可以在命令行里加：", "You can also add one in a terminal: ")}
+          <code className="font-mono break-all">
+            uv run avoc add "{state.workspace}" {tr("视频 --subs 字幕", "VIDEO --subs SUBTITLES")}
+          </code>
+        </Note>
       </form>
     </div>
   );

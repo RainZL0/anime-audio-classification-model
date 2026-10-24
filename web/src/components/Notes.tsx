@@ -43,13 +43,3 @@ export function Empty({
     </div>
   );
 }
-
-/* A first-time explanation at the top of a view. */
-export function Welcome({ title, children }: { title: ReactNode; children: ReactNode }) {
-  return (
-    <div className="my-3 rounded-xl border bg-muted/50 px-4 py-3.5 text-[13px] text-muted-foreground">
-      <h3 className="mb-1 text-sm font-semibold text-foreground">{title}</h3>
-      {children}
-    </div>
-  );
-}

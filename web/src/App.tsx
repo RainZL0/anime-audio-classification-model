@@ -163,8 +163,6 @@ export function App() {
   }
   /* The bottom bar holds only target characters; number keys follow its order. */
   const dock = dockOrder.current.filter((n) => roles[n]?.target);
-  const totalConfirmed = state ? state.roles.reduce((s, r) => s + r.confirmed, 0) : 0;
-  const firstRun = !!state && totalConfirmed === 0;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -1129,7 +1127,6 @@ export function App() {
               dock={dock}
               focus={focus}
               setFocus={pick}
-              firstRun={firstRun}
               picked={picked}
               setPicked={setPicked}
               onName={(ids, name, low) => assign(name, ids, low)}

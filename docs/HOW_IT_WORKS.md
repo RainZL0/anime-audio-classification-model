@@ -119,7 +119,7 @@ The interface's labels are stored in the workspace folder `labels/`:
 ```text
 src/avoc/
   cli.py                   command entry point (also run by `python -m avoc`)
-  doctor.py                machine checks, shown by `avoc doctor` and the welcome page
+  doctor.py                machine checks, shown by `avoc doctor`; problems also show in the "Add an episode" form
   project.py               data format for an episode and its clips, content fingerprints, cache folders
   pipeline.py              prepare and add episodes, attach video and subtitles, voiceprint cache
   audio.py                 audio tracks, voice separation, the analysis copy, the speech timeline used to measure subtitle offset
@@ -148,6 +148,6 @@ web/src/
   components/              the top and bottom bars, the stage, one line, avatars, the avatar cropper, help,
                            and small shared parts (chips, pills, hints, rows of joined buttons)
   components/ui/           shadcn/ui components, copied in by its command
-  views/                   Groups, Scenes, Characters, Export, adding an episode, welcome page
+  views/                   Groups, Scenes, Characters, Export, adding an episode, the first page of an empty workspace
 web/e2e/                   browser tests, and the script that serves a small made-up workspace for them
 ```
