@@ -57,9 +57,18 @@ test("Q labels the line Other, and Z undoes it", async ({ page }) => {
   await expect(confirmed).toHaveCount(0);
 });
 
+test("the episode menu switches episodes", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "ep01" }).click();
+  await page.getByRole("menuitemradio", { name: "ep02" }).click();
+  await expect(page).toHaveURL(/ep=ep02/);
+  await expect(page.getByRole("menu")).toBeHidden();
+});
+
 test("the add dialog opens from the episode menu and closes with Escape", async ({ page }) => {
   await open(page);
-  await page.getByRole("combobox").first().selectOption({ label: "+ Add an episode…" });
+  await page.getByRole("button", { name: "ep01" }).click();
+  await page.getByRole("menuitem", { name: "Add an episode…" }).click();
   await expect(page.getByText("Video file")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByText("Video file")).toBeHidden();

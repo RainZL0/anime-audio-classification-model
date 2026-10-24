@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { call } from "../api";
 import { tr } from "../language";
 import type { Toast } from "../toast";
+import { Tip } from "./Tip";
 
 /* What the box takes. The file window shows only files of this kind at first. */
 export type PathKind = "video" | "subtitles" | "folder";
@@ -30,16 +33,18 @@ export function PathInput({ kind, value, onChange, placeholder, toast }: PathInp
     setOpen(false);
   };
   return (
-    <span className="path-input">
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
-      <button
-        type="button"
-        disabled={open}
-        onClick={browse}
-        title={tr("打开系统的选择窗口", "Open the system's file window")}
-      >
-        {open ? tr("在选择窗口里选…", "Choose in the window…") : tr("浏览…", "Browse…")}
-      </button>
+    <span className="flex min-w-0 gap-1.5">
+      <Input
+        className="min-w-0 flex-1"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <Tip text={tr("打开系统的选择窗口", "Open the system's file window")}>
+        <Button type="button" variant="outline" disabled={open} onClick={browse}>
+          {open ? tr("在选择窗口里选…", "Choose in the window…") : tr("浏览…", "Browse…")}
+        </Button>
+      </Tip>
     </span>
   );
 }

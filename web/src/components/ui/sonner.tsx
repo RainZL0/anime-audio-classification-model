@@ -1,6 +1,3 @@
-"use client";
-
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
   CircleCheckIcon,
@@ -10,12 +7,11 @@ import {
   Loader2Icon,
 } from "lucide-react";
 
+/* Changed from shadcn's version: the page passes its own light or dark choice, instead of reading it from
+   next-themes, which is made for Next.js. */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

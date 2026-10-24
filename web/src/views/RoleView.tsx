@@ -1,8 +1,14 @@
+import { cn } from "cn";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Separator } from "@/components/ui/separator";
 import type { Clip, Counts as RoleCounts, Role, Roles, Summary } from "../api";
 import { confirmedOf, maybeListOf, OTHER, pendingOf, type LabelText } from "../clips";
 import { Avatar } from "../components/Avatar";
+import { Empty, Note } from "../components/Notes";
 import { RoleName } from "../components/RoleName";
 import { Row } from "../components/Row";
+import { Tip } from "../components/Tip";
 import { howLong } from "../format";
 import { lines, tr } from "../language";
 
@@ -12,12 +18,12 @@ import { lines, tr } from "../language";
    the total length of the confirmed lines. */
 function Counts({ info }: { info: RoleCounts }) {
   return (
-    <span className="c">
+    <span className="text-right text-[11px] text-muted-foreground tabular-nums">
       {info.confirmed}
       {info.predicted ? (
         <>
           {" "}
-          · <b>{info.predicted}</b>
+          · <b className="font-semibold text-warning">{info.predicted}</b>
         </>
       ) : (
         ""
@@ -25,14 +31,22 @@ function Counts({ info }: { info: RoleCounts }) {
       {info.seconds > 0 && (
         <>
           <br />
-          <span title={tr("确认过的台词累计时长", "Total length of confirmed lines")}>
-            {howLong(info.seconds)}
-          </span>
+          <Tip text={tr("确认过的台词累计时长", "Total length of confirmed lines")}>
+            <span>{howLong(info.seconds)}</span>
+          </Tip>
         </>
       )}
     </span>
   );
 }
+
+/* One row of the character list on the left. */
+const ITEM =
+  "grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-[9px] rounded-lg border border-transparent px-2 py-1.5 hover:bg-muted/60";
+const ITEM_ON = "border-primary/40 bg-accent hover:bg-accent";
+
+/* A short gray heading above a part of the list. */
+const SECTION_TITLE = "mx-1 mt-[18px] mb-1.5 text-xs text-muted-foreground";
 
 interface RoleViewProps {
   state: Summary;
@@ -95,14 +109,14 @@ export function RoleView({
     />
   );
   return (
-    <div className="roles-grid">
-      <div className="role-list">
+    <div className="grid grid-cols-[230px_1fr] gap-[18px] pt-2.5">
+      {/* Characters that are not targets are listed under the target characters, with a lighter name. "Other"
+          goes at the very bottom, with a divider line above it. */}
+      <div className="sticky top-2 flex max-h-[calc(100vh-170px)] flex-col gap-0.5 self-start overflow-y-auto">
         {list.map((r) => (
-          <div
+          <Tip
             key={r.name}
-            className={`role-item ${r.name === role ? "on" : ""} ${r.target ? "" : "off"}`}
-            onClick={() => setRole(r.name)}
-            title={
+            text={
               r.target
                 ? ""
                 : tr(
@@ -111,35 +125,39 @@ export function RoleView({
                   )
             }
           >
-            <Avatar role={r} name={r.name} size="md" />
-            <RoleName role={r} name={r.name} cls="nm" />
-            <Counts info={r} />
-          </div>
+            <div className={cn(ITEM, r.name === role && ITEM_ON)} onClick={() => setRole(r.name)}>
+              <Avatar role={r} name={r.name} size="md" />
+              <RoleName
+                role={r}
+                name={r.name}
+                className={cn(!r.target && "text-muted-foreground")}
+              />
+              <Counts info={r} />
+            </div>
+          </Tip>
         ))}
-        <div
-          className={`role-item other ${other ? "on" : ""}`}
-          onClick={() => setRole(OTHER)}
-          title={tr("不是任何一个目标角色", "Not any of the target characters")}
-        >
-          <Avatar blank={true} size="md" />
-          <span className="rn nm">{labelText[OTHER]}</span>
-          <Counts info={state.other} />
-        </div>
+        <Separator className="my-1" />
+        <Tip text={tr("不是任何一个目标角色", "Not any of the target characters")}>
+          <div className={cn(ITEM, other && ITEM_ON)} onClick={() => setRole(OTHER)}>
+            <Avatar blank={true} size="md" />
+            <span>{labelText[OTHER]}</span>
+            <Counts info={state.other} />
+          </div>
+        </Tip>
       </div>
       <div>
         {!current || !role ? (
-          <div className="empty">
-            <h2>{tr("选一个角色", "Pick a character")}</h2>
+          <Empty title={tr("选一个角色", "Pick a character")}>
             <p>
               {tr(
                 "左边上面是目标角色，就是你要收集的人；其余的人一律标「其他」。灰色数字是确认过的句数，橙色是机器归进来、还没人确认的句数，下面是确认过的台词累计多长。",
                 'At the top left are the target characters, the people you want to collect; everyone else is labeled "Other". The gray number is lines confirmed, the orange one is lines the machine gave them that no one has confirmed yet, and below is the total length of the confirmed lines.',
               )}
             </p>
-          </div>
+          </Empty>
         ) : (
           <>
-            <div className="role-head">
+            <div className="flex items-center gap-3.5 pt-1.5 pb-3">
               {other ? (
                 <Avatar blank={true} size="xl" />
               ) : (
@@ -162,8 +180,10 @@ export function RoleView({
                 />
               )}
               <div>
-                <h2>{other ? name : <RoleName role={current as Role} name={role} />}</h2>
-                <div className="stats">
+                <h2 className="text-xl font-semibold">
+                  {other ? name : <RoleName role={current as Role} name={role} />}
+                </h2>
+                <div className="text-xs text-muted-foreground">
                   {tr(`确认过 ${confirmed.length} 句`, `${lines(confirmed.length)} confirmed`)}
                   {info && info.seconds > 0
                     ? tr(`，共 ${howLong(info.seconds)}`, `, ${howLong(info.seconds)} in total`)
@@ -184,21 +204,23 @@ export function RoleView({
                     : tr(" · 不是目标角色", " · not a target character")}
                 </div>
               </div>
-              <div className="role-actions">
-                <button onClick={() => setPlaying(!playing)}>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setPlaying(!playing)}>
                   {playing ? tr("停止连播", "Stop playing") : tr("连播待核对", "Play all to check")}{" "}
-                  <kbd>P</kbd>
-                </button>
+                  <Kbd>P</Kbd>
+                </Button>
                 {!other && (
                   <>
-                    <button className={current.named === false ? "primary" : ""} onClick={onRename}>
+                    <Button
+                      variant={current.named === false ? "default" : "outline"}
+                      onClick={onRename}
+                    >
                       {current.named === false
                         ? tr("起名字", "Name")
                         : tr("改名或合并", "Rename or merge")}
-                    </button>
-                    <button
-                      onClick={onToggleTarget}
-                      title={
+                    </Button>
+                    <Tip
+                      text={
                         current.target
                           ? tr(
                               "不再收集这个人：机器不再猜这个角色，已标的留着，以后还能加回来",
@@ -210,64 +232,66 @@ export function RoleView({
                             )
                       }
                     >
-                      {current.target
-                        ? tr("不再作为目标", "Stop targeting")
-                        : tr("设为目标角色", "Make target")}
-                    </button>
+                      <Button variant="outline" onClick={onToggleTarget}>
+                        {current.target
+                          ? tr("不再作为目标", "Stop targeting")
+                          : tr("设为目标角色", "Make target")}
+                      </Button>
+                    </Tip>
                   </>
                 )}
               </div>
             </div>
             {pending.length > 0 && (
-              <div className="welcome" style={{ alignItems: "center" }}>
-                <div style={{ flex: 1 }}>
-                  <h3>
+              <div className="my-3 flex items-center gap-3.5 rounded-xl border bg-muted/50 px-4 py-3.5">
+                <div className="flex-1">
+                  <h3 className="mb-1 text-sm font-semibold">
                     {tr(
                       `机器把这 ${pending.length} 句归给了${other ? "「其他」" : ` ${role}`}`,
                       `The machine gave these ${lines(pending.length)} to ${them}`,
                     )}
                   </h3>
-                  <p>
+                  <p className="text-[13px] text-muted-foreground">
                     {tr(
                       <>
-                        从最没把握的开始排。听到不对的，直接标成对的人或「其他」<kbd>Q</kbd>
+                        从最没把握的开始排。听到不对的，直接标成对的人或「其他」<Kbd>Q</Kbd>
                         ，它就离开这里；听完一键确认其余的。
                       </>,
                       <>
                         Least sure first. When one is wrong, label it with the right character or
-                        "Other" <kbd>Q</kbd> and it leaves this list; when you're done listening,
+                        "Other" <Kbd>Q</Kbd> and it leaves this list; when you're done listening,
                         confirm the rest at once.
                       </>,
                     )}
                   </p>
                 </div>
-                <button className="primary" onClick={onConfirmRest}>
+                <Button onClick={onConfirmRest}>
                   {tr(
                     `确认其余 ${pending.length} 句`,
                     `Confirm the other ${lines(pending.length)}`,
                   )}{" "}
-                  <kbd style={{ marginLeft: "4px" }}>Shift+Enter</kbd>
-                </button>
+                  <Kbd className="ml-1">Shift+Enter</Kbd>
+                </Button>
               </div>
             )}
             {pending.map((clip) => row(clip, { showTarget: other }))}
             {maybe.length > 0 && (
               <>
-                <div className="section-title">
+                <div className={SECTION_TITLE}>
                   {tr(`可能漏掉的 ${maybe.length} 句`, `Maybe missed: ${lines(maybe.length)}`)}
                 </div>
-                <p className="note" style={{ margin: "0 0 8px" }}>
+                <Note className="mb-2">
                   {tr(
                     `机器没归给 ${role}，但听起来有可能是，最像的排在前面。刚设成目标角色时，以前标成「其他」的台词也会列在这里。`,
                     `The machine didn't give these to ${role}, but they might be; most likely first. Right after you make someone a target, lines labeled "Other" before are listed here too.`,
                   )}
-                </p>
+                </Note>
                 {maybe.map((clip) => row(clip, { maybeOf: role }))}
               </>
             )}
             {confirmed.length > 0 && (
               <>
-                <div className="section-title">
+                <div className={SECTION_TITLE}>
                   {tr(`确认过的 ${confirmed.length} 句`, `Confirmed: ${lines(confirmed.length)}`)}
                   {other
                     ? tr("，最像某个目标角色的排在前面", ", most like a target character first")

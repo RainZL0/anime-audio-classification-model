@@ -10,24 +10,21 @@ import {
   type Roles,
   type Summary,
 } from "./api";
-import {
-  lowTip,
-  maybeListOf,
-  NEEDS_WORK,
-  otherName,
-  OTHER,
-  pendingOf,
-  type LabelText,
-} from "./clips";
-import { Avatar } from "./components/Avatar";
+import { maybeListOf, NEEDS_WORK, otherName, OTHER, pendingOf, type LabelText } from "./clips";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { Cropper } from "./components/Cropper";
 import { Divider } from "./components/Divider";
+import { Dock } from "./components/Dock";
 import { Guide, GUIDE_SEEN } from "./components/Guide";
 import { Help } from "./components/Help";
 import { LanguageButton } from "./components/LanguageButton";
-import { RoleName } from "./components/RoleName";
+import { Empty } from "./components/Notes";
 import { Stage } from "./components/Stage";
-import { currentLanguage, lines, many, setLanguage, tr } from "./language";
+import { TopBar, type View } from "./components/TopBar";
+import { currentLanguage, lines, setLanguage, tr } from "./language";
 import { CONTEXTS, SPEEDS, type Sound } from "./playback";
 import { currentPurpose, setPurpose, type Purpose } from "./purpose";
 import { fitStage, savedStageWidth } from "./stageWidth";
@@ -38,30 +35,23 @@ import { RoleView } from "./views/RoleView";
 import { SceneView } from "./views/SceneView";
 import { Welcome } from "./views/Welcome";
 
-type View = "groups" | "scene" | "roles" | "export";
 const VIEWS: View[] = ["groups", "scene", "roles", "export"];
 /* A list request was overtaken by a later one. Its result is dropped; this is not an error. */
 const STALE = new Error("stale");
 /* The position saved after # in the address when the page opened; see where App writes it back. */
 const saved = new URLSearchParams(location.hash.slice(1));
 
-/* Shortcuts stay off while the keys go into a text box or a menu. A tick box is not typed into, so they still
+/* Shortcuts stay off while the keys go into a text box or an open menu. A tick box is not typed into, so they still
    work after ticking a line. */
 const typing = (el: EventTarget | null) => {
   if (!(el instanceof HTMLElement)) return false;
   return (
     el.tagName === "SELECT" ||
     el.tagName === "TEXTAREA" ||
+    !!el.closest("[role=menu]") ||
     (el instanceof HTMLInputElement && !["checkbox", "radio", "button", "range"].includes(el.type))
   );
 };
-
-interface ToastState {
-  message: string;
-  isError: boolean;
-  /* Show an Undo button with it. */
-  extra: boolean;
-}
 
 /* The avatar dialog: whose avatar, what to do after it closes, and for a new character, the name box. */
 interface Crop {
@@ -113,7 +103,6 @@ export function App() {
   /* The server's job that adds an episode (see AddEpisode), and whether its dialog is open. */
   const [adding, setAdding] = useState<Adding | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState<Sound>(() =>
     localStorage.getItem("sound") === "original" ? "original" : "vocals",
@@ -145,7 +134,6 @@ export function App() {
   const dockOrder = useRef<string[]>([]);
   const playerRef = useRef<HTMLMediaElement | null>(null);
   const refAudio = useRef<HTMLAudioElement>(null);
-  const toastTimer = useRef(0);
   const stableOrder = useRef<string[] | null>(null);
   const loadSeq = useRef(0);
 
@@ -176,8 +164,6 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    if (theme === "dark") document.documentElement.dataset.theme = "dark";
-    else delete document.documentElement.dataset.theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
   useEffect(() => {
@@ -207,10 +193,25 @@ export function App() {
     history.replaceState(null, "", `#${at}`);
   }, [state, view, episode, role, focus, onlyWork]);
 
+  /* A short message at the bottom. One at a time: a new one takes the place of the last. `extra` adds an Undo
+     button. */
+  const undoNow = useRef(() => {});
   const showToast = useCallback((message: string, isError = false, extra = false) => {
-    clearTimeout(toastTimer.current);
-    setToast({ message, isError, extra });
-    toastTimer.current = setTimeout(() => setToast(null), isError ? 6000 : 3800);
+    const action = extra
+      ? {
+          label: (
+            <>
+              {tr("撤销", "Undo")} <Kbd>Z</Kbd>
+            </>
+          ),
+          onClick: () => undoNow.current(),
+        }
+      : undefined;
+    (isError ? toast.error : toast)(message, {
+      id: "note",
+      duration: isError ? 6000 : 3800,
+      action,
+    });
   }, []);
 
   /* Switch the page language. The overview is fetched again because it holds a few messages from the server,
@@ -966,8 +967,13 @@ export function App() {
     setGuide(false);
   };
 
+  undoNow.current = undo;
+  const toaster = (
+    <Toaster theme={theme === "dark" ? "dark" : "light"} position="bottom-center" offset={70} />
+  );
+  /* The language button on pages without the top bar (empty workspace, can't connect). */
   const corner = (
-    <div className="corner">
+    <div className="fixed top-3 right-4">
       <LanguageButton onSwitch={switchLanguage} />
     </div>
   );
@@ -975,18 +981,17 @@ export function App() {
     return (
       <>
         {corner}
-        <div className="empty">
-          <h2>{tr("连不上本地服务", "Can't reach the local server")}</h2>
+        <Empty title={tr("连不上本地服务", "Can't reach the local server")}>
           <p>{error}</p>
-        </div>
+        </Empty>
       </>
     );
   if (!state)
     return (
-      <div className="empty">
-        <div className="spinner" style={{ margin: "auto" }}></div>
+      <Empty>
+        <Spinner className="mx-auto size-6" />
         <p>{tr("正在载入…", "Loading…")}</p>
-      </div>
+      </Empty>
     );
   const addProps = {
     state,
@@ -1002,181 +1007,47 @@ export function App() {
       <>
         {corner}
         <Welcome {...addProps} />
-        {toast && (
-          <div className={`toast ${toast.isError ? "error" : ""}`}>
-            <span>{toast.message}</span>
-          </div>
-        )}
+        {toaster}
       </>
     );
   }
 
   const counts = episodeInfo?.counts || {};
-  const targetCount = state.roles.filter((r) => r.target).length;
   /* Short lines skipped by default need no labeling and don't count toward progress. */
   const total =
     Object.values(counts).reduce((a: number, b) => a + (b ?? 0), 0) - (counts.skipped || 0) || 1;
-  const done = counts.confirmed || 0;
-  const work = (counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0);
   const showStage = view !== "export";
-  /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
-  const episodeTabs: [View, string, string][] = [
-    ["groups", tr("起步分组", "Groups"), "G"],
-    ["scene", tr("场景", "Scenes"), "S"],
-  ];
-  const allTabs: [View, string, string][] = [
-    ["roles", tr("角色", "Characters"), "O"],
-    ["export", tr("导出", "Export"), "E"],
-  ];
-  const perEpisode = episodeTabs.some(([v]) => v === view);
-  const tabButtons = (list: [View, string, string][]) =>
-    list.map(([v, l, key]) => (
-      <button
-        key={v}
-        className={view === v ? "on" : ""}
-        title={tr(`快捷键 ${key}`, `Shortcut ${key}`)}
-        onClick={() => setView(v)}
-      >
-        {l}
-        {v === "scene" && work > 0 ? <span className="count">{work}</span> : ""}
-      </button>
-    ));
-  const unfinishedCount = Object.keys(state.skipped || {}).length;
   const cropRole = crop ? roles[crop.name] : undefined;
 
+  /* Overall layout: top bar, stage on the left, list on the right, character bar at the bottom. The whole page
+     does not scroll, only the list does. */
   return (
-    <div className="shell">
-      <header className="top">
-        <div className="brand">
-          <span className="dot"></span>avoc
-        </div>
-        <nav className={`tabs ${perEpisode ? "" : "away"}`}>
-          <select
-            value={episode ?? ""}
-            title={
-              perEpisode
-                ? tr("换一集", "Switch episode")
-                : tr(
-                    "「角色」和「导出」看的是全部集数，换集只影响「起步分组」和「场景」",
-                    "Characters and Export cover all episodes; switching only changes Groups and Scenes",
-                  )
-            }
-            onChange={(e) => {
-              /* Let go of the menu, or the arrow keys meant for the next line would switch the episode again. */
-              e.target.blur();
-              if (e.target.value === "+") {
-                e.target.value = episode ?? "";
-                setAddOpen(true);
-              } else setEpisode(e.target.value);
-            }}
-          >
-            {state.episodes.map((e) => (
-              <option key={e.name} value={e.name}>
-                {e.name}
-              </option>
-            ))}
-            <option value="+">
-              {tr("＋ 加一集…", "+ Add an episode…")}
-              {unfinishedCount
-                ? tr(`（${unfinishedCount} 集没做完）`, ` (${unfinishedCount} unfinished)`)
-                : ""}
-            </option>
-          </select>
-          {tabButtons(episodeTabs)}
-        </nav>
-        <nav className="tabs">
-          <span className="scope">{tr("全部集数", "All episodes")}</span>
-          {tabButtons(allTabs)}
-        </nav>
-        {addingState === "running" && !addOpen && (
-          <button
-            className="ghost adding-chip"
-            onClick={() => setAddOpen(true)}
-            title={tr("点开看进度", "Click to see the progress")}
-          >
-            <span className="spinner small"></span>
-            {tr(`正在加 ${adding?.episode}`, `Adding ${adding?.episode}`)}
-          </button>
-        )}
-        <span className="spacer"></span>
-        {perEpisode && (
-          <div
-            className="progress"
-            title={tr(
-              "绿色是已经确认的，浅绿是机器有把握的",
-              "Green is confirmed, light green is the machine's confident ones",
-            )}
-          >
-            <span>
-              {tr(
-                `${episode}：确认 ${Math.round((done / total) * 100)}%`,
-                `${episode}: ${Math.round((done / total) * 100)}% confirmed`,
-              )}
-            </span>
-            <div className="bar">
-              <i className="ok" style={{ width: `${(done / total) * 100}%` }}></i>
-              <i className="auto" style={{ width: `${((counts.auto || 0) / total) * 100}%` }}></i>
-            </div>
-          </div>
-        )}
-        <span
-          className={`model-chip ${busy ? "busy" : ""}`}
-          title={tr("机器每次标注后都会重新学一次", "The machine retrains after every label")}
-        >
-          {busy
-            ? tr("正在重新学习…", "Retraining…")
-            : state.model.labels
-              ? tr(
-                  `机器学过 ${state.model.labels} 句 · ${targetCount} 个目标角色`,
-                  `Trained on ${lines(state.model.labels)} · ${many(targetCount, "target")}`,
-                )
-              : tr("机器还没学过", "Not trained yet")}
-        </span>
-        <button
-          className="ghost"
-          disabled={!state.can_undo}
-          onClick={undo}
-          title={tr("撤销上一步", "Undo the last step")}
-        >
-          {tr("撤销", "Undo")} <kbd>Z</kbd>
-        </button>
-        <LanguageButton onSwitch={switchLanguage} />
-        <button
-          className="ghost theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          title={
-            theme === "dark"
-              ? tr("换成白天配色", "Switch to light colors")
-              : tr("换成夜间配色", "Switch to dark colors")
-          }
-          aria-label={
-            theme === "dark"
-              ? tr("换成白天配色", "Switch to light colors")
-              : tr("换成夜间配色", "Switch to dark colors")
-          }
-        >
-          {theme === "dark" ? "☀" : "☾"}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => setGuide(true)}
-          title={tr(
-            "四个页面是做什么的，怎么上手",
-            "What the four views are for, and how to start",
-          )}
-        >
-          {tr("指南", "Guide")}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => setHelp(true)}
-          title={tr("全部快捷键", "All shortcuts")}
-        >
-          <kbd>?</kbd>
-        </button>
-      </header>
+    <div className="flex h-screen flex-col">
+      <TopBar
+        episodes={state.episodes.map((e) => e.name)}
+        episode={episode}
+        setEpisode={setEpisode}
+        onAdd={() => setAddOpen(true)}
+        unfinished={Object.keys(state.skipped || {}).length}
+        view={view}
+        setView={setView}
+        work={(counts.review || 0) + (counts.novoice || 0) + (counts.unlabeled || 0)}
+        adding={addingState === "running" && !addOpen ? (adding?.episode ?? "") : null}
+        onShowAdding={() => setAddOpen(true)}
+        progress={{ done: (counts.confirmed || 0) / total, auto: (counts.auto || 0) / total }}
+        busy={busy}
+        trainedOn={state.model.labels || 0}
+        targets={state.roles.filter((r) => r.target).length}
+        canUndo={!!state.can_undo}
+        onUndo={undo}
+        dark={theme === "dark"}
+        onTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onLanguage={switchLanguage}
+        onGuide={() => setGuide(true)}
+        onHelp={() => setHelp(true)}
+      />
       {state.outdated !== false && (
-        <div className="banner warn">
+        <div className="border-b bg-warning/15 px-[18px] py-2 text-[13px] text-warning">
           {tr(
             "avoc 已经更新，但正在运行的服务还是旧的，有些内容会显示不出来。关掉运行 avoc app 的窗口（或按 Ctrl+C），再重新运行它，然后刷新这个页面。",
             "avoc was updated, but the running server is still the old one, so some things will not show. Close the window running avoc app (or press Ctrl+C), run it again, then refresh this page.",
@@ -1185,7 +1056,7 @@ export function App() {
       )}
 
       <div
-        className="body"
+        className="grid min-h-0 flex-1"
         style={{
           gridTemplateColumns: showStage ? `${fitStage(stageWidth)}px auto minmax(0, 1fr)` : "1fr",
         }}
@@ -1213,7 +1084,7 @@ export function App() {
           />
         )}
         {showStage && <Divider width={fitStage(stageWidth)} setWidth={setStageWidth} />}
-        <main className="main">
+        <main className="min-h-0 scroll-pt-20 overflow-y-auto px-5 pt-2 pb-10">
           {view === "scene" && (
             <SceneView
               clips={clips}
@@ -1279,70 +1150,14 @@ export function App() {
       </div>
 
       {view !== "export" && (
-        <footer className="dock">
-          {dock.map((name, i) => (
-            <div
-              className="chip"
-              key={name}
-              title={
-                i < 9
-                  ? tr(`按 ${i + 1} 标成 ${name}`, `Press ${i + 1} to label as ${name}`)
-                  : tr(`标成 ${name}`, `Label as ${name}`)
-              }
-              onClick={() => assign(name, keyTargets())}
-            >
-              <Avatar role={roles[name]} name={name} size="md" />
-              <RoleName role={roles[name]} name={name} />
-              {i < 9 && <span className="k">{i + 1}</span>}
-              <button
-                className="low"
-                title={
-                  (i < 9
-                    ? tr(
-                        `按 Shift + ${i + 1} 标成 ${name}·质量低：`,
-                        `Press Shift + ${i + 1} to label as ${name}, low quality: `,
-                      )
-                    : tr(`标成 ${name}·质量低：`, `Label as ${name}, low quality: `)) + lowTip()
-                }
-                onClick={(e) => {
-                  e.stopPropagation();
-                  assign(name, keyTargets(), true);
-                }}
-              >
-                {tr("质量低", "Low quality")}
-                {i < 9 ? (
-                  <>
-                    {" "}
-                    <span className="k">⇧{i + 1}</span>
-                  </>
-                ) : (
-                  ""
-                )}
-              </button>
-            </div>
-          ))}
-          <div
-            className="chip"
-            title={tr("不是任何一个目标角色", "Not any of the target characters")}
-            onClick={() => assign(OTHER, keyTargets())}
-          >
-            <Avatar blank={true} size="md" />
-            <span className="rn">{labelText[OTHER]}</span>
-            <span className="k">Q</span>
-          </div>
-          <div
-            className={`chip ${current ? "" : "off"}`}
-            title={tr(
-              "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
-              "Make a new target character; you can name it later. With video, crop an avatar next",
-            )}
-            onClick={() => current && newRole(keyTargets())}
-          >
-            <div className="av md unknown">+</div>
-            <span className="rn">{tr("新角色", "New character")}</span>
-            <span className="k">N</span>
-          </div>
-        </footer>
+        <Dock
+          dock={dock}
+          roles={roles}
+          labelText={labelText}
+          canNew={!!current}
+          onName={(name, low) => assign(name, keyTargets(), low)}
+          onNew={() => current && newRole(keyTargets())}
+        />
       )}
 
       <audio ref={refAudio} hidden></audio>
@@ -1376,16 +1191,7 @@ export function App() {
         />
       )}
       {addOpen && <AddDialog onClose={() => setAddOpen(false)} {...addProps} />}
-      {toast && (
-        <div className={`toast ${toast.isError ? "error" : ""}`}>
-          <span>{toast.message}</span>
-          {toast.extra && (
-            <button onClick={undo}>
-              {tr("撤销", "Undo")} <kbd>Z</kbd>
-            </button>
-          )}
-        </div>
-      )}
+      {toaster}
     </div>
   );
 }

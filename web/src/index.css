@@ -1,11 +1,7 @@
-/* The old hand-written styles sit in their own layer below Tailwind's, so Tailwind classes win where both apply.
-   They go away view by view as the views move to Tailwind. */
-@layer theme, base, legacy, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
-@import "./style.css" layer(legacy);
 
 @custom-variant dark (&:is(.dark *));
 

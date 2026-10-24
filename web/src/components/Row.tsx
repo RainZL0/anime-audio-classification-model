@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import { useEffect, useRef } from "react";
 import type { Clip, Roles } from "../api";
 import { bestTarget, chanceOf, lowTip, whoOf, type LabelText } from "../clips";
@@ -5,7 +6,7 @@ import { pct, stamp } from "../format";
 import { tr } from "../language";
 import { needsText } from "../purpose";
 import { Avatar } from "./Avatar";
-import { Closest, Pill } from "./Pills";
+import { Closest, Pill, Tag } from "./Pills";
 import { RoleName } from "./RoleName";
 
 interface RowProps {
@@ -44,19 +45,28 @@ export function Row({
   return (
     <div
       ref={ref}
-      className={`row ${selected ? "sel" : ""} ${flash ? "done-flash" : ""}`}
+      className={cn(
+        "relative isolate grid cursor-pointer grid-cols-[36px_1fr_auto] items-start gap-2.5 rounded-lg border border-transparent px-2.5 py-[7px] hover:bg-muted/60",
+        selected && "border-primary/40 bg-accent shadow-sm hover:bg-accent",
+      )}
       onClick={onSelect}
     >
+      {/* Just labeled: a green background that fades out. It sits behind the row's content. */}
+      {flash && (
+        <span className="pointer-events-none absolute inset-0 -z-10 animate-out rounded-[inherit] bg-success/10 duration-900 ease-out fill-mode-forwards fade-out" />
+      )}
       <Avatar
         role={who && !stranger ? roles[who.name] : undefined}
         name={stranger ? null : who?.name}
         blank={isOther}
       />
       <div>
-        <div className="who">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span
-            className="n"
-            style={who && !who.human ? { color: "var(--text-2)", fontWeight: 500 } : undefined}
+            className={cn(
+              "font-semibold text-foreground",
+              who && !who.human && "font-medium text-muted-foreground",
+            )}
           >
             {stranger ? (
               ""
@@ -71,25 +81,25 @@ export function Row({
           <Pill clip={clip} />
           {stranger && best && <Closest roles={roles} name={best.name} p={best.p} />}
           {clip.unusable && !(clip.label && labelText[clip.label]) && (
-            <span className="pill unusable" title={lowTip()}>
+            <Tag look="unusable" tip={lowTip()}>
               {tr("质量低", "Low quality")}
-            </span>
+            </Tag>
           )}
           {needsText() && clip.role && clip.spoken_problem && !clip.unusable && (
-            <span className="pill no-text" title={clip.spoken_problem}>
+            <Tag look="noText" tip={clip.spoken_problem}>
               {tr("导不出文字", "No text to export")}
-            </span>
+            </Tag>
           )}
           {clip.maybe && (
-            <span
-              className="pill maybe"
-              title={tr(
+            <Tag
+              look="maybe"
+              tip={tr(
                 "机器没归给这个角色，但听起来有可能是",
                 "The machine didn't give it to this character, but it might be",
               )}
             >
               {tr("可能漏掉", "Maybe missed")} {pct(chanceOf(clip, maybeOf))}
-            </span>
+            </Tag>
           )}
           {showTarget && best && (
             <Closest
@@ -103,13 +113,15 @@ export function Row({
             />
           )}
         </div>
-        <div className={`say ${clip.text ? "" : "empty"}`}>
+        <div className={cn("mt-px text-[15px]", !clip.text && "text-muted-foreground italic")}>
           {clip.text || tr("（没有字幕文字）", "(no subtitle text)")}
         </div>
         {/* The text written on export, in the language spoken, when it differs from the subtitles. */}
-        {clip.spoken && clip.spoken !== clip.text && <div className="spoken">{clip.spoken}</div>}
+        {clip.spoken && clip.spoken !== clip.text && (
+          <div className="mt-px text-[13px] text-muted-foreground">{clip.spoken}</div>
+        )}
       </div>
-      <div className="t">
+      <div className="text-right text-[11px] whitespace-nowrap text-muted-foreground tabular-nums">
         {stamp(clip.start)}
         <br />
         {clip.duration.toFixed(2)}s

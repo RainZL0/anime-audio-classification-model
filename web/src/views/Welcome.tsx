@@ -1,3 +1,4 @@
+import { Field, FieldLabel } from "@/components/ui/field";
 import { currentLanguage, tr } from "../language";
 import { AddEpisode, Checks, type AddEpisodeProps } from "./AddEpisode";
 
@@ -6,16 +7,16 @@ import { AddEpisode, Checks, type AddEpisodeProps } from "./AddEpisode";
 /* The page for a workspace with no usable episode yet: what the tool does, the machine checks, and the form. */
 export function Welcome(props: AddEpisodeProps) {
   return (
-    <div className="form welcome-page">
+    <div className="mx-auto flex max-w-[720px] flex-col gap-[18px] pt-6 pb-15">
       <div>
-        <h2>{tr("欢迎", "Welcome")}</h2>
-        <p>
+        <h2 className="mb-1.5 text-xl font-semibold">{tr("欢迎", "Welcome")}</h2>
+        <p className="text-muted-foreground">
           {tr(
             "这个工具把一个动画角色说的每一句台词收集成干净的单人音频，带上台词文字，可以直接拿去训练语音模型。",
             "This tool collects every line one anime character speaks as clean single-speaker audio with its text, ready for training a voice model.",
           )}
         </p>
-        <ol className="steps">
+        <ol className="mt-2.5 flex list-decimal flex-col gap-1 pl-5 text-muted-foreground">
           <li>
             {tr(
               "加一集：给出视频和对白字幕。机器按字幕切台词，再把人声和音乐分开。",
@@ -42,23 +43,31 @@ export function Welcome(props: AddEpisodeProps) {
           </li>
         </ol>
       </div>
-      <div className="field">
-        <label className="title">{tr("这台机器", "This machine")}</label>
+      <Field className="gap-1.5">
+        <FieldLabel className="text-xs font-normal text-muted-foreground">
+          {tr("这台机器", "This machine")}
+        </FieldLabel>
         <Checks key={currentLanguage()} />
-      </div>
-      <div className="field">
-        <label className="title">{tr("加第一集", "Add the first episode")}</label>
+      </Field>
+      <Field className="gap-1.5">
+        <FieldLabel className="text-xs font-normal text-muted-foreground">
+          {tr("加第一集", "Add the first episode")}
+        </FieldLabel>
         <AddEpisode {...props} />
-      </div>
-      <p className="note">
+      </Field>
+      <p className="text-xs text-muted-foreground">
         {tr(
           <>
             也可以在命令行里加：
-            <code>uv run avoc add "{props.state.workspace}" 视频 --subs 字幕</code>
+            <code className="font-mono">
+              uv run avoc add "{props.state.workspace}" 视频 --subs 字幕
+            </code>
           </>,
           <>
             You can also add one in a terminal:{" "}
-            <code>uv run avoc add "{props.state.workspace}" VIDEO --subs SUBTITLES</code>
+            <code className="font-mono">
+              uv run avoc add "{props.state.workspace}" VIDEO --subs SUBTITLES
+            </code>
           </>,
         )}
       </p>

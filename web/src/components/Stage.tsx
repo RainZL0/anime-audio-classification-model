@@ -1,4 +1,8 @@
+import { cn } from "cn";
 import { useEffect, useRef, useState, type RefObject, type SyntheticEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { media, mediaProblem, type Clip, type Roles } from "../api";
 import { lowTip, OTHER, type LabelText } from "../clips";
 import { pct, stamp } from "../format";
@@ -6,7 +10,22 @@ import { tr } from "../language";
 import { needsText } from "../purpose";
 import { CONTEXTS, SPEEDS, VIDEO_PAD, type Sound } from "../playback";
 import { Avatar } from "./Avatar";
+import { LowButton } from "./Chip";
+import { Choice } from "./Choice";
+import { Note } from "./Notes";
+import { Tag } from "./Pills";
 import { RoleName } from "./RoleName";
+import { Tip } from "./Tip";
+
+const STAGE = "overflow-y-auto bg-background p-4";
+/* The picture's frame is always dark, in both themes. */
+const SCREEN = "relative aspect-video overflow-hidden rounded-lg bg-neutral-950";
+/* A message or the spinner in the middle of the screen. */
+const WAIT = "absolute inset-0 grid place-items-center text-xs text-neutral-400";
+/* The small heading above the choices. */
+const ASK = "mt-[18px] mb-2 text-xs tracking-[0.3px] text-muted-foreground";
+/* A note above the choices when the voice may be someone new. */
+const STRANGER = "mb-2 rounded-lg px-2.5 py-[7px] text-xs leading-[1.7]";
 
 /* The text that export writes for this line, in the language spoken, when it differs from the subtitles shown
    above. For a target character's line that cannot be exported with text, the reason, unless only the sound is
@@ -14,23 +33,24 @@ import { RoleName } from "./RoleName";
 function SpokenLine({ clip }: { clip: Clip }) {
   if (needsText() && clip.role && clip.spoken_problem)
     return (
-      <div className="spoken-line warn">
+      <div className="mx-0.5 mb-1 text-xs leading-normal text-warning">
         {tr("导出时没有文字：", "No text on export: ")}
         {clip.spoken_problem}
-        {clip.spoken && <span className="spoken-text">{clip.spoken}</span>}
+        {clip.spoken && <span className="ml-1.5 text-muted-foreground">{clip.spoken}</span>}
       </div>
     );
   if (!clip.spoken || clip.spoken === clip.text) return null;
   return (
-    <div
-      className="spoken-line"
-      title={tr(
+    <Tip
+      text={tr(
         "导出时写的文字，用说话的语言",
         "The text written on export, in the language spoken",
       )}
     >
-      {clip.spoken}
-    </div>
+      <div className="mx-0.5 mb-1 text-[15px] leading-normal text-muted-foreground">
+        {clip.spoken}
+      </div>
+    </Tip>
   );
 }
 
@@ -136,9 +156,9 @@ export function Stage({
 
   if (!clip) {
     return (
-      <aside className="stage">
-        <div className="screen">
-          <div className="wait">{tr("在右边选一句台词", "Pick a line on the right")}</div>
+      <aside className={STAGE}>
+        <div className={SCREEN}>
+          <div className={WAIT}>{tr("在右边选一句台词", "Pick a line on the right")}</div>
         </div>
       </aside>
     );
@@ -164,8 +184,8 @@ export function Stage({
   const isOther = !!clip.label && !!labelText[clip.label];
   const label = clip.label;
   return (
-    <aside className="stage">
-      <div className="screen">
+    <aside className={STAGE}>
+      <div className={SCREEN}>
         {hasVideo ? (
           <>
             <video
@@ -173,6 +193,7 @@ export function Stage({
                 videoRef.current = el;
               }}
               key={shown}
+              className="block size-full object-contain"
               src={media("video", clip.id, context, fresh)}
               autoPlay
               playsInline
@@ -202,24 +223,33 @@ export function Stage({
                 onError={() => fail("audio")}
               ></audio>
             )}
+            {/* Paused: a see-through triangle. Playing: the two bars. In the bottom right corner, so it does not
+                cover the speaker's face. Clicks go through to the video. */}
             {!loading && problem === undefined && (
-              <div className={`play-state ${playing ? "playing" : ""}`} aria-hidden="true">
-                {playing ? (
-                  <svg viewBox="0 0 24 24">
-                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24">
+              <div
+                className="pointer-events-none absolute right-2 bottom-2"
+                data-playing={playing || undefined}
+                aria-hidden="true"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="block size-7 rounded-full bg-black/40 fill-white/85 p-[5px]"
+                >
+                  {playing ? (
+                    <>
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </>
+                  ) : (
                     <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" />
-                  </svg>
-                )}
+                  )}
+                </svg>
               </div>
             )}
           </>
         ) : (
           <>
-            <div className="wait">
+            <div className={WAIT}>
               {tr("这一集没有视频，只有人声", "This episode has no video, only vocals")}
             </div>
             <audio
@@ -235,87 +265,96 @@ export function Stage({
             ></audio>
           </>
         )}
-        <div className={`wait ${!hasVideo || !loading ? "hide" : ""}`}>
-          <div className="spinner"></div>
+        <div className={cn(WAIT, (!hasVideo || !loading) && "hidden")}>
+          <Spinner className="size-[22px] text-neutral-300" />
         </div>
         {problem !== undefined && (
-          <div className="wait failed">
+          <div className={cn(WAIT, "bg-black/75 text-center text-[13px] text-neutral-300")}>
             <div>
               <div>{tr("这一句放不了", "This line cannot play")}</div>
-              <div className="reason">{problem || tr("正在查原因…", "Finding out why…")}</div>
-              <button
-                onClick={() => setRetry({ for: line, times: fresh + 1 })}
-                title={tr(
+              <div className="mx-4 mt-1 mb-2.5 text-xs text-neutral-500">
+                {problem || tr("正在查原因…", "Finding out why…")}
+              </div>
+              <Tip
+                text={tr(
                   "丢掉存好的片段，从原视频重新切",
                   "Throw away the saved clip and cut it again from the original",
                 )}
               >
-                {tr("重新切一次", "Cut again")}
-              </button>
+                {/* The screen is always dark, so its button is too, in both themes. */}
+                <Button
+                  variant="outline"
+                  className="border-neutral-600 bg-neutral-800 text-neutral-100 hover:bg-neutral-700 hover:text-neutral-100 dark:border-neutral-600 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+                  onClick={() => setRetry({ for: line, times: fresh + 1 })}
+                >
+                  {tr("重新切一次", "Cut again")}
+                </Button>
+              </Tip>
             </div>
           </div>
         )}
       </div>
-      <div className="player">
+      {/* The row just below the picture controls which sound is played and how fast. */}
+      <div className="mt-2 flex flex-wrap justify-between gap-2">
         {hasVideo && (
-          <span className="seg">
-            <button className={sound === "vocals" ? "on" : ""} onClick={() => setSound("vocals")}>
-              {tr("只听人声", "Vocals only")}
-            </button>
-            <button
-              className={sound === "original" ? "on" : ""}
-              onClick={() => setSound("original")}
-            >
-              {tr("画面原声", "Original sound")}
-            </button>
-          </span>
+          <Choice
+            small
+            value={sound}
+            options={[
+              ["vocals", tr("只听人声", "Vocals only")],
+              ["original", tr("画面原声", "Original sound")],
+            ]}
+            onPick={setSound}
+          />
         )}
-        <span
-          className="seg"
-          title={tr("播放速度，参考音也一样快", "Playback speed, also used for reference clips")}
-        >
-          {SPEEDS.map((s) => (
-            <button key={s} className={speed === s ? "on" : ""} onClick={() => setSpeed(s)}>
-              {s}×
-            </button>
-          ))}
-        </span>
+        <Tip text={tr("播放速度，参考音也一样快", "Playback speed, also used for reference clips")}>
+          <span>
+            <Choice
+              small
+              value={speed}
+              options={SPEEDS.map((s) => [s, `${s}×`] as const)}
+              onPick={setSpeed}
+            />
+          </span>
+        </Tip>
       </div>
-      <div className="line-text">
+      <div className="mx-0.5 mt-2.5 mb-1 min-h-7 text-[19px] leading-normal">
         {clip.text || (
-          <span style={{ color: "var(--text-3)" }}>
+          <span className="text-muted-foreground">
             {tr("（字幕里没有这句的文字）", "(no text for this line in the subtitles)")}
           </span>
         )}
       </div>
       <SpokenLine clip={clip} />
-      <div className="line-meta">
+      <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
         <span>{clip.episode}</span>
         <span>{stamp(clip.start)}</span>
         <span>{tr(`${clip.duration.toFixed(2)} 秒`, `${clip.duration.toFixed(2)} s`)}</span>
-        <span
-          className="context"
-          title={tr(
+        <Tip
+          text={tr(
             "看不出是谁时，前后各多放一些。选好的会一直用到你改回来；L 键依次切换",
             "When you can't tell who it is, play more on each side. Your choice stays until you change it; L steps through them",
           )}
         >
-          {tr("多放前后文", "More context")}
-          <span className="seg">
-            {CONTEXTS.map((c) => (
-              <button key={c} className={context === c ? "on" : ""} onClick={() => setContext(c)}>
-                {c ? tr(`±${c} 秒`, `±${c} s`) : tr("不多放", "None")}
-              </button>
-            ))}
+          <span className="inline-flex items-center gap-1.5">
+            {tr("多放前后文", "More context")}
+            <Choice
+              small
+              value={context}
+              options={CONTEXTS.map(
+                (c) => [c, c ? tr(`±${c} 秒`, `±${c} s`) : tr("不多放", "None")] as const,
+              )}
+              onPick={setContext}
+            />
+            <Kbd>L</Kbd>
           </span>
-          <kbd>L</kbd>
-        </span>
+        </Tip>
       </div>
 
       {label ? (
         <>
-          <div className="ask">{tr("已经确认", "Confirmed")}</div>
-          <div className="confirmed-box">
+          <div className={ASK}>{tr("已经确认", "Confirmed")}</div>
+          <div className="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 text-success">
             <Avatar
               role={roles[label]}
               name={label}
@@ -325,41 +364,41 @@ export function Stage({
               title={tr("从画面里截一块当头像", "Crop an avatar from the picture")}
             />
             <div>
-              <div className="who">
+              <div className="font-semibold text-foreground">
                 {isOther ? labelText[label] : <RoleName role={roles[label]} name={label} />}
                 {clip.unusable && !labelText[label] && (
                   <>
                     {" "}
-                    <span className="pill unusable" title={lowTip()}>
+                    <Tag look="unusable" tip={lowTip()}>
                       {tr("质量低", "Low quality")}
-                    </span>
+                    </Tag>
                   </>
                 )}
               </div>
-              <div style={{ fontSize: "12px" }}>
+              <div className="text-xs">
                 {tr(
                   "要改的话，直接按别的数字键或在下面选；Shift + 数字是质量低",
                   "To change it, press another number key or pick below. Shift + number means low quality",
                 )}
               </div>
             </div>
-            <span className="actions">
-              <button
-                className="ghost"
-                title={tr(
+            <span className="ml-auto flex flex-col gap-1.5">
+              <Tip
+                text={tr(
                   "清掉这句的标签，回到机器的猜测",
                   "Clear this line's label and go back to the machine's guess",
                 )}
-                onClick={onClear}
               >
-                {tr("清掉标签", "Clear label")} <kbd>Backspace</kbd>
-              </button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={onClear}>
+                  {tr("清掉标签", "Clear label")} <Kbd>Backspace</Kbd>
+                </Button>
+              </Tip>
             </span>
           </div>
         </>
       ) : (
         <>
-          <div className="ask">
+          <div className={ASK}>
             {clip.guess.length
               ? tr("这是谁？机器的猜测", "Who is this? The machine's guesses")
               : clip.voiced
@@ -370,35 +409,35 @@ export function Stage({
                   )}
           </div>
           {clip.familiar === false && (
-            <div className="stranger">
+            <div className={cn(STRANGER, "bg-warning/15 text-warning")}>
               {tr(
                 <>
-                  跟已经确认过的角色都不太像，可能是还没标过的人。是新角色就按 <kbd>N</kbd>{" "}
+                  跟已经确认过的角色都不太像，可能是还没标过的人。是新角色就按 <Kbd>N</Kbd>{" "}
                   新建，名字以后再起也行。
                 </>,
                 <>
                   Not much like any confirmed character, so it may be someone not labeled yet. If it
-                  is a new character, press <kbd>N</kbd>; you can name it later.
+                  is a new character, press <Kbd>N</Kbd>; you can name it later.
                 </>,
               )}
             </div>
           )}
           {clip.familiar === null && clip.guess.length > 0 && (
-            <div className="stranger early">
+            <div className={cn(STRANGER, "border bg-muted text-muted-foreground")}>
               {tr(
                 <>
-                  机器现在只会在底部这几个角色里挑。都不是就按 <kbd>N</kbd> 新建；确认满 20
+                  机器现在只会在底部这几个角色里挑。都不是就按 <Kbd>N</Kbd> 新建；确认满 20
                   句后，它会自己提醒你哪句像新面孔。
                 </>,
                 <>
                   For now the machine only picks among the characters at the bottom. If it is none
-                  of them, press <kbd>N</kbd>. After 20 confirmed lines it will point out lines that
+                  of them, press <Kbd>N</Kbd>. After 20 confirmed lines it will point out lines that
                   sound like someone new.
                 </>,
               )}
             </div>
           )}
-          <div className="cands">
+          <div className="flex flex-col gap-1.5">
             {clip.guess
               .filter((g) => g.p >= 0.02 || g === clip.guess[0])
               .map((g, i) => {
@@ -406,11 +445,23 @@ export function Stage({
                 return (
                   <div
                     key={g.name}
-                    className={`cand ${i === 0 ? "top" : ""}`}
+                    className={cn(
+                      "grid cursor-pointer grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-lg border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary/40",
+                      i === 0 && "border-primary/40 bg-accent",
+                    )}
                     onClick={() => onAssign(g.name)}
                   >
-                    <Avatar role={roles[g.name]} name={g.name} blank={g.name === OTHER} size="md" />
-                    <div className="name">
+                    {/* The avatar takes two rows. The probability bar has its own row, running from under the
+                        name to the far right, so it does not compete with the buttons for width. */}
+                    <div className="row-span-2">
+                      <Avatar
+                        role={roles[g.name]}
+                        name={g.name}
+                        blank={g.name === OTHER}
+                        size="md"
+                      />
+                    </div>
+                    <div className="font-[560]">
                       {g.name === OTHER ? (
                         labelText[OTHER]
                       ) : (
@@ -418,103 +469,91 @@ export function Stage({
                       )}
                     </div>
                     {g.name !== OTHER && (
-                      <button
-                        className="ref"
-                        title={tr(
+                      <Tip
+                        text={tr(
                           "听这个角色确认过的一句",
                           "Hear a confirmed line of this character",
                         )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPlayRef(g.name);
-                        }}
                       >
-                        {tr("参考音", "Reference")}
-                        {i === 0 ? (
-                          <>
-                            {" "}
-                            <kbd>R</kbd>
-                          </>
-                        ) : (
-                          ""
-                        )}
-                      </button>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPlayRef(g.name);
+                          }}
+                        >
+                          {tr("参考音", "Reference")}
+                          {i === 0 ? (
+                            <>
+                              {" "}
+                              <Kbd>R</Kbd>
+                            </>
+                          ) : (
+                            ""
+                          )}
+                        </Button>
+                      </Tip>
                     )}
                     {g.name !== OTHER && (
-                      <button
-                        className="low"
-                        title={
+                      <LowButton
+                        hotkey={k ?? undefined}
+                        tip={
                           tr(`标成 ${g.name}·质量低：`, `Label as ${g.name}, low quality: `) +
                           lowTip()
                         }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAssign(g.name, true);
-                        }}
-                      >
-                        {tr("质量低", "Low quality")}
-                        {k ? (
-                          <>
-                            {" "}
-                            <span className="k">⇧{k}</span>
-                          </>
-                        ) : (
-                          ""
-                        )}
-                      </button>
+                        onClick={() => onAssign(g.name, true)}
+                      />
                     )}
-                    <span className="pct">{pct(g.p)}</span>
-                    <div className="meter">
-                      <i style={{ width: pct(g.p) }}></i>
+                    {/* The percentage is fixed in the last column. "Other" rows, which have no button, are also
+                        pushed right, so the rows line up. */}
+                    <span className="col-start-[-2] min-w-[34px] text-right text-xs text-muted-foreground tabular-nums">
+                      {pct(g.p)}
+                    </span>
+                    <div className="col-[2/-1] h-1 overflow-hidden rounded-xs bg-border">
+                      <i className="block h-full bg-primary" style={{ width: pct(g.p) }}></i>
                     </div>
                   </div>
                 );
               })}
           </div>
-          <div
-            style={{
-              marginTop: "10px",
-              display: "flex",
-              gap: "8px",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {clip.guess.length > 0 && (
-              <button className="primary" onClick={onAccept}>
+              <Button onClick={onAccept}>
                 {tr("是", "It's")} {labelText[clip.guess[0].name] || clip.guess[0].name}
-                <kbd style={{ marginLeft: "4px" }}>Enter</kbd>
-              </button>
+                <Kbd className="ml-1">Enter</Kbd>
+              </Button>
             )}
-            <button
-              onClick={onNewRole}
-              title={tr(
+            <Tip
+              text={tr(
                 "新建一个目标角色，名字可以以后再起；有画面时接着截头像",
                 "Make a new target character; you can name it later. With video, crop an avatar next",
               )}
             >
-              {tr("新角色", "New character")} <kbd style={{ marginLeft: "4px" }}>N</kbd>
-            </button>
-            <span style={{ fontSize: "12px", color: "var(--text-3)" }}>
+              <Button variant="outline" onClick={onNewRole}>
+                {tr("新角色", "New character")} <Kbd className="ml-1">N</Kbd>
+              </Button>
+            </Tip>
+            <Note>
               {tr(
                 "已有的人按数字键，或点底部的头像",
                 "Existing characters: number keys, or click an avatar at the bottom",
               )}
-            </span>
+            </Note>
           </div>
         </>
       )}
 
-      <div className="hint">
+      <div className="mt-4 text-xs leading-[1.9] text-muted-foreground">
         {tr(
           <>
-            <kbd>J</kbd> <kbd>K</kbd> 上下一句 · <kbd>空格</kbd> 重播 · <kbd>1</kbd>–<kbd>9</kbd>{" "}
-            选下面的角色 ·<kbd>N</kbd> 新角色 · <kbd>Z</kbd> 撤销 · <kbd>?</kbd> 全部快捷键
+            <Kbd>J</Kbd> <Kbd>K</Kbd> 上下一句 · <Kbd>空格</Kbd> 重播 · <Kbd>1</Kbd>–<Kbd>9</Kbd>{" "}
+            选下面的角色 ·<Kbd>N</Kbd> 新角色 · <Kbd>Z</Kbd> 撤销 · <Kbd>?</Kbd> 全部快捷键
           </>,
           <>
-            <kbd>J</kbd> <kbd>K</kbd> next / previous · <kbd>Space</kbd> replay · <kbd>1</kbd>–
-            <kbd>9</kbd> pick a character below ·<kbd>N</kbd> new character · <kbd>Z</kbd> undo ·{" "}
-            <kbd>?</kbd> all shortcuts
+            <Kbd>J</Kbd> <Kbd>K</Kbd> next / previous · <Kbd>Space</Kbd> replay · <Kbd>1</Kbd>–
+            <Kbd>9</Kbd> pick a character below ·<Kbd>N</Kbd> new character · <Kbd>Z</Kbd> undo ·{" "}
+            <Kbd>?</Kbd> all shortcuts
           </>,
         )}
       </div>

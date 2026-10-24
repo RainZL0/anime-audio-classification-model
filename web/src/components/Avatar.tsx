@@ -1,4 +1,8 @@
+import { cn } from "cn";
+import type { CSSProperties } from "react";
 import type { Role } from "../api";
+import { tr } from "../language";
+import { Tip } from "./Tip";
 
 /* The picture for a character without an avatar: background color × white shape × pattern.
    The number is given out by the server and kept in the character list, so a character always gets the
@@ -56,7 +60,7 @@ function Pattern({ role, name }: { role?: Role; name: string }) {
   const shape = ((p % SHAPES.length) + 3 * round) % SHAPES.length;
   const variant = Math.floor(p / (PALETTE.length * SHAPES.length)) % 3;
   return (
-    <svg viewBox="0 0 40 40" aria-hidden="true">
+    <svg viewBox="0 0 40 40" aria-hidden="true" className="block size-full">
       <rect width="40" height="40" fill={color} />
       {variant === 1 && <path d="M0 40L40 0V40z" fill="rgba(0,0,0,.22)" />}
       {variant === 2 && (
@@ -67,33 +71,61 @@ function Pattern({ role, name }: { role?: Role; name: string }) {
   );
 }
 
+const SIZES = {
+  xs: "size-4 text-[9px]",
+  sm: "size-[26px] text-[11px]",
+  base: "size-[34px] text-[13px]",
+  md: "size-10 text-[15px]",
+  lg: "size-14 text-[19px]",
+  xl: "size-[88px] text-[26px]",
+};
+
 interface AvatarProps {
   role?: Role;
   name?: string | null;
-  size?: string;
-  /* An empty circle, for "other". */
+  size?: keyof typeof SIZES;
+  /* A gray circle with a dot, for "other". */
   blank?: boolean;
+  /* A gray circle with a plus, for "New character". */
+  plus?: boolean;
   onClick?: (() => void) | null;
   title?: string;
 }
 
-export function Avatar({ role, name, size = "", blank, onClick, title }: AvatarProps) {
-  if (blank) return <div className={`av ${size} unknown`}>·</div>;
-  if (!name) return <div className={`av ${size} unknown`}>?</div>;
-  const click = onClick ? { onClick, role: "button" } : {};
-  if (role?.avatar) {
+export function Avatar({ role, name, size = "base", blank, plus, onClick, title }: AvatarProps) {
+  const base = cn(
+    "grid flex-none place-items-center overflow-hidden rounded-full bg-cover bg-center font-semibold text-white ring-1 ring-border select-none",
+    SIZES[size],
+  );
+  if (blank || plus || !name)
     return (
-      <div
-        className={`av ${size} ${onClick ? "edit" : ""}`}
-        title={title || name}
-        {...click}
-        style={{ backgroundImage: `url(/media/avatar/${role.avatar})` }}
-      ></div>
+      <div className={cn(base, "bg-muted text-muted-foreground")}>
+        {blank ? "·" : plus ? "+" : "?"}
+      </div>
     );
-  }
+  /* A clickable avatar says "Crop" on hover, when it is big enough to hold the word. */
+  const edit =
+    onClick &&
+    cn(
+      "relative cursor-pointer hover:ring-2 hover:ring-primary",
+      size !== "xs" &&
+        size !== "sm" &&
+        "hover:after:absolute hover:after:inset-x-0 hover:after:bottom-0 hover:after:bg-black/55 hover:after:text-center hover:after:text-[10px] hover:after:leading-relaxed hover:after:font-medium hover:after:content-[var(--crop)]",
+    );
+  const style = {
+    ...(onClick && { "--crop": `"${tr("截取", "Crop")}"` }),
+    ...(role?.avatar && { backgroundImage: `url(/media/avatar/${role.avatar})` }),
+  } as CSSProperties;
   return (
-    <div className={`av ${size} ${onClick ? "edit" : ""}`} title={title || name} {...click}>
-      <Pattern role={role} name={name} />
-    </div>
+    <Tip text={title || name}>
+      <div
+        className={cn(base, edit)}
+        onClick={onClick ?? undefined}
+        role={onClick ? "button" : undefined}
+        style={style}
+      >
+        {!role?.avatar && <Pattern role={role} name={name} />}
+      </div>
+    </Tip>
   );
 }

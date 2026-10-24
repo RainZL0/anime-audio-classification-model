@@ -1,4 +1,8 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 import { tr } from "../language";
+import { Note } from "./Notes";
 
 export function Help({ onClose, onGuide }: { onClose: () => void; onGuide: () => void }) {
   const rows = [
@@ -68,36 +72,45 @@ export function Help({ onClose, onGuide }: { onClose: () => void; onGuide: () =>
     [tr("截头像时 Enter / Esc", "Enter / Esc when cropping"), tr("保存 / 放弃", "Save / cancel")],
   ];
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="help" onClick={(e) => e.stopPropagation()}>
-        <h2>{tr("快捷键", "Keyboard shortcuts")}</h2>
-        <table>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[620px]">
+        <DialogHeader>
+          <DialogTitle className="font-semibold">{tr("快捷键", "Keyboard shortcuts")}</DialogTitle>
+        </DialogHeader>
+        <table className="w-full border-collapse text-[13px]">
           <tbody>
             {rows.map(([k, v]) => (
               <tr key={k}>
-                <td>
-                  <kbd>{k}</kbd>
+                <td className="w-[150px] border-t px-1 py-[5px]">
+                  <Kbd className="whitespace-nowrap">{k}</Kbd>
                 </td>
-                <td>{v}</td>
+                <td className="border-t px-1 py-[5px]">{v}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="note" style={{ marginTop: "12px" }}>
-          {tr(
-            "每次标注都立刻保存，并让机器重新学一次。标注、新建、改名和合并角色都能撤销；头像和设不设目标角色不算标注，直接改回去就行。",
-            "Every label is saved at once and retrains the machine. Labeling, making, renaming and merging characters can all be undone; avatars and target settings are not labels, just change them back.",
-          )}
-        </p>
-        <p className="note">
-          <button className="ghost" onClick={onGuide}>
+        <div className="flex flex-col gap-2">
+          <Note>
             {tr(
-              "打开上手指南：四个页面各是做什么的",
-              "Open the getting-started guide: what each of the four views is for",
+              "每次标注都立刻保存，并让机器重新学一次。标注、新建、改名和合并角色都能撤销；头像和设不设目标角色不算标注，直接改回去就行。",
+              "Every label is saved at once and retrains the machine. Labeling, making, renaming and merging characters can all be undone; avatars and target settings are not labels, just change them back.",
             )}
-          </button>
-        </p>
-      </div>
-    </div>
+          </Note>
+          <Note>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto justify-start py-1 text-left whitespace-normal"
+              onClick={onGuide}
+            >
+              {tr(
+                "打开上手指南：四个页面各是做什么的",
+                "Open the getting-started guide: what each of the four views is for",
+              )}
+            </Button>
+          </Note>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

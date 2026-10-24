@@ -7,13 +7,27 @@ import {
   type Summary,
   type SubtitleStyles as Styles,
 } from "../api";
+import { cn } from "cn";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Note } from "../components/Notes";
+import { Choice } from "../components/Choice";
 import { PathInput } from "../components/PathInput";
+import { Tip } from "../components/Tip";
 import { minutes } from "../format";
 import { languageName, languageNames, lines, many, SPOKEN, tr } from "../language";
 import { needsText, type Purpose } from "../purpose";
 import type { Toast } from "../toast";
 
 /* ───────────── Adding an episode ───────────── */
+
+/* The progress of a running add: monospace, scrolling, kept at the bottom. */
+const LOG =
+  "m-0 max-h-[180px] overflow-y-auto rounded-lg bg-muted px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap";
 
 /* The machine checks, the same list as `avoc doctor`. Fetched once; torch is loaded for the GPU check, so it can
    take a few seconds. */
@@ -24,18 +38,28 @@ export function Checks() {
       .then(setList)
       .catch(() => setList([]));
   }, []);
-  if (!list) return <div className="note">{tr("正在检查这台机器…", "Checking this machine…")}</div>;
+  if (!list) return <Note>{tr("正在检查这台机器…", "Checking this machine…")}</Note>;
   return (
-    <ul className="checks">
+    <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
       {list.map((c) => (
-        <li key={c.text} className={c.ok ? "ok" : c.required ? "bad" : "soft"}>
-          <span className="mark">{c.ok ? "✓" : c.required ? "✗" : "–"}</span>
+        <li
+          key={c.text}
+          className={cn("flex items-baseline gap-2", !c.ok && c.required && "text-destructive")}
+        >
+          <span
+            className={cn(
+              "w-3.5 flex-none font-semibold",
+              c.ok ? "text-success" : c.required ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {c.ok ? "✓" : c.required ? "✗" : "–"}
+          </span>
           <span>
             {c.text}
             {!c.ok && c.fix ? (
               <>
                 <br />
-                <span className="note">{c.fix}</span>
+                <span className="text-xs text-muted-foreground">{c.fix}</span>
               </>
             ) : (
               ""
@@ -65,29 +89,28 @@ function SubtitleStyles({
   /* Subtitle groups often give each sign its own style with a line or two, so only the ticked styles and the next
      few biggest are shown at first. */
   const [all, setAll] = useState(false);
-  if (found.error) return <div className="note warn">{found.error}</div>;
-  if (!found.styles)
-    return <div className="note">{tr("正在读字幕…", "Reading the subtitles…")}</div>;
+  if (found.error) return <Note warn>{found.error}</Note>;
+  if (!found.styles) return <Note>{tr("正在读字幕…", "Reading the subtitles…")}</Note>;
   const format = (found.format ?? "").toUpperCase();
   const said = languageNames(found.languages ?? []);
   const read = tr(`${format}，${found.encoding}，${said}`, `${format}, ${found.encoding}, ${said}`);
   if (found.styles.length === 0)
     return (
-      <div className="note warn">
+      <Note warn>
         {tr(`字幕里没有台词（${read}）`, `There are no dialogue lines in the subtitles (${read})`)}
-      </div>
+      </Note>
     );
   /* Marks such as speaker names that the text cleaning does not know, found in the picked styles. */
-  const marked = found.marked && <div className="note warn">{found.marked}</div>;
+  const marked = found.marked && <Note warn>{found.marked}</Note>;
   if (found.styles.length === 1)
     return (
       <>
-        <div className="note">
+        <Note>
           {tr(
             `读到 ${found.styles[0].lines} 句台词（${read}）`,
             `Read ${lines(found.styles[0].lines)} of dialogue (${read})`,
           )}
-        </div>
+        </Note>
         {marked}
       </>
     );
@@ -107,38 +130,42 @@ function SubtitleStyles({
   const hidden = ordered.filter((s) => !shown.includes(s));
   const hiddenLines = hidden.reduce((n, s) => n + s.lines, 0);
   return (
-    <div className="style-list">
-      <div className="note">
+    <div className="mt-1.5 flex flex-col gap-1.5">
+      <Note>
         {tr(
           `字幕（${read}）里的台词分几种样式。勾上的切成片段；歌词、招牌字之类的不用勾。已经自动选好，一般不用改，看看例句对不对就行。`,
           `The lines in these subtitles (${read}) come in several styles. Ticked styles are cut into clips; leave out song lyrics, signs and such. They are already picked automatically and rarely need changing; just check the sample lines.`,
         )}
-      </div>
+      </Note>
       {shown.map((s) => (
-        <label className="style-row" key={s.name}>
-          <input type="checkbox" checked={chosen.has(s.name)} onChange={() => toggle(s.name)} />
-          <span>
+        <label className="flex cursor-pointer items-start gap-2 text-[13px]" key={s.name}>
+          <Checkbox
+            className="mt-0.5"
+            checked={chosen.has(s.name)}
+            onCheckedChange={() => toggle(s.name)}
+          />
+          <span className="min-w-0">
             <b>{s.name}</b>{" "}
-            <span className="note">
+            <span className="text-xs text-muted-foreground">
               {lines(s.lines)} · {minutes(s.first)}–{minutes(s.last)}
             </span>
-            <span className="samples">{s.samples.join(" ／ ")}</span>
+            <span className="block max-w-[560px] truncate text-xs text-muted-foreground">
+              {s.samples.join(" ／ ")}
+            </span>
           </span>
         </label>
       ))}
       {hidden.length > 0 && (
         <div>
-          <button type="button" className="ghost" onClick={() => setAll(true)}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setAll(true)}>
             {tr(
               `还有 ${hidden.length} 种样式，共 ${hiddenLines} 句`,
               `${many(hidden.length, "more style")}, ${lines(hiddenLines)} in all`,
             )}
-          </button>
+          </Button>
         </div>
       )}
-      {chosen.size === 0 && (
-        <div className="note warn">{tr("至少勾一种", "Tick at least one")}</div>
-      )}
+      {chosen.size === 0 && <Note warn>{tr("至少勾一种", "Tick at least one")}</Note>}
       {marked}
     </div>
   );
@@ -175,7 +202,7 @@ function useAnswer<T>(url: string, path: string): Answer<T> | null {
 /* Which audio track the voices are taken from, and the language it speaks. */
 function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) {
   if (!tracks.tracks.length)
-    return <div className="note warn">{tr("视频里没有音轨", "The video has no audio track")}</div>;
+    return <Note warn>{tr("视频里没有音轨", "The video has no audio track")}</Note>;
   const tagged = tracks.tracks.find((t) => t.language === spoken);
   const used = tagged ?? tracks.tracks.find((t) => t.default) ?? tracks.tracks[0];
   const what = [
@@ -185,7 +212,7 @@ function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) 
     .filter(Boolean)
     .join(tr("，", ", "));
   return (
-    <div className={`note ${tagged || tracks.tracks.length === 1 ? "" : "warn"}`}>
+    <Note warn={!(tagged || tracks.tracks.length === 1)}>
       {tr(
         `共 ${tracks.tracks.length} 条音轨，人声从第 ${used.number + 1} 条（${what}）取`,
         `${many(tracks.tracks.length, "audio track")}; the voices are taken from track ${used.number + 1} (${what})`,
@@ -196,7 +223,7 @@ function TrackNote({ tracks, spoken }: { tracks: AudioTracks; spoken: string }) 
           `。没有标成${languageName(spoken)}的音轨，确认一下`,
           `. No track is tagged ${languageName(spoken)}; check it`,
         )}
-    </div>
+    </Note>
   );
 }
 
@@ -355,35 +382,47 @@ export function AddEpisode({
       stopped: tr(`${adding.episode} 已停下`, `${adding.episode} was stopped`),
     }[adding.state];
   return (
-    <div className="add-episode">
+    <div className="flex flex-col gap-3.5">
       {adding && adding.state !== "idle" && (
-        <div className={`add-run ${adding.state}`}>
-          <div className="add-head">
+        <div
+          className={cn(
+            "flex flex-col gap-2 rounded-xl border px-3 py-2.5",
+            adding.state === "done" && "bg-success/10",
+            adding.state === "failed" && "border-destructive",
+          )}
+        >
+          <div className="flex items-center gap-2.5">
             <b>{heading}</b>
-            <span className="note">{minutes(adding.seconds)}</span>
-            <span className="spacer"></span>
+            <span className="text-xs text-muted-foreground">{minutes(adding.seconds)}</span>
+            <span className="flex-1"></span>
             {running && (
-              <button disabled={busy} onClick={stop}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={stop}>
                 {tr("停下", "Stop")}
-              </button>
+              </Button>
             )}
             {adding.state === "done" &&
               adding.episode &&
               state.episodes.some((e) => e.name === adding.episode) && (
-                <button className="primary" onClick={() => onOpen(adding.episode as string)}>
+                <Button size="sm" onClick={() => onOpen(adding.episode as string)}>
                   {tr(`打开 ${adding.episode}`, `Open ${adding.episode}`)}
-                </button>
+                </Button>
               )}
           </div>
-          <pre className="add-log" ref={log}>
+          <pre className={LOG} ref={log}>
             {adding.lines.join("\n") || tr("正在启动…", "Starting…")}
           </pre>
-          {running && adding.bar && <div className="note add-bar">{adding.bar}</div>}
+          {running && adding.bar && (
+            <Note className="overflow-hidden font-mono text-ellipsis whitespace-pre">
+              {adding.bar}
+            </Note>
+          )}
           {adding.state === "failed" && adding.errors?.length > 0 && (
-            <pre className="add-log errors">{adding.errors.slice(-15).join("\n")}</pre>
+            <pre className={cn(LOG, "bg-destructive/10 text-destructive")}>
+              {adding.errors.slice(-15).join("\n")}
+            </pre>
           )}
           {running && (
-            <div className="note">
+            <Note>
               {tr(
                 "有显卡时一集要几分钟，只用 CPU 会慢很多。可以关掉这个窗口接着标别的集，做完会提示。",
                 "With a GPU one episode takes a few minutes; on the CPU it takes much longer. You can close this and keep labeling other episodes; you will be told when it is done.",
@@ -397,52 +436,63 @@ export function AddEpisode({
                     "切片段是最慢的一步，在这一步停下的话，下次要从头切。",
                     "Cutting the clips is the slowest step; if it stops during this step, the next run cuts them again from the start.",
                   )}
-            </div>
+            </Note>
           )}
-          {(adding.state === "failed" || adding.state === "stopped") && (
-            <div className="note">{after}</div>
-          )}
+          {(adding.state === "failed" || adding.state === "stopped") && <Note>{after}</Note>}
         </div>
       )}
       {unfinished.length > 0 && (
-        <div className="field">
-          <label className="title">{tr("没做完的集", "Unfinished episodes")}</label>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
+            {tr("没做完的集", "Unfinished episodes")}
+          </FieldLabel>
           {unfinished.map(([name, why]) => (
-            <div className="unfinished" key={name}>
+            <div className="mt-1 flex items-center gap-2.5" key={name}>
               <b>{name}</b>
-              <span className="note">{why}</span>
-              <button disabled={busy || running} onClick={() => run({ resume: name })}>
+              <span className="flex-1 text-xs text-muted-foreground">{why}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || running}
+                onClick={() => run({ resume: name })}
+              >
                 {tr("接着做", "Carry on")}
-              </button>
+              </Button>
               {state.not_cut?.includes(name) && (
-                <button
-                  className="ghost"
-                  disabled={busy || running}
-                  title={tr(
+                <Tip
+                  text={tr(
                     "删掉这一集的记录和做了一半的文件",
                     "Delete its record and half-built files",
                   )}
-                  onClick={() => forget(name)}
                 >
-                  {tr("不要了", "Give up")}
-                </button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || running}
+                    onClick={() => forget(name)}
+                  >
+                    {tr("不要了", "Give up")}
+                  </Button>
+                </Tip>
               )}
             </div>
           ))}
-        </div>
+        </Field>
       )}
-      <form className="add-form" onSubmit={start}>
-        <div className="field">
-          <label className="title">{tr("收集声音做什么用", "What the voices are for")}</label>
-          <span className="seg">
-            <button type="button" className={text ? "on" : ""} onClick={() => onPurpose("tts")}>
-              {tr("语音合成（GPT-SoVITS 等）", "Speech synthesis (GPT-SoVITS and such)")}
-            </button>
-            <button type="button" className={text ? "" : "on"} onClick={() => onPurpose("audio")}>
-              {tr("只要声音（RVC 等）", "Sound only (RVC and such)")}
-            </button>
-          </span>
-          <div className="note">
+      <form className="flex flex-col gap-3" onSubmit={start}>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
+            {tr("收集声音做什么用", "What the voices are for")}
+          </FieldLabel>
+          <Choice<Purpose>
+            value={text ? "tts" : "audio"}
+            options={[
+              ["tts", tr("语音合成（GPT-SoVITS 等）", "Speech synthesis (GPT-SoVITS and such)")],
+              ["audio", tr("只要声音（RVC 等）", "Sound only (RVC and such)")],
+            ]}
+            onPick={onPurpose}
+          />
+          <Note>
             {text
               ? tr(
                   "语音合成要每句说的话，用这一集说的语言（一般是日语），所以要有这种语言的字幕。",
@@ -452,10 +502,12 @@ export function AddEpisode({
                   "只要声音就不用管台词文字，什么语言的字幕都行。以后在导出页也能改。",
                   "Sound only needs no text, so subtitles in any language will do. You can change this later on the Export page.",
                 )}
-          </div>
-        </div>
-        <div className="field">
-          <label className="title">{tr("视频文件", "Video file")}</label>
+          </Note>
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
+            {tr("视频文件", "Video file")}
+          </FieldLabel>
           <PathInput
             kind="video"
             value={video}
@@ -465,29 +517,35 @@ export function AddEpisode({
           />
           {tracks &&
             (tracks.error ? (
-              <div className="note warn">{tracks.error}</div>
+              <Note warn>{tracks.error}</Note>
             ) : (
               tracks.tracks && <TrackNote tracks={tracks as AudioTracks} spoken={heard} />
             ))}
-        </div>
-        <div className="field">
-          <label className="title">{tr("说的语言", "Language spoken")}</label>
-          <select value={spoken} onChange={(e) => setSpoken(e.target.value)}>
-            <option value="">
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
+            {tr("说的语言", "Language spoken")}
+          </FieldLabel>
+          <NativeSelect
+            className="max-w-fit"
+            value={spoken}
+            onChange={(e) => setSpoken(e.target.value)}
+          >
+            <NativeSelectOption value="">
               {tracks?.language
                 ? tr(
                     `按音轨标的：${languageName(tracks.language)}`,
                     `From the audio track: ${languageName(tracks.language)}`,
                   )
                 : tr("按音轨标的（没标就算日语）", "From the audio track (Japanese if not tagged)")}
-            </option>
+            </NativeSelectOption>
             {SPOKEN.map((code) => (
-              <option key={code} value={code}>
+              <NativeSelectOption key={code} value={code}>
                 {languageName(code)}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-          <div className="note">
+          </NativeSelect>
+          <Note>
             {text
               ? tr(
                   "人声从这种语言的音轨取，导出的文字也要是这种语言。双语视频里想要配音版的声音，就在这里选配音的语言。",
@@ -497,10 +555,10 @@ export function AddEpisode({
                   "人声从这种语言的音轨取。双语视频里想要配音版的声音，就在这里选配音的语言。",
                   "The voices are taken from the audio track in this language. For the dub of a dual-audio video, pick the dub's language here.",
                 )}
-          </div>
-        </div>
-        <div className="field">
-          <label className="title">
+          </Note>
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
             {text
               ? tr(
                   "对白字幕（ASS 或 SRT，按它切台词。最好用说的语言的字幕）",
@@ -510,7 +568,7 @@ export function AddEpisode({
                   "对白字幕（ASS 或 SRT，按它切台词）",
                   "Dialogue subtitles (ASS or SRT; lines are cut from it)",
                 )}
-          </label>
+          </FieldLabel>
           <PathInput
             kind="subtitles"
             value={subtitles}
@@ -522,7 +580,7 @@ export function AddEpisode({
             <SubtitleStyles key={subtitles} found={found} chosen={chosen} setChosen={setChosen} />
           )}
           {found?.languages?.length === 1 && found.languages[0] === heard && (
-            <div className="note">
+            <Note>
               {text
                 ? tr(
                     "对白字幕就是说的语言：每段片段的文字就是它自己那一句。一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
@@ -532,16 +590,16 @@ export function AddEpisode({
                     "对白字幕就是说的语言：一条字幕里有两个人说话（用「－」或名字标出）的，按人分开切。",
                     "The dialogue subtitles are in the language spoken: an entry where two people speak (marked with a dash or a name) is cut into one clip per person.",
                   )}
-            </div>
+            </Note>
           )}
-        </div>
-        <div className="field">
-          <label className="title">
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
             {tr(
               "显示用字幕（可以不填。对白字幕是你看不懂的语言时，配一份译文，标注时显示在台词上面；导出不用它）",
               "Display subtitles (optional. If you don't read the dialogue subtitles' language, add a translation; it is shown above each line while labeling, and never exported)",
             )}
-          </label>
+          </FieldLabel>
           <PathInput
             kind="subtitles"
             value={displaySubtitles}
@@ -549,15 +607,15 @@ export function AddEpisode({
             placeholder="D:\anime\Episode 01.zh.ass"
             toast={toast}
           />
-        </div>
+        </Field>
         {text && (
-          <div className="field">
-            <label className="title">
+          <Field className="gap-1.5">
+            <FieldLabel className="text-xs font-normal text-muted-foreground">
               {tr(
                 "台词文字字幕（可以不填。对白字幕是译文时，配一份原声语言的字幕，导出的文字从它取）",
                 "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)",
               )}
-            </label>
+            </FieldLabel>
             <PathInput
               kind="subtitles"
               value={textSubtitles}
@@ -565,9 +623,9 @@ export function AddEpisode({
               placeholder="D:\anime\Episode 01.ja.srt"
               toast={toast}
             />
-            {textFound?.error && <div className="note warn">{textFound.error}</div>}
+            {textFound?.error && <Note warn>{textFound.error}</Note>}
             {textFound?.languages && (
-              <div className={`note ${textFound.languages.includes(heard) ? "" : "warn"}`}>
+              <Note warn={!textFound.languages.includes(heard)}>
                 {textFound.languages.includes(heard)
                   ? tr(
                       `${languageNames(textFound.languages)}，导出的文字取其中的${languageName(heard)}`,
@@ -577,45 +635,46 @@ export function AddEpisode({
                       `这份字幕是${languageNames(textFound.languages)}，不是${languageName(heard)}，会被拒绝`,
                       `These subtitles are in ${languageNames(textFound.languages)}, not ${languageName(heard)}, so they will be refused`,
                     )}
-              </div>
+              </Note>
             )}
             {!textSubtitles.trim() &&
               found?.languages &&
               found.languages.length > 0 &&
               !found.languages.includes(heard) && (
-                <div className="note warn">
+                <Note warn>
                   {tr(
                     `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。导出 GPT-SoVITS 或 Style-Bert-VITS2 要有${languageName(heard)}台词：现在配上，或者以后在导出页配。只导出音频（RVC）不需要。有${languageName(heard)}字幕的话，更好的做法是把它当对白字幕，这份当显示用字幕：按译文切的片段和原文时间对不齐，不少句子会导不出文字。`,
                     `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the ${languageName(heard)} text: attach it now, or later on the Export page. Audio-only export (RVC) does not need it. If you have ${languageName(heard)} subtitles, it is better to use them as the dialogue subtitles and these as the display subtitles: clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
                   )}
-                </div>
+                </Note>
               )}
-          </div>
+          </Field>
         )}
-        <div className="field">
-          <label className="title">{tr("字幕偏移（秒）", "Subtitle offset (seconds)")}</label>
-          <input
-            className="offset"
+        <Field className="gap-1.5">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">
+            {tr("字幕偏移（秒）", "Subtitle offset (seconds)")}
+          </FieldLabel>
+          <Input
+            className="max-w-[120px]"
             value={offset}
             onChange={(e) => setOffset(e.target.value)}
             placeholder={tr("自动测", "measure")}
           />
-          <div className="note">
+          <Note>
             {tr(
               "字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。不知道就填 0，或者空着让它自动测（要 Hugging Face 令牌）。",
               "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. If you don't know, try 0, or leave it empty to measure it (needs a Hugging Face token).",
             )}
-          </div>
-        </div>
-        <div className="note">
+          </Note>
+        </Field>
+        <Note>
           {tr(
             "按「浏览…」选文件，或者把整段路径粘贴进框里。Windows 上按住 Shift 右键文件，选「复制文件地址」。",
             'Press "Browse…" to pick each file, or paste its full path into the box. On Windows, hold Shift, right-click the file, and choose "Copy as path".',
           )}
-        </div>
+        </Note>
         <div>
-          <button
-            className="primary"
+          <Button
             type="submit"
             disabled={
               busy ||
@@ -626,7 +685,7 @@ export function AddEpisode({
             }
           >
             {tr("开始", "Start")}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -635,11 +694,13 @@ export function AddEpisode({
 
 export function AddDialog({ onClose, ...props }: AddEpisodeProps & { onClose: () => void }) {
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="help add-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2>{tr("加一集", "Add an episode")}</h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-[680px]">
+        <DialogHeader>
+          <DialogTitle>{tr("加一集", "Add an episode")}</DialogTitle>
+        </DialogHeader>
         <AddEpisode {...props} />
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { App } from "./App";
 import { startLanguage } from "./language";
 import "./index.css";
@@ -12,6 +13,9 @@ addEventListener("hashchange", () => location.reload());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    {/* Hints show after a short pause, so they don't flicker up while the mouse just passes over. */}
+    <TooltipProvider delay={500}>
+      <App />
+    </TooltipProvider>
   </StrictMode>,
 );
