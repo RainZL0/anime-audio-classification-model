@@ -588,7 +588,7 @@ export function AddEpisode({
             kind="video"
             value={video}
             onChange={setVideo}
-            placeholder="D:\anime\Episode 01.mkv"
+            placeholder={tr("视频文件的路径", "Path to the video file")}
             toast={toast}
           />
           {tracks &&
@@ -628,7 +628,7 @@ export function AddEpisode({
             kind="subtitles"
             value={subtitles}
             onChange={setSubtitles}
-            placeholder="D:\anime\Episode 01.ja.srt"
+            placeholder={tr("对白字幕文件的路径", "Path to the dialogue subtitles")}
             toast={toast}
           />
           {!found && (
@@ -675,7 +675,7 @@ export function AddEpisode({
             kind="subtitles"
             value={displaySubtitles}
             onChange={setDisplaySubtitles}
-            placeholder="D:\anime\Episode 01.zh.ass"
+            placeholder={tr("显示用字幕文件的路径", "Path to the display subtitles")}
             toast={toast}
           />
           <Note>
