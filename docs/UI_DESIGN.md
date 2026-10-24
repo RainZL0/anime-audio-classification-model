@@ -49,7 +49,8 @@ The colors below are the theme's color names (set in `web/src/index.css`), not f
 - The top bar stays on one line and inside the window. As the window narrows, the least needed parts are left out whole rather than cut short: first the training note (it still shows while retraining), then the "All episodes" label. What belongs to one episode, such as its progress, is not in the top bar but in the summary at the top of Groups and Scenes. The buttons do not move off screen.
 - **Each part fits the width of its own area, not of the window**, because the divider between the stage and the list can make either side narrow. When there is not enough room, parts wrap or move to a line of their own: text is never squeezed into a thin column, a name never shrinks to nothing, and nothing scrolls sideways.
 - **A box is as wide as what it holds needs**, so there is no wide empty gap, for example between a name and its numbers.
-- **The summary at the top of a list stays on screen while scrolling**, as in Groups and Scenes, where the episode, its progress, its counts and the filters stay at the top; in Scenes the stuck scene header sits right below them. shows which episode each line is from.**
+- **The summary at the top of a list stays on screen while scrolling**, as in Groups and Scenes, where the episode, its progress, its counts and the filters stay at the top; in Scenes the stuck scene header sits right below them.
+- **A list that covers all episodes shows which episode each line is from.**
 - Choices of the same kind sit together in one row.
 - A button that cannot be used yet is shown grayed out, not hidden, so nothing jumps when it becomes usable. For example, the chips under a group stay gray until a line is ticked.
 - A count is shown once, next to what it counts, not repeated on every button.
