@@ -26,7 +26,7 @@ export type View = "groups" | "scene" | "roles" | "export";
 
 /* Groups and Scenes show the episode picked on the left; Characters and Export cover all episodes. */
 const EPISODE_VIEWS = (): [View, string, string][] => [
-  ["groups", tr("起步分组", "Groups"), "G"],
+  ["groups", tr("机器分组", "Guessed groups"), "G"],
   ["scene", tr("场景", "Scenes"), "S"],
 ];
 const ALL_VIEWS = (): [View, string, string][] => [
@@ -120,8 +120,8 @@ export function TopBar(p: TopBarProps) {
               perEpisode
                 ? undefined
                 : tr(
-                    "「角色」和「导出」看的是全部集数，换集只影响「起步分组」和「场景」",
-                    "Characters and Export cover all episodes; switching only changes Groups and Scenes",
+                    "「角色」和「导出」看的是全部集数，换集只影响「机器分组」和「场景」",
+                    "Characters and Export cover all episodes; switching only changes Guessed groups and Scenes",
                   )
             }
           >

@@ -102,7 +102,7 @@ export function GroupsView({
       {/* Says why there is nothing to do here, then where the work goes on. Wider than usual, so each step fits on one line when there is room. */}
       {groups.length === 0 && (
         <Empty
-          title={tr("「起步分组」里没有要做的了", "No more work to do in Groups")}
+          title={tr("「机器分组」里没有要做的了", "No more work to do in Guessed groups")}
           className="max-w-4xl"
         >
           <p>
@@ -192,7 +192,7 @@ export function GroupsView({
           return (
             <Card key={g.key} className={cn("gap-2.5 p-3.5", done && "opacity-60")}>
               <h3 className="flex items-center gap-2 text-sm font-semibold">
-                {tr(`第 ${gi + 1} 组`, `Group ${gi + 1}`)}
+                {tr(`第 ${gi + 1} 组 · 像同一个人`, `Group ${gi + 1} · sounds like one person`)}
                 <span className="text-xs font-normal text-muted-foreground">
                   {lines(g.size)} · {tr(`${g.seconds} 秒`, `${g.seconds} s`)}
                   {done ? tr(" · 都标好了", " · all labeled") : ""}

@@ -71,7 +71,10 @@ export function Help({ onClose, onGuide }: { onClose: () => void; onGuide: () =>
     ],
     [
       "[G] / [S] / [O] / [E]",
-      tr("切到起步分组 / 场景 / 角色 / 导出", "Go to Groups / Scenes / Characters / Export"),
+      tr(
+        "切到机器分组 / 场景 / 角色 / 导出",
+        "Go to Guessed groups / Scenes / Characters / Export",
+      ),
     ],
     [
       tr("截头像时 [Enter] / [Esc]", "[Enter] / [Esc] when cropping"),
