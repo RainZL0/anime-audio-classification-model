@@ -256,13 +256,11 @@ export function AddEpisode({
   const last = [...state.episodes].reverse().find((e) => e.offset != null);
   const [video, setVideo] = useState("");
   const [subtitles, setSubtitles] = useState("");
-  const [textSubtitles, setTextSubtitles] = useState("");
   const [displaySubtitles, setDisplaySubtitles] = useState("");
   const [offset, setOffset] = useState(last ? String(last.offset) : "");
   /* "" lets the audio track's tag decide. */
   const [spoken, setSpoken] = useState("");
   const tracks = useAnswer<AudioTracks>("/api/audio-tracks", video);
-  const textFound = useAnswer<Styles>("/api/subtitle-styles", textSubtitles);
   const heard = spoken || tracks?.language || "ja";
   const [busy, setBusy] = useState(false);
   /* The server's answer, and the text of the box it answers. */
@@ -325,7 +323,6 @@ export function AddEpisode({
     run({
       video,
       subtitles,
-      text_subtitles: text ? textSubtitles : "",
       display_subtitles: displaySubtitles,
       offset: seconds,
       styles,
@@ -528,7 +525,7 @@ export function AddEpisode({
         </Field>
         <Field className="gap-1.5">
           <FieldLabel className="text-xs font-normal text-muted-foreground">
-            {tr("说的语言", "Language spoken")}
+            {tr("角色说哪种语言", "Language the characters speak")}
           </FieldLabel>
           <NativeSelect
             className="max-w-fit"
@@ -538,10 +535,10 @@ export function AddEpisode({
             <NativeSelectOption value="">
               {tracks?.language
                 ? tr(
-                    `按音轨标的：${languageName(tracks.language)}`,
-                    `From the audio track: ${languageName(tracks.language)}`,
+                    `${languageName(tracks.language)}（音轨上标的）`,
+                    `${languageName(tracks.language)} (as the audio track says)`,
                   )
-                : tr("按音轨标的（没标就算日语）", "From the audio track (Japanese if not tagged)")}
+                : tr("日语（音轨没标语言时默认）", "Japanese (when the audio track doesn't say)")}
             </NativeSelectOption>
             {SPOKEN.map((code) => (
               <NativeSelectOption key={code} value={code}>
@@ -550,15 +547,10 @@ export function AddEpisode({
             ))}
           </NativeSelect>
           <Note>
-            {text
-              ? tr(
-                  "人声从这种语言的音轨取，导出的文字也要是这种语言。双语视频里想要配音版的声音，就在这里选配音的语言。",
-                  "The voices are taken from the audio track in this language, and exported text must be in it too. For the dub of a dual-audio video, pick the dub's language here.",
-                )
-              : tr(
-                  "人声从这种语言的音轨取。双语视频里想要配音版的声音，就在这里选配音的语言。",
-                  "The voices are taken from the audio track in this language. For the dub of a dual-audio video, pick the dub's language here.",
-                )}
+            {tr(
+              "一般不用改。视频里有原声和配音两条音轨时，选你要收集的那种语言。",
+              "Usually leave it as is. If the video has both the original voices and a dub, pick the language of the voices you want.",
+            )}
           </Note>
         </Field>
         <Field className="gap-1.5">
@@ -596,6 +588,18 @@ export function AddEpisode({
                   )}
             </Note>
           )}
+          {/* Speech synthesis needs the words in the language spoken, which a translation can't give. */}
+          {text &&
+            found?.languages &&
+            found.languages.length > 0 &&
+            !found.languages.includes(heard) && (
+              <Note warn>
+                {tr(
+                  `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。语音合成的导出要${languageName(heard)}台词。有${languageName(heard)}字幕的话，把它填在这里，这份填到下面的显示用字幕；没有的话，以后也能在导出页配${languageName(heard)}字幕，但按译文切的片段和原文对不齐，不少句子会导不出文字。`,
+                  `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exports for speech synthesis need the ${languageName(heard)} words. If you have ${languageName(heard)} subtitles, put them here and these under display subtitles below. Otherwise you can attach ${languageName(heard)} subtitles later on the Export page, but clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
+                )}
+              </Note>
+            )}
         </Field>
         <Field className="gap-1.5">
           <FieldLabel className="text-xs font-normal text-muted-foreground">
@@ -612,48 +616,6 @@ export function AddEpisode({
             toast={toast}
           />
         </Field>
-        {text && (
-          <Field className="gap-1.5">
-            <FieldLabel className="text-xs font-normal text-muted-foreground">
-              {tr(
-                "台词文字字幕（可以不填。对白字幕是译文时，配一份原声语言的字幕，导出的文字从它取）",
-                "Text subtitles (optional. If the dialogue subtitles are a translation, add subtitles in the language spoken; exported text is taken from them)",
-              )}
-            </FieldLabel>
-            <PathInput
-              kind="subtitles"
-              value={textSubtitles}
-              onChange={setTextSubtitles}
-              placeholder="D:\anime\Episode 01.ja.srt"
-              toast={toast}
-            />
-            {textFound?.error && <Note warn>{textFound.error}</Note>}
-            {textFound?.languages && (
-              <Note warn={!textFound.languages.includes(heard)}>
-                {textFound.languages.includes(heard)
-                  ? tr(
-                      `${languageNames(textFound.languages)}，导出的文字取其中的${languageName(heard)}`,
-                      `${languageNames(textFound.languages)}; the ${languageName(heard)} lines are exported`,
-                    )
-                  : tr(
-                      `这份字幕是${languageNames(textFound.languages)}，不是${languageName(heard)}，会被拒绝`,
-                      `These subtitles are in ${languageNames(textFound.languages)}, not ${languageName(heard)}, so they will be refused`,
-                    )}
-              </Note>
-            )}
-            {!textSubtitles.trim() &&
-              found?.languages &&
-              found.languages.length > 0 &&
-              !found.languages.includes(heard) && (
-                <Note warn>
-                  {tr(
-                    `对白字幕是${languageNames(found.languages)}，这一集说${languageName(heard)}。导出 GPT-SoVITS 或 Style-Bert-VITS2 要有${languageName(heard)}台词：现在配上，或者以后在导出页配。只导出音频（RVC）不需要。有${languageName(heard)}字幕的话，更好的做法是把它当对白字幕，这份当显示用字幕：按译文切的片段和原文时间对不齐，不少句子会导不出文字。`,
-                    `The dialogue subtitles are in ${languageNames(found.languages)}, but this episode speaks ${languageName(heard)}. Exporting for GPT-SoVITS or Style-Bert-VITS2 needs the ${languageName(heard)} text: attach it now, or later on the Export page. Audio-only export (RVC) does not need it. If you have ${languageName(heard)} subtitles, it is better to use them as the dialogue subtitles and these as the display subtitles: clips cut from a translation often don't line up with the original lines, and many cannot be exported with text.`,
-                  )}
-                </Note>
-              )}
-          </Field>
-        )}
         <Field className="gap-1.5">
           <FieldLabel className="text-xs font-normal text-muted-foreground">
             {tr("字幕偏移（秒）", "Subtitle offset (seconds)")}
