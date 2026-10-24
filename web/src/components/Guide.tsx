@@ -106,12 +106,12 @@ export function Guide({ onClose, onStart }: { onClose: () => void; onStart: () =
       key: "E",
       scope: allEpisodes,
       what: tr(
-        "把角色的句子写成 GPT-SoVITS、Style-Bert-VITS2 或 RVC 用的数据集。",
-        "Writes a character's lines as a dataset for GPT-SoVITS, Style-Bert-VITS2 or RVC.",
+        "把角色的句子写成 GPT-SoVITS 或 RVC 用的数据集。",
+        "Writes a character's lines as a dataset for GPT-SoVITS or RVC.",
       ),
       when: tr(
-        "标够了以后，选角色和格式导出。要带文字的格式，台词得是视频里说的语言，这里能给每集补配字幕。",
-        "When you have enough, pick the character and the format, and export. Formats with text need the words in the language spoken; you can attach subtitles for each episode here.",
+        "标够了以后，选角色和格式导出。GPT-SoVITS 要的台词得是视频里说的语言，这里能给每集补配字幕。",
+        "When you have enough, pick the character and the format, and export. GPT-SoVITS needs the words in the language spoken; you can attach subtitles for each episode here.",
       ),
     },
   ];

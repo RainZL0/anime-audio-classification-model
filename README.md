@@ -4,7 +4,7 @@
 
 **English** · [简体中文](README.zh.md)
 
-**Turn anime episodes into a voice dataset for one character: clean clips, each with its line, ready for GPT-SoVITS, Style-Bert-VITS2 and RVC.**
+**Turn anime episodes into a voice dataset for one character: clean clips, each with its line, ready for GPT-SoVITS and RVC.**
 
 [![CI](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -19,7 +19,7 @@
 
 ## Why
 
-To train a voice model of one character (GPT-SoVITS, Style-Bert-VITS2, RVC), you need minutes or hours of that character speaking alone, each clip with its line. Doing it by hand means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
+To train a voice model of one character (GPT-SoVITS, RVC), you need minutes or hours of that character speaking alone, each clip with its line. Doing it by hand means scrubbing through every episode. Most tools stop at speaker diarization (grouping lines by which voice they sound like) and leave naming and checking the groups to you.
 
 Here you label a few clips while watching the scene. A small model learns your character, sorts the rest, and **retrains in a few seconds every time you correct it**, so its other guesses update right away.
 
@@ -31,7 +31,7 @@ Here you label a few clips while watching the scene. A small model learns your c
 - 📺 **Label while watching.** The video plays with each line, with more context one key away.
 - ⌨️ **Keyboard first,** with undo.
 - 🈶 **Text in the language spoken.** Cut with translated or bilingual subtitles; the exported text is always the words actually said, and each clip shows it while you label.
-- 📦 **Export** to GPT-SoVITS, Style-Bert-VITS2, or one folder per character (for RVC), at the original sample rate.
+- 📦 **Export** to GPT-SoVITS or one folder per character (for RVC), at the original sample rate.
 - 🔒 **Runs on your machine.** Nothing is uploaded.
 
 ## Quick start
@@ -89,7 +89,6 @@ You only name the characters you want (the targets). Everyone else gets a single
 | Format | Output |
 | --- | --- |
 | GPT-SoVITS | Clips and `train.list` with each line's text |
-| Style-Bert-VITS2 | Clips and `esd.list` with each line's text |
 | One folder per character | Plain audio clips, for RVC and other tools that need no text |
 
 Clips are cut from the separated vocals at the original sample rate. The text is in the language spoken. Clips whose text cannot be matched completely are left out and listed in `rejected.tsv`.

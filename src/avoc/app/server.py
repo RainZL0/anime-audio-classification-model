@@ -37,8 +37,6 @@ MAYBE_FLOOR = 0.05
 target is at least this number."""
 UNUSABLE = Words("人标了质量低", "marked low quality")
 """Why a clip someone marked low quality was skipped on export, as written in rejected.tsv."""
-STYLE_BERT_VITS2 = {"ja": "JP", "zh": "ZH", "en": "EN"}
-"""The language codes Style-Bert-VITS2 writes in esd.list. It has no Korean."""
 MAYBE_LIMIT = 100
 """The "possibly missed" list shows at most this many clips, most likely first."""
 CONTEXT_SECONDS = (5, 15)
@@ -574,15 +572,6 @@ class AppState:
                 language = self.workspace.spoken[clip.episode].language
                 wanted.add(language)
                 text, reason = self.text_of(clip, tag)
-                if (
-                    reason is None
-                    and form == "style-bert-vits2"
-                    and language not in STYLE_BERT_VITS2
-                ):
-                    reason = say(
-                        f"Style-Bert-VITS2 不支持{name_of(language)}",
-                        f"Style-Bert-VITS2 does not take {name_of(language)}",
-                    )
                 if reason is None:
                     texts[clip.id] = text
                     kept.append(clip)
@@ -597,7 +586,7 @@ class AppState:
         rejected.tsv; see `spoken_of`."""
         from avoc.stages.export import export, summarize
 
-        if form not in ("gpt-sovits", "style-bert-vits2", "folder"):
+        if form not in ("gpt-sovits", "folder"):
             raise ValueError(say("不认识的导出格式", "unknown export format"))
         if out.exists() and any(out.iterdir()):
             raise ValueError(
@@ -657,12 +646,8 @@ class AppState:
             language = self.workspace.spoken[item.episode].language
             if form == "gpt-sovits":
                 lines.append(f"{item.path.resolve()}|{item.name}|{language}|{text}")
-            elif form == "style-bert-vits2":
-                rel = item.path.relative_to(out).as_posix()
-                lines.append(f"{rel}|{item.name}|{STYLE_BERT_VITS2[language]}|{text}")
         if lines:
-            listing = out / ("esd.list" if form == "style-bert-vits2" else "train.list")
-            listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            (out / "train.list").write_text("\n".join(lines) + "\n", encoding="utf-8")
         if rejected:
             _write_rejected(out / "rejected.tsv", rejected)
         reasons = Counter(r["reason"] for r in rejected)

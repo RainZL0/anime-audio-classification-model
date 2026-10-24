@@ -4,7 +4,7 @@
 
 [English](README.md) · **简体中文**
 
-**把动画剧集整理成一个角色的语音数据集：干净的切片，每段都带台词，可直接用于 GPT-SoVITS、Style-Bert-VITS2 和 RVC。**
+**把动画剧集整理成一个角色的语音数据集：干净的切片，每段都带台词，可直接用于 GPT-SoVITS 和 RVC。**
 
 [![CI](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/RainZL0/anime-voice-collector/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -19,7 +19,7 @@
 
 ## 为什么做这个
 
-想训练某个角色的声音模型（GPT-SoVITS、Style-Bert-VITS2、RVC），需要这个角色单独说话的几分钟音频，每段还要配上台词。手工做就得把每一集从头拖到尾。多数工具只做到说话人分离（按声音像谁把台词分成几组），给每组起名字、逐条检查还是要你自己来。
+想训练某个角色的声音模型（GPT-SoVITS、RVC），需要这个角色单独说话的几分钟音频，每段还要配上台词。手工做就得把每一集从头拖到尾。多数工具只做到说话人分离（按声音像谁把台词分成几组），给每组起名字、逐条检查还是要你自己来。
 
 在这里，你一边看画面一边标几条。一个小模型学会你的角色，把剩下的分好类，而且**每次你纠正它，几秒内就重新训练**，其他的猜测马上跟着更新。
 
@@ -31,7 +31,7 @@
 - 📺 **边看边标。** 每句台词都配着视频播放，按一个键就能看前后更多内容。
 - ⌨️ **以键盘操作为主**，可以撤销。
 - 🈶 **台词用原声语言。** 用翻译字幕或双语字幕切分也可以；导出的文字始终是角色实际说的话，标注时每段也会显示它。
-- 📦 **导出**为 GPT-SoVITS、Style-Bert-VITS2 格式，或每个角色一个文件夹（给 RVC 用），保持原始采样率。
+- 📦 **导出**为 GPT-SoVITS 格式，或每个角色一个文件夹（给 RVC 用），保持原始采样率。
 - 🔒 **全部在本机运行。** 不上传任何东西。
 
 ## 快速开始
@@ -89,7 +89,6 @@ uv run avoc app workspace
 | 格式 | 输出 |
 | --- | --- |
 | GPT-SoVITS | 切片，以及带每句台词的 `train.list` |
-| Style-Bert-VITS2 | 切片，以及带每句台词的 `esd.list` |
 | 每个角色一个文件夹 | 纯音频切片，给 RVC 等不需要文字的工具用 |
 
 切片从分离出的人声中切出，保持原始采样率。文字是原声语言。文字无法完整对上的切片不会导出，列在 `rejected.tsv` 里。

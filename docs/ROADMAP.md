@@ -4,7 +4,7 @@ This page covers who the tool is for, the direction it takes, and what is planne
 
 ## Who it is for
 
-- Mainly, people who want to train a voice model for one character (GPT-SoVITS, Style-Bert-VITS2, RVC and so on), and who need clean audio of that character speaking alone, with the line in the language spoken.
+- Mainly, people who want to train a voice model for one character (GPT-SoVITS, RVC and so on), and who need clean audio of that character speaking alone, with the line in the language spoken.
 - Second, people who want to find all of a character's lines.
 
 ## Direction

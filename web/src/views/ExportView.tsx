@@ -162,7 +162,7 @@ function SpokenTexts({
     </div>
   );
 }
-type Form = "gpt-sovits" | "style-bert-vits2" | "folder";
+type Form = "gpt-sovits" | "folder";
 
 export function ExportView({
   state,
@@ -225,7 +225,6 @@ export function ExportView({
   };
   const forms: [Form, string][] = [
     ["gpt-sovits", "GPT-SoVITS"],
-    ["style-bert-vits2", "Style-Bert-VITS2"],
     ["folder", tr("只要音频（RVC）", "Audio only (RVC)")],
   ];
   return (

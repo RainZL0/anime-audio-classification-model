@@ -174,10 +174,6 @@ def test_export_takes_text_from_the_attached_subtitles_and_reports_the_rest(
     assert report[0].startswith("角色\t集\t开始") and len(report) == 4
     assert "中文4" in report[1]
 
-    sbv2 = tmp_path / "sbv2"
-    client.post("/api/export", json={**body, "form": "style-bert-vits2", "out": str(sbv2)})
-    assert (sbv2 / "esd.list").read_text("utf-8").split("\n")[0].split("|")[2] == "JP"
-
     # Saying the episode speaks Chinese makes the attached Japanese file the wrong language.
     changed = client.post("/api/spoken-language", json={"episode": "ep1", "language": "zh"})
     spoken = changed.json()["episodes"][0]["spoken"]
