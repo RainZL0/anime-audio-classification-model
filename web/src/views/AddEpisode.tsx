@@ -686,7 +686,13 @@ export function AddEpisode({
           </Note>
           <DisplayNote path={displaySubtitles} />
         </Section>
-        <Section title={tr("字幕偏移（秒）", "Subtitle offset (seconds)")}>
+        <Section
+          title={tr("字幕偏移（秒）", "Subtitle offset (seconds)")}
+          aside={tr(
+            "空着就自动测（要 Hugging Face 令牌）",
+            "leave it empty to measure it (needs a Hugging Face token)",
+          )}
+        >
           <Input
             className="max-w-[120px]"
             value={offset}
@@ -696,12 +702,12 @@ export function AddEpisode({
           <Note>
             {last
               ? tr(
-                  "字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。换了片源或字幕组的话，清空让它重新测（要 Hugging Face 令牌）。",
-                  "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. For another source or subtitle group, empty it to measure again (needs a Hugging Face token).",
+                  "字幕时间要加几秒才和声音对上。同一片源、同一字幕组的每一集都一样，所以默认填上一集的值。换了片源或字幕组的话，清空让它重新测。",
+                  "How many seconds to add to the subtitle times so they line up with the sound. It is the same for every episode from the same source and subtitle group, so the last episode's value is filled in. For another source or subtitle group, empty it to measure again.",
                 )
               : tr(
-                  "字幕时间要加几秒才和声音对上。空着就自动测（要 Hugging Face 令牌），之后同一片源、同一字幕组的集会默认填上这个值。没有令牌的话先填 0。",
-                  "How many seconds to add to the subtitle times so they line up with the sound. Leave it empty to measure it (needs a Hugging Face token); later episodes from the same source and subtitle group get this value filled in. Without a token, try 0.",
+                  "字幕时间要加几秒才和声音对上。测出来的值，之后同一片源、同一字幕组的集会默认填上。没有令牌的话先填 0。",
+                  "How many seconds to add to the subtitle times so they line up with the sound. Later episodes from the same source and subtitle group get the measured value filled in. Without a token, try 0.",
                 )}
           </Note>
         </Section>
